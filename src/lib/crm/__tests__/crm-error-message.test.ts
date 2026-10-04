@@ -34,6 +34,20 @@ describe("crmErrorMessage", () => {
     );
   });
 
+  it("explains why a consultation with upcoming bookings cannot be deleted", () => {
+    expect(
+      crmErrorMessage(
+        {
+          statusCode: 409,
+          message: "booking.error.eventTypeHasUpcomingBookings",
+        },
+        "fallback",
+      ),
+    ).toBe(
+      "This consultation has upcoming appointments. Cancel those first, then delete it.",
+    );
+  });
+
   it("strips Nest ConflictException stacks for booking slots", () => {
     const json = {
       statusCode: 409,

@@ -134,6 +134,8 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "That consultation was not found in the CRM. Open it and Save again.",
   "booking.error.eventTypeInactive":
     "This consultation is inactive in the CRM.",
+  "booking.error.eventTypeHasUpcomingBookings":
+    "This consultation has upcoming appointments. Cancel those first, then delete it.",
   "booking.error.hostRequired": "Choose a host for this appointment.",
   "booking.error.invalidDate": "That date or time is not valid for booking.",
 };

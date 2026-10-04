@@ -60,6 +60,53 @@ describe("native booking API smoke (CI)", () => {
     expect(merged[0]?.crmEventTypeId).toBe("et-1");
   });
 
+  it("keeps the consultation's saved working hours when CRM hours are the weekday default", () => {
+    const local: BookingPage = {
+      id: "local-hours",
+      title: "Day test",
+      slug: "day-test",
+      owner: "Ada",
+      eventType: "Consultation",
+      durationMinutes: 90,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: WEEKDAYS.map((day) => ({
+        day,
+        enabled: day !== "Saturday" && day !== "Sunday",
+        start: "09:00",
+        end: "17:00",
+      })),
+      questions: [],
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Live",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      crmEventTypeId: "et-hours",
+    };
+    const remote: BookingPage = {
+      ...local,
+      id: "et-hours",
+      availability: WEEKDAYS.map((day) => ({
+        day,
+        enabled: true,
+        start: "08:00",
+        end: "12:00",
+      })),
+    };
+    const merged = mergeCrmEventTypePages([local], [remote]);
+    expect(merged[0]?.availability.find((row) => row.day === "Monday")).toEqual({
+      day: "Monday",
+      enabled: true,
+      start: "09:00",
+      end: "17:00",
+    });
+    expect(merged[0]?.availability.find((row) => row.day === "Saturday")?.enabled).toBe(false);
+  });
+
   it("keeps local booking-form questions when the CRM event type has none", () => {
     const local: BookingPage = {
       id: "et-1",

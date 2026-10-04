@@ -87,4 +87,26 @@ describe("booking conferencing + guest email", () => {
     expect(copy.html).toContain("/book/test2/manage/tok-1");
     expect(copy.text).toContain("Join meeting:");
   });
+
+  it("tells an invited guest they were added, without cancel links", () => {
+    const copy = bookingConfirmEmailHtml({
+      guestName: "Razu Shrestha",
+      hostName: "nepatronixx web",
+      title: "Day test",
+      dateLabel: "4 Oct 2026",
+      timeLabel: "10:00 AM",
+      timezoneLabel: "Australia/Sydney",
+      reference: "NE-00002",
+      slug: "day-test",
+      manageToken: "tok-secret",
+      origin: "http://localhost:3000",
+      invited: true,
+    });
+    expect(copy.subject).toMatch(/invited/i);
+    expect(copy.text).toContain("Razu Shrestha invited you");
+    expect(copy.html).toContain("Razu Shrestha");
+    expect(copy.html).toContain("invited you");
+    expect(copy.html).not.toContain("tok-secret");
+    expect(copy.text).not.toContain("Reschedule");
+  });
 });

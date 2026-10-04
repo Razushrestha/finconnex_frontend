@@ -80,6 +80,8 @@ export type AppointmentSlot = {
   label: string;
   /** Every host who is free at this instant. */
   hostIds: string[];
+  /** True when this start was filled from consultation hours, not CRM. */
+  fromHours?: boolean;
 };
 
 function validZone(timeZone: string): string {
@@ -203,6 +205,111 @@ export function localPageSlots(
     if (slots.length) days.set(iso, slots);
   }
   return days;
+}
+
+function slotMs(slot: AppointmentSlot): number {
+  return Date.parse(slot.startTime);
+}
+
+function sortDaySlots(slots: AppointmentSlot[]): AppointmentSlot[] {
+  return [...slots].sort((a, b) => slotMs(a) - slotMs(b));
+}
+
+/**
+ * CRM available-slots used to list only the first start when a daily booking
+ * limit was set. Staff still need every free time from the consultation hours
+ * (Mon–Fri 09:00–17:00, etc.). Keep CRM instants when they are at least as
+ * complete as those hours; otherwise fill the missing starts.
+ */
+export function expandOfferedSlots(input: {
+  offered: Map<string, AppointmentSlot[]>;
+  hours: Map<string, AppointmentSlot[]>;
+  hostIds?: string[];
+}): Map<string, AppointmentSlot[]> {
+  const hostIds = (input.hostIds ?? []).filter(Boolean);
+  const days = new Map<string, AppointmentSlot[]>();
+  const keys = new Set([...input.offered.keys(), ...input.hours.keys()]);
+  for (const key of keys) {
+    const offered = input.offered.get(key) ?? [];
+    const hours = input.hours.get(key) ?? [];
+    if (offered.length >= hours.length && offered.length > 0) {
+      days.set(key, sortDaySlots(offered));
+      continue;
+    }
+    const byMs = new Map<number, AppointmentSlot>();
+    for (const slot of offered) {
+      const ms = slotMs(slot);
+      if (!Number.isNaN(ms)) byMs.set(ms, slot);
+    }
+    for (const slot of hours) {
+      const ms = slotMs(slot);
+      if (Number.isNaN(ms) || byMs.has(ms)) continue;
+      byMs.set(ms, {
+        ...slot,
+        hostIds: slot.hostIds.length ? slot.hostIds : hostIds,
+        fromHours: true,
+      });
+    }
+    const merged = sortDaySlots([...byMs.values()]);
+    if (merged.length) days.set(key, merged);
+  }
+  return days;
+}
+
+function bookingIsOpen(status: string): boolean {
+  return !/cancel|no-?show|declin|reject/i.test(status);
+}
+
+/**
+ * Drops starts that already have an open booking for this consultation (and
+ * host, when one is chosen). Used when we fill in hours the CRM omitted.
+ */
+export function subtractBusySlots(
+  days: Map<string, AppointmentSlot[]>,
+  busy: Array<{
+    startTime: string;
+    endTime?: string;
+    eventTypeId?: string;
+    hostId?: string;
+    status?: string;
+  }>,
+  input: {
+    eventTypeId?: string;
+    hostId?: string;
+    durationMinutes: number;
+  },
+): Map<string, AppointmentSlot[]> {
+  const durationMs = Math.max(1, input.durationMinutes || 30) * 60_000;
+  const ranges = busy
+    .filter((row) => {
+      if (!bookingIsOpen(row.status ?? "")) return false;
+      if (input.eventTypeId && row.eventTypeId && row.eventTypeId !== input.eventTypeId) {
+        return false;
+      }
+      if (input.hostId && row.hostId && row.hostId !== input.hostId) return false;
+      return !Number.isNaN(Date.parse(row.startTime));
+    })
+    .map((row) => {
+      const start = Date.parse(row.startTime);
+      const end = row.endTime ? Date.parse(row.endTime) : start + durationMs;
+      return {
+        start,
+        end: Number.isNaN(end) ? start + durationMs : end,
+      };
+    });
+  if (!ranges.length) return days;
+
+  const next = new Map<string, AppointmentSlot[]>();
+  for (const [key, slots] of days) {
+    const open = slots.filter((slot) => {
+      const start = slotMs(slot);
+      if (Number.isNaN(start)) return false;
+      const end = start + durationMs;
+      return !ranges.some((range) => start < range.end && end > range.start);
+    });
+    if (open.length) next.set(key, open);
+  }
+  return next;
 }
 
 /** Random User picks among the free hosts; a named user must be one of them. */

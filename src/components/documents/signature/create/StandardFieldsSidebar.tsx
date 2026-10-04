@@ -12,6 +12,7 @@ import {
   Building2,
   Clock,
   CheckSquare,
+  ListChecks,
   ChevronDown,
   CircleDot,
   CreditCard,
@@ -66,10 +67,12 @@ const prefillStandardFields: PaletteField[] = [
   { type: "checkbox", label: "Checkbox", icon: CheckSquare },
   { type: "dropdown", label: "Dropdown", icon: ChevronDown },
   { type: "radio", label: "Radio", icon: CircleDot },
+  { type: "checkbox_group", label: "Checkbox group", icon: ListChecks },
 ];
 
 const signerCustomFields: PaletteField[] = [
   { type: "radio", label: "Radio", icon: CircleDot },
+  { type: "checkbox_group", label: "Checkbox group", icon: ListChecks },
   { type: "payment", label: "Payment", icon: CreditCard },
   { type: "attachment", label: "Attachment", icon: Paperclip },
 ];

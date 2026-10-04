@@ -1,7 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Users, UserPlus, GripVertical, Trash2, Plus } from "lucide-react";
+import {
+  fetchSignatureSelf,
+  selfFromStores,
+} from "@/lib/documents/signature/current-user";
 import {
   SignatureSigner,
   SignerRole,
@@ -126,7 +130,7 @@ export function RecipientsSection({
   onChange,
   signingOrder,
   onToggleOrder,
-  currentUser = { name: "Harry", email: "harry@example.com" },
+  currentUser,
   ccRecipients = [],
   setCcRecipients,
   searchCrmEntities,
@@ -153,6 +157,23 @@ export function RecipientsSection({
   const signerSearchSeq = React.useRef(0);
   const ccSearchSeq = React.useRef(0);
   const resolveCrmSearch = searchCrmEntities ?? searchSignatureCrmEntities;
+  const [me, setMe] = useState(
+    () => currentUser ?? selfFromStores(),
+  );
+
+  useEffect(() => {
+    if (currentUser?.email || currentUser?.name) {
+      setMe(currentUser);
+      return;
+    }
+    let alive = true;
+    void fetchSignatureSelf().then((self) => {
+      if (alive && (self.email || self.name)) setMe(self);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [currentUser]);
 
   React.useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -334,11 +355,23 @@ export function RecipientsSection({
   };
 
   const handleAddMe = () => {
-    if (!currentUser) return;
+    const self = me.email || me.name ? me : selfFromStores();
+    if (!self.email && !self.name) {
+      void fetchSignatureSelf().then((next) => {
+        setMe(next);
+        if (next.email || next.name) applySelfToSigners(next);
+      });
+      return;
+    }
+    applySelfToSigners(self);
+  };
 
+  const applySelfToSigners = (self: { name: string; email: string }) => {
     onChange((prev) => {
       const alreadyAdded = prev.some(
-        (s) => s.email.toLowerCase() === currentUser.email.toLowerCase(),
+        (s) =>
+          self.email &&
+          s.email.toLowerCase() === self.email.toLowerCase(),
       );
       if (alreadyAdded) return prev;
 
@@ -348,8 +381,8 @@ export function RecipientsSection({
           s.id === emptySigner.id
             ? {
                 ...s,
-                name: currentUser.name,
-                email: currentUser.email,
+                name: self.name || self.email,
+                email: self.email,
                 entityType: "email" as CrmEntityType,
               }
             : s,
@@ -358,8 +391,8 @@ export function RecipientsSection({
 
       const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
         id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: currentUser.name,
-        email: currentUser.email,
+        name: self.name || self.email,
+        email: self.email,
         order: prev.length + 1,
         role: "Signer",
         deliveryMethod: "email",
@@ -550,7 +583,7 @@ export function RecipientsSection({
             type="button"
             onClick={handleAddMe}
             className={`px-3 py-1.5 rounded-md transition-all text-sm bg-white border border-border text-gray-700 hover:text-gray-900 ${
-              !currentUser ? "opacity-40 cursor-not-allowed" : ""
+              !(me.email || me.name) ? "opacity-40 cursor-not-allowed" : ""
             }`}
           >
             Add me
@@ -766,7 +799,6 @@ export function RecipientsSection({
                   className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
                 >
                   <option value="Signer">Needs to sign</option>
-                  <option value="Approver">Needs to approve</option>
                   <option value="CC">Receives a copy</option>
                 </select>
               </div>

@@ -29,6 +29,10 @@ import {
   StandardFieldsSidebar,
   type StandardFieldType,
 } from "./StandardFieldsSidebar";
+import {
+  FieldPropertiesSidebar,
+  fieldHasPropertiesPanel,
+} from "./FieldPropertiesSidebar";
 import type {
   PlacedField,
   DraggingFieldType,
@@ -38,6 +42,7 @@ import {
   signerColor,
 } from "@/lib/documents/signature/types";
 import { useRouter } from "next/navigation";
+import { fetchSignatureSelf } from "@/lib/documents/signature/current-user";
 import { toast } from "@/lib/notify/toast";
 import { ConfirmSendDetailsModal } from "./ConfirmSendDetailsModal";
 import { PlaceFieldsPreviewModal } from "./PlaceFieldsPreviewModal";
@@ -130,6 +135,7 @@ interface PlaceFieldsViewProps {
   handleResizeField?: (id: string, width: number, height: number) => void;
   handleChangeFieldValue?: (id: string, value: string) => void;
   handleRemovePlacedField: (id: string) => void;
+  handleUpdatePlacedField?: (id: string, patch: Partial<PlacedField>) => void;
   handleSidebarDragStart: (
     e: DragEvent<HTMLDivElement>,
     field: StandardFieldType,
@@ -147,7 +153,7 @@ interface PlaceFieldsViewProps {
    * (currently mock) notifications. Resolves with whoever was just notified,
    * so we can show test links before navigating away.
    */
-  onSend?: () => Promise<SignatureSigner[]>;
+  onSend?: () => Promise<SignatureSigner[] | null>;
 }
 
 const isPdfDocument = (file: File | null) =>
@@ -166,6 +172,7 @@ export function PlaceFieldsView({
   handleResizeField,
   handleChangeFieldValue,
   handleRemovePlacedField,
+  handleUpdatePlacedField,
   handleSidebarDragStart,
   handleSidebarDragEnd,
   handleArmField,
@@ -193,6 +200,7 @@ export function PlaceFieldsView({
   );
   const [signaturePickerField, setSignaturePickerField] =
     useState<PlacedField | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -220,6 +228,25 @@ export function PlaceFieldsView({
     x: number;
     y: number;
   } | null>(null);
+
+  const selectedField =
+    placedFields.find((field) => field.id === selectedFieldId) ?? null;
+  const showFieldProperties = Boolean(
+    selectedField && fieldHasPropertiesPanel(selectedField.type),
+  );
+
+  useEffect(() => {
+    if (
+      selectedFieldId &&
+      !placedFields.some((field) => field.id === selectedFieldId)
+    ) {
+      setSelectedFieldId(null);
+    }
+  }, [placedFields, selectedFieldId]);
+
+  const selectPlacedField = (field: PlacedField) => {
+    setSelectedFieldId(fieldHasPropertiesPanel(field.type) ? field.id : null);
+  };
 
   useEffect(() => {
     if (documents.length === 0) {
@@ -342,7 +369,7 @@ export function PlaceFieldsView({
     else if (top < previous && atTop) goToAdjacentDocument(-1);
   }
 
-  const handleSubmitAction = async () => {
+  const handleSubmitAction = async (signAfterSending = false) => {
     setIsSubmitting(true);
 
     try {
@@ -359,12 +386,35 @@ export function PlaceFieldsView({
 
       if (onSend) {
         const notified = await onSend();
+        if (notified == null) {
+          setIsConfirmOpen(false);
+          return;
+        }
+        setIsConfirmOpen(false);
+        if (signAfterSending) {
+          const self = await fetchSignatureSelf();
+          const email = self.email.trim().toLowerCase();
+          const mine =
+            recipients.find(
+              (signer) =>
+                signer.role !== "CC" &&
+                Boolean(signer.token) &&
+                email &&
+                signer.email.trim().toLowerCase() === email,
+            ) ??
+            recipients.find(
+              (signer) => signer.role !== "CC" && Boolean(signer.token),
+            );
+          if (mine?.token) {
+            router.push(`/sign/${encodeURIComponent(mine.token)}`);
+            return;
+          }
+        }
         toast.success(
-          notified?.length
+          notified.length
             ? `Signature request sent to ${notified.length} recipient${notified.length === 1 ? "" : "s"}.`
             : "Signature request sent successfully!",
         );
-        setIsConfirmOpen(false);
         router.push("/signature/documents");
       } else {
         toast.success("Signature request sent successfully!");
@@ -401,7 +451,7 @@ export function PlaceFieldsView({
     }
   }
 
-  function handleConfirmAndSend() {
+  function handleConfirmAndSend(signAfterSending = false) {
     const emptyPrefill = placedFields.find(
       (field) =>
         isSenderPrefillField(field.recipientId) &&
@@ -422,7 +472,7 @@ export function PlaceFieldsView({
       }, 50);
       return;
     }
-    void handleSubmitAction();
+    void handleSubmitAction(signAfterSending);
   }
 
   const makeContainerDropHandler =
@@ -862,6 +912,11 @@ export function PlaceFieldsView({
 
         <div
           ref={canvasRef}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest("[data-placed-field]")) return;
+            setSelectedFieldId(null);
+          }}
           onScroll={handleCanvasScroll}
           onWheel={handleCanvasWheel}
           onDragOver={(e) => {
@@ -904,6 +959,9 @@ export function PlaceFieldsView({
                               onChangeFieldValue={handleChangeValue}
                               emptyFieldErrorId={emptyFieldErrorId}
                               onPickSignature={setSignaturePickerField}
+                              selectedFieldId={selectedFieldId}
+                              onSelectField={selectPlacedField}
+                              onClearSelection={() => setSelectedFieldId(null)}
                               onNumPagesResolved={handleNumPagesResolved}
                               onDocumentReady={setPdfReadyDocId}
                             />
@@ -964,25 +1022,23 @@ export function PlaceFieldsView({
                                     field.type === "job_title";
                                   const showEmptyError =
                                     emptyFieldErrorId === field.id;
+                                  const displayLabel =
+                                    field.fieldName || field.label;
+                                  const selected = selectedFieldId === field.id;
 
                                   return (
                                     <div
                                       key={field.id}
                                       id={`placed-field-${field.id}`}
+                                      data-placed-field=""
                                       onPointerDown={(e) => {
                                         if (e.button !== 0) return;
+                                        selectPlacedField(field);
                                         const target = e.target as HTMLElement;
                                         if (
                                           target.closest(
                                             "input, textarea, select, button",
                                           )
-                                        ) {
-                                        e.stopPropagation();
-                                          return;
-                                        }
-                                        if (
-                                          field.type === "signature" ||
-                                          field.type === "initials"
                                         ) {
                                           e.stopPropagation();
                                           return;
@@ -1001,8 +1057,12 @@ export function PlaceFieldsView({
                                         };
                                         setActiveResizingId(field.id);
                                       }}
-                                      onClick={
-                                        isSignaturePick
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        selectPlacedField(field);
+                                      }}
+                                      onDoubleClick={
+                                        isSignaturePick && isPrefill
                                           ? (e) => {
                                               e.stopPropagation();
                                               setSignaturePickerField(field);
@@ -1022,7 +1082,7 @@ export function PlaceFieldsView({
                                           : color
                                             ? `z-10 ${color.bg} ${color.text} ${color.border}`
                                             : "z-10 bg-indigo-50/90 text-indigo-700 border-indigo-400"
-                                      }`}
+                                      } ${selected ? "ring-2 ring-slate-800/80 ring-offset-1" : ""}`}
                                     >
                                       {isSignaturePick &&
                                       (field.type === "signature" ||
@@ -1036,14 +1096,14 @@ export function PlaceFieldsView({
                                           />
                                         ) : (
                                           <span className="truncate">
-                                            {field.value || field.label}
+                                            {field.value || displayLabel}
                                           </span>
                                         )
                                       ) : field.type === "checkbox" ? (
                                         <input
                                           type="checkbox"
                                           disabled={!isPrefill}
-                                          checked={field.value === "true"}
+                                          checked={field.checked === true || field.value === "true"}
                                           onChange={(e) =>
                                             handleChangeValue(
                                               field.id,
@@ -1081,7 +1141,7 @@ export function PlaceFieldsView({
                                         />
                                       ) : (
                                         <span className="truncate">
-                                          {field.label}
+                                          {displayLabel}
                                         </span>
                                       )}
                                       <button
@@ -1095,6 +1155,8 @@ export function PlaceFieldsView({
                                         ×
                                       </button>
 
+                                      {field.resizable !== false ? (
+                                      <>
                                       {/* Resize handles */}
                                       <div
                                         onMouseDown={(e) =>
@@ -1129,6 +1191,8 @@ export function PlaceFieldsView({
                                         }
                                         className="absolute -right-1 -bottom-1 w-4 h-4 cursor-se-resize z-30"
                                       />
+                                      </>
+                                      ) : null}
                                       {showEmptyError ? (
                                         <SenderFieldErrorTooltip
                                           fieldId={field.id}
@@ -1156,11 +1220,27 @@ export function PlaceFieldsView({
           </div>
         </div>
 
-        <StandardFieldsSidebar
-          recipients={recipients}
-          onArmField={handleArmField}
-          onPalettePointerDown={onPalettePointerDown}
-        />
+        {showFieldProperties && selectedField ? (
+          <FieldPropertiesSidebar
+            field={selectedField}
+            fields={placedFields}
+            recipients={recipients}
+            onClose={() => setSelectedFieldId(null)}
+            onDelete={() => {
+              handleRemovePlacedField(selectedField.id);
+              setSelectedFieldId(null);
+            }}
+            onChange={(patch) =>
+              handleUpdatePlacedField?.(selectedField.id, patch)
+            }
+          />
+        ) : (
+          <StandardFieldsSidebar
+            recipients={recipients}
+            onArmField={handleArmField}
+            onPalettePointerDown={onPalettePointerDown}
+          />
+        )}
       </div>
 
       {isConfirmOpen ? (
@@ -1172,8 +1252,8 @@ export function PlaceFieldsView({
           onCancel={() => {
             if (!isSubmitting) setIsConfirmOpen(false);
           }}
-          onConfirm={() => {
-            handleConfirmAndSend();
+          onConfirm={(signAfterSending) => {
+            handleConfirmAndSend(signAfterSending);
           }}
         />
       ) : null}

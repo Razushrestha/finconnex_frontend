@@ -265,6 +265,7 @@ export function AvailabilityLimitsStep({
   consultants,
   consultantUserIds,
   initial,
+  timezone,
   onBack,
   onNext,
   onChange,
@@ -274,6 +275,7 @@ export function AvailabilityLimitsStep({
   consultants: string[];
   consultantUserIds?: Record<string, string>;
   initial?: AvailabilityLimitsValues | null;
+  timezone?: string;
   onBack: () => void;
   onNext: (values: AvailabilityLimitsValues, hostIds: string[]) => void;
   onChange?: (values: AvailabilityLimitsValues) => void;
@@ -347,6 +349,7 @@ export function AvailabilityLimitsStep({
       const hostIds = await syncConsultationAvailability({
         names: consultants,
         userIds: consultantUserIds,
+        timezone,
         values: {
           ...values,
           slotsPerEvent: normalizeSlotLimit(values.slotsPerEvent),

@@ -791,6 +791,12 @@ function CreateTemplateForm() {
     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const handleUpdatePlacedField = (id: string, patch: Partial<PlacedField>) => {
+    setPlacedFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, ...patch } : field)),
+    );
+  };
+
   const handleChangeFieldValue = (id: string, value: string) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, value } : f)),
@@ -814,6 +820,7 @@ function CreateTemplateForm() {
           handleDropField={handleDropField}
           handleRepositionField={handleRepositionField}
           handleRemovePlacedField={handleRemovePlacedField}
+          handleUpdatePlacedField={handleUpdatePlacedField}
           handleSidebarDragStart={handleSidebarDragStart}
           handleSidebarDragEnd={handleSidebarDragEnd}
           handleArmField={handleArmField}

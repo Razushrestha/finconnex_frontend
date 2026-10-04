@@ -6,7 +6,6 @@ import {
   applySignerSignature,
   applySignerViewed,
   canSignerAccess,
-  DEMO_SIGNER_IP,
   getRequestDocuments,
   getSignatureByToken,
   fieldKindLabel,
@@ -40,15 +39,20 @@ import {
 } from "@/lib/documents/signature/field-kinds";
 import { SigningGuideCallout } from "./SigningGuideCallout";
 import {
-  CheckCircle2,
+  ChevronDown,
   Clock,
+  Download,
+  Mail,
   PenLine,
-  Sparkles,
-  Send,
+  Printer,
+  Search,
   ShieldCheck,
   X,
   AlertCircle,
 } from "lucide-react";
+import { Document, Page, pdfjs } from "react-pdf";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 import { cn } from "@/lib/utils";
 
 function fieldIsComplete(field: SignatureField): boolean {
@@ -56,6 +60,78 @@ function fieldIsComplete(field: SignatureField): boolean {
   const action = signingFieldAction(field.kind);
   if (action === "checkbox") return field.value === "true";
   return Boolean(field.value?.trim());
+}
+
+function SignPageRail({
+  fileUrl,
+  fileName,
+  activePage,
+  onSelectPage,
+}: {
+  fileUrl?: string;
+  fileName: string;
+  activePage: number;
+  onSelectPage: (page: number) => void;
+}) {
+  const [numPages, setNumPages] = useState(0);
+  const isPdf = Boolean(
+    fileUrl && !/\.docx?$/i.test(fileName || ""),
+  );
+  return (
+    <div className="flex flex-col items-center gap-3 px-3 py-3">
+      {isPdf && fileUrl ? (
+        <Document
+          file={fileUrl}
+          onLoadSuccess={({ numPages: count }) => setNumPages(count)}
+          loading={
+            <div className="h-28 w-[140px] animate-pulse bg-white" />
+          }
+          className="flex flex-col items-center gap-3"
+        >
+          {numPages > 0
+            ? Array.from({ length: numPages }, (_, index) => {
+                const page = index + 1;
+                const selected = page === activePage;
+                return (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => onSelectPage(page)}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <span
+                      className={cn(
+                        "block overflow-hidden border bg-white shadow-sm",
+                        selected ? "border-[#12875a]" : "border-slate-300",
+                      )}
+                    >
+                      <Page
+                        pageNumber={page}
+                        width={140}
+                        renderAnnotationLayer={false}
+                        renderTextLayer={false}
+                      />
+                    </span>
+                    <span className="text-[12px] text-slate-700">{page}</span>
+                  </button>
+                );
+              })
+            : null}
+        </Document>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onSelectPage(1)}
+          className="flex flex-col items-center gap-1"
+        >
+          <span className="flex h-36 w-[140px] items-center justify-center border border-[#12875a] bg-white text-[12px] text-slate-500">
+            {fileName || "Document"}
+          </span>
+          <span className="text-[12px] text-slate-700">1</span>
+        </button>
+      )}
+    </div>
+  );
 }
 
 function incompleteFieldsForSigner(
@@ -94,6 +170,8 @@ export function PublicSignClient({ token }: { token: string }) {
   // Which of the request's (possibly several) attached documents is
   // currently shown. Defaults to the first document once it's known.
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState(1);
+  const [moreOpen, setMoreOpen] = useState(false);
   const packScrollRef = useRef<HTMLDivElement | null>(null);
 
   const guideFields = useMemo(() => {
@@ -128,7 +206,10 @@ export function PublicSignClient({ token }: { token: string }) {
     const current = guideFields[guideIndex];
     if (!current || !fieldIsComplete(current)) return;
     const missing = incompleteFieldsForSigner(req.fields, signer.id);
-    if (!missing.length) return;
+    if (!missing.length) {
+      setGuideOpen(false);
+      return;
+    }
     const nextIndex = guideFields.findIndex((field) => field.id === missing[0].id);
     if (nextIndex >= 0 && nextIndex !== guideIndex) setGuideIndex(nextIndex);
   }, [guideOpen, guideIndex, guideFields, req, signer]);
@@ -332,7 +413,16 @@ export function PublicSignClient({ token }: { token: string }) {
   }
 
   function handleFinalSubmit() {
-    if (!req || !signer || !pendingSignatureData) return;
+    if (!req || !signer) return;
+    const signatureData =
+      pendingSignatureData ||
+      req.fields.find(
+        (field) =>
+          field.signerId === signer.id &&
+          isSignatureCaptureKind(field.kind) &&
+          Boolean(field.value?.trim()),
+      )?.value ||
+      "signed";
     if (!signingEnabled) {
       setConsentError(true);
       return;
@@ -349,13 +439,14 @@ export function PublicSignClient({ token }: { token: string }) {
     }
     setSubmitError("");
     justFinishedRef.current = true;
-    const next = applySignerSignature(req, signer.id, pendingSignatureData);
+    const next = applySignerSignature(req, signer.id, signatureData);
     afterPersist(next);
     if (publicMode) {
       void fetch(`/api/sign/${encodeURIComponent(token)}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          signatureData,
           fields: next.fields
             .filter((field) => field.signerId === signer.id && field.value?.trim())
             .map((field) => ({ fieldId: field.id, value: field.value })),
@@ -370,7 +461,7 @@ export function PublicSignClient({ token }: { token: string }) {
     if (isCrmSignatureRequestId(req.id)) {
       void tryCrmSignatureRequest(() =>
         signCrmSignatureRequest(req.id, {
-          signatureData: pendingSignatureData,
+          signatureData,
         }),
       ).then((remote) => {
         if (remote) persistRemoteSignatureRequest(remote);
@@ -545,12 +636,11 @@ export function PublicSignClient({ token }: { token: string }) {
     );
   }
 
-  const myFields: SignatureField[] = req.fields.filter(
-    (f) => f.signerId === signer.id,
-  );
   const missingFields = incompleteFieldsForSigner(req.fields, signer.id);
-  const canSubmit =
-    Boolean(pendingSignatureData) && missingFields.length === 0;
+  const fieldsComplete = missingFields.length === 0;
+  const canSubmit = fieldsComplete;
+  const finishMessage =
+    "You've successfully filled all fields. Click Finish to complete.";
 
   const documents = getRequestDocuments(req);
   const activeDoc =
@@ -558,171 +648,322 @@ export function PublicSignClient({ token }: { token: string }) {
   const fieldsForDoc = (docId: string) =>
     req.fields.filter((field) => (field.documentId ?? "primary") === docId);
 
+  const pageAnchor =
+    activeDoc != null ? `sign-doc-${activeDoc.id}` : "sign-doc";
+
+  function showPage(page: number) {
+    setActivePage(page);
+    document
+      .getElementById(`${pageAnchor}-page-${page}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div
-      className="mx-auto flex min-h-dvh max-w-4xl flex-col px-4 py-6"
+      className="flex h-dvh min-h-0 flex-col bg-[#d5d5d5]"
       suppressHydrationWarning
     >
-      {/* Electronic Record & Signature Disclosure Top Consent Bar */}
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
+        <h1 className="text-[18px] font-semibold text-slate-900">Sign</h1>
+        <select
+          aria-label="Language"
+          defaultValue="en"
+          className="h-8 rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-700"
+        >
+          <option value="en">English</option>
+        </select>
+      </header>
+
+      {fieldsComplete ? (
+        <div className="relative shrink-0 border-b border-slate-300 bg-[#e6e6e6]">
+          <div className="flex items-center justify-between gap-4 px-4 py-2">
+            <p className="min-w-0 text-[13px] text-slate-800">{finishMessage}</p>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                aria-label="Find"
+                onClick={() => {
+                  const term = window.prompt("Find in document");
+                  if (!term) return;
+                  const finder = (
+                    window as Window & { find?: (query: string) => boolean }
+                  ).find;
+                  finder?.(term);
+                }}
+                className="flex h-8 w-8 items-center justify-center text-slate-600 hover:text-slate-900"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Download"
+                onClick={() => {
+                  const url = activeDoc?.fileUrl;
+                  if (!url) return;
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = activeDoc?.fileName || "document.pdf";
+                  link.target = "_blank";
+                  link.rel = "noreferrer";
+                  link.click();
+                }}
+                className="flex h-8 w-8 items-center justify-center text-slate-600 hover:text-slate-900"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Print"
+                onClick={() => window.print()}
+                className="flex h-8 w-8 items-center justify-center text-slate-600 hover:text-slate-900"
+              >
+                <Printer className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Email"
+                onClick={() => {
+                  const subject = encodeURIComponent(req.documentName || "Document");
+                  window.location.href = `mailto:?subject=${subject}`;
+                }}
+                className="flex h-8 w-8 items-center justify-center text-slate-600 hover:text-slate-900"
+              >
+                <Mail className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                className="ml-2 h-8 rounded-[3px] bg-[#12875a] px-4 text-[13px] font-semibold text-white hover:bg-[#0f734d]"
+              >
+                Finish
+              </button>
+              <div className="relative ml-1">
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen((open) => !open)}
+                  className="inline-flex h-8 items-center gap-1 rounded-[3px] border border-slate-300 bg-white px-3 text-[13px] text-slate-700 hover:bg-slate-50"
+                >
+                  More actions
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                {moreOpen ? (
+                  <div className="absolute right-0 z-40 mt-1 w-44 rounded border border-slate-200 bg-white py-1 shadow-lg">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        window.location.href = "/signature/documents";
+                      }}
+                    >
+                      Finish later
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        decline();
+                      }}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="pointer-events-none absolute top-full right-64 z-30 mt-2 max-w-[280px] rounded-[3px] border border-[#d7eee4] bg-[#f3fbf7] px-3 py-2 text-[13px] text-slate-800 shadow-sm">
+            <span className="absolute -top-1.5 right-8 h-2.5 w-2.5 rotate-45 border-t border-l border-[#d7eee4] bg-[#f3fbf7]" />
+            {finishMessage}
+          </div>
+        </div>
+      ) : (
       <div
         data-sign-consent
         className={cn(
-          "sticky top-2 z-30 mb-6 rounded-2xl border bg-white/95 backdrop-blur-md p-4 shadow-md transition-all dark:bg-zinc-900/95",
+          "flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-white px-4 py-2.5",
           consentError && !signingEnabled
-            ? "border-rose-400 ring-2 ring-rose-400/30 bg-rose-50/40"
-            : "border-slate-200/90 dark:border-zinc-800",
+            ? "border-rose-300"
+            : "border-slate-200",
         )}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={hasAgreedConsent}
-              onChange={(e) => {
-                setHasAgreedConsent(e.target.checked);
-                if (!e.target.checked) setSigningEnabled(false);
-              }}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer shrink-0"
-            />
-            <span className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
-              I confirm that I have read and understood the{" "}
-              <button
-                type="button"
-                onClick={() => setIsDisclosureModalOpen(true)}
-                className="font-semibold text-emerald-600 underline hover:text-emerald-700 dark:text-emerald-400 cursor-pointer"
-              >
-                Electronic Record and Signature Disclosure
-              </button>{" "}
-              and consent to use electronic records and signatures.
-            </span>
-          </label>
-
-          <div className="flex items-center gap-2 shrink-0">
+        <label className="flex min-w-0 flex-1 items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={hasAgreedConsent}
+            onChange={(e) => {
+              setHasAgreedConsent(e.target.checked);
+              if (!e.target.checked) setSigningEnabled(false);
+            }}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[#12875a]"
+          />
+          <span className="text-[13px] leading-5 text-slate-800">
+            I confirm that I have read and understood the{" "}
             <button
               type="button"
-              onClick={() => {
-                if (!hasAgreedConsent) {
-                  setConsentError(true);
-                  return;
-                }
-                setSigningEnabled(true);
-                setConsentError(false);
-                startSigningGuide();
-              }}
-              className={cn(
-                "h-9 rounded-xl px-4 text-xs font-semibold text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer",
-                signingEnabled
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : hasAgreedConsent
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-emerald-600/80 opacity-90",
-              )}
+              onClick={() => setIsDisclosureModalOpen(true)}
+              className="text-[#1a73c7] underline"
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Agree &amp; Continue
+              &quot;Electronic Record and Signature Disclosure&quot;
+            </button>{" "}
+            and consent to use electronic records and signatures.
+          </span>
+        </label>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (!hasAgreedConsent) {
+                setConsentError(true);
+                return;
+              }
+              setSigningEnabled(true);
+              setConsentError(false);
+              startSigningGuide();
+            }}
+            className="h-8 rounded-[3px] bg-[#12875a] px-3 text-[13px] font-semibold text-white hover:bg-[#0f734d]"
+          >
+            Agree &amp; Continue
+          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((open) => !open)}
+              className="inline-flex h-8 items-center gap-1 rounded-[3px] border border-slate-300 bg-white px-3 text-[13px] text-slate-700 hover:bg-slate-50"
+            >
+              More actions
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
+            {moreOpen ? (
+              <div className="absolute right-0 z-40 mt-1 w-44 rounded border border-slate-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    if (!signingEnabled) {
+                      setConsentError(true);
+                      return;
+                    }
+                    if (canSubmit) {
+                      handleFinalSubmit();
+                      return;
+                    }
+                    setSubmitError(
+                      `Complete every field before submitting: ${missingFields
+                        .map((field) => field.label || fieldKindLabel(field.kind))
+                        .slice(0, 4)
+                        .join(", ")}.`,
+                    );
+                    focusFirstIncomplete(missingFields);
+                  }}
+                >
+                  Finish
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    window.location.href = "/signature/documents";
+                  }}
+                >
+                  Finish later
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    decline();
+                  }}
+                >
+                  Decline
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
-
-        {consentError && !signingEnabled && (
-          <p className="mt-2 text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-            <AlertCircle className="h-3.5 w-3.5" />
-            Check the box, then click Agree &amp; Continue before filling
-            fields.
+        {consentError && !signingEnabled ? (
+          <p className="basis-full text-[12px] font-medium text-rose-600">
+            Check the box, then click Agree &amp; Continue before filling fields.
           </p>
-        )}
+        ) : null}
+        {submitError ? (
+          <p className="basis-full text-[12px] font-medium text-rose-600">
+            {submitError}
+          </p>
+        ) : null}
       </div>
+      )}
 
-      <div className="mb-6 text-center">
-        <p className="text-[11px] font-semibold tracking-wide text-violet-600 uppercase">
-          FinConnex
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">
-          Review &amp; sign
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">{req.documentName}</p>
-        <p className="mt-0.5 text-xs text-slate-400">
-          Signing as {signer.name} · Requested by {req.createdBy} · Expires{" "}
-          {req.expiryDate}
-        </p>
-      </div>
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-[188px] shrink-0 flex-col border-r border-slate-300 bg-[#ececec]">
+          <div className="border-b border-slate-300 px-3 py-2 text-[13px] font-semibold text-slate-800">
+            Documents
+          </div>
+          {documents.length > 1 ? (
+            <div className="border-b border-slate-200 px-2 py-2">
+              {documents.map((doc) => (
+                <button
+                  key={doc.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveDocId(doc.id);
+                    setActivePage(1);
+                  }}
+                  className={cn(
+                    "block w-full truncate rounded px-2 py-1.5 text-left text-[12px]",
+                    activeDoc?.id === doc.id
+                      ? "bg-white font-medium text-slate-900"
+                      : "text-slate-600 hover:bg-white/70",
+                  )}
+                >
+                  {doc.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="border-b border-slate-200 px-3 py-2">
+              <p className="truncate text-[12px] font-medium text-slate-800">
+                {activeDoc?.name || req.documentName}
+              </p>
+              <p className="text-[11px] text-slate-500">Document</p>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {activeDoc ? (
+              <SignPageRail
+                fileUrl={activeDoc.fileUrl}
+                fileName={activeDoc.fileName}
+                activePage={activePage}
+                onSelectPage={showPage}
+              />
+            ) : null}
+          </div>
+        </aside>
 
-      <div className="mb-6">
-        {documents.length > 1 ? (
-          <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
-            {documents.map((doc, i) => (
-              <button
-                key={doc.id}
-                type="button"
-                onClick={() => {
-                  setActiveDocId(doc.id);
-                  document
-                    .getElementById(`sign-doc-${doc.id}`)
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                  (activeDoc?.id ?? documents[0].id) === doc.id
-                    ? "border-violet-300 bg-violet-50 text-violet-700"
-                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
-                )}
-              >
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-900/80 text-[9px] text-white">
-                  {i + 1}
-                </span>
-                {doc.name}
-              </button>
-            ))}
+        <div className="min-w-0 flex-1 overflow-y-auto py-6">
+        {activeDoc ? (
+          <div className="mx-auto w-fit shadow-[0_2px_16px_rgba(15,23,42,0.18)]">
+            <SignatureDocPreview
+              key={activeDoc.id}
+              fileName={activeDoc.fileName}
+              fileUrl={activeDoc.fileUrl}
+              fields={fieldsForDoc(activeDoc.id)}
+              signers={req.signers}
+              selectedFieldId={guidedField?.id}
+              highlightSignerId={signer.id}
+              interactive={signingEnabled}
+              onFieldClick={handleFieldClick}
+              pageWidth={760}
+              embedded
+              pageAnchorPrefix={pageAnchor}
+            />
           </div>
         ) : null}
-
-        {documents.length > 1 ? (
-          <div
-            ref={packScrollRef}
-            className="relative mx-auto flex max-h-[68vh] w-full max-w-3xl flex-col overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 shadow-inner custom-scrollbar"
-          >
-            {documents.map((doc, index) => (
-              <section
-                key={doc.id}
-                id={`sign-doc-${doc.id}`}
-                data-sign-doc={doc.id}
-                className={cn("w-full", index > 0 && "mt-8 border-t border-slate-200 pt-6")}
-              >
-                <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Document {index + 1} of {documents.length}
-                  {doc.name ? ` · ${doc.name}` : ""}
-                </p>
-                <SignatureDocPreview
-                  fileName={doc.fileName}
-                  fileUrl={doc.fileUrl}
-                  fields={fieldsForDoc(doc.id)}
-                  signers={req.signers}
-                  selectedFieldId={guidedField?.id}
-                  highlightSignerId={signer.id}
-                  interactive={signingEnabled}
-                  onFieldClick={handleFieldClick}
-                  pageWidth={700}
-                  embedded
-                />
-              </section>
-            ))}
-          </div>
-        ) : activeDoc ? (
-          <SignatureDocPreview
-            key={activeDoc.id}
-            fileName={activeDoc.fileName}
-            fileUrl={activeDoc.fileUrl}
-            fields={fieldsForDoc(activeDoc.id)}
-            signers={req.signers}
-            selectedFieldId={guidedField?.id}
-            highlightSignerId={signer.id}
-            interactive={signingEnabled}
-            onFieldClick={handleFieldClick}
-            className="shadow-sm"
-            pageWidth={700}
-          />
-        ) : null}
-        {guideOpen && guidedField && !isModalOpen && !activeInputField ? (
+        {guideOpen && guidedField && !fieldsComplete && !isModalOpen && !activeInputField ? (
           <SigningGuideCallout
             fieldId={guidedField.id}
             title={
@@ -762,121 +1003,8 @@ export function PublicSignClient({ token }: { token: string }) {
             onClose={() => setGuideOpen(false)}
           />
         ) : null}
-        {myFields.length ? (
-          <p className="mt-2 text-center text-xs text-slate-500">
-            {signingEnabled
-              ? `Click each highlighted field to complete it · ${myFields.length} assigned to you${documents.length > 1 ? " across all documents" : ""}`
-              : "Check the box, then click Agree & Continue to fill fields"}
-          </p>
-        ) : null}
       </div>
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-        {pendingSignatureData ? (
-          <div className="space-y-3">
-            {canSubmit ? (
-              <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3 border border-emerald-200">
-                <div className="flex items-center gap-2 text-xs text-emerald-800 font-semibold">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>All of your fields are complete.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(true)}
-                  className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
-                >
-                  Change Signature
-                </button>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
-                Fill every highlighted field before submitting
-                {missingFields.length
-                  ? `: ${missingFields
-                      .map((field) => field.label || fieldKindLabel(field.kind))
-                      .join(", ")}`
-                  : "."}
-              </div>
-            )}
-
-            {submitError ? (
-              <p className="flex items-center gap-1 text-[11px] font-semibold text-rose-600">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {submitError}
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={
-                canSubmit
-                  ? handleFinalSubmit
-                  : () => {
-                      setSubmitError(
-                        `Complete every field before submitting: ${missingFields
-                          .map((field) => field.label || fieldKindLabel(field.kind))
-                          .slice(0, 4)
-                          .join(", ")}.`,
-                      );
-                      focusFirstIncomplete(missingFields);
-                    }
-              }
-              className={cn(
-                "flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white shadow-md transition-all",
-                canSubmit
-                  ? "cursor-pointer bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700"
-                  : "cursor-not-allowed bg-slate-300 shadow-none",
-              )}
-            >
-              <Send className="h-4 w-4" />
-              Finalize &amp; Submit Document
-            </button>
-
-            <button
-              type="button"
-              onClick={decline}
-              className="mt-1 h-8 w-full text-xs font-medium text-slate-500 hover:text-rose-600 transition-colors"
-            >
-              Decline Request
-            </button>
-          </div>
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!signingEnabled) {
-                  setConsentError(true);
-                } else {
-                  setIsModalOpen(true);
-                }
-              }}
-              className={cn(
-                "flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white shadow-md transition-all cursor-pointer",
-                signingEnabled
-                  ? "bg-violet-600 shadow-violet-600/20 hover:bg-violet-700"
-                  : "bg-slate-400 shadow-none cursor-pointer",
-              )}
-            >
-              <PenLine className="h-4 w-4" />
-              Click to Sign Document
-            </button>
-
-            <button
-              type="button"
-              onClick={decline}
-              className="mt-3 h-9 w-full text-xs font-medium text-slate-500 hover:text-rose-600 transition-colors"
-            >
-              Decline Request
-            </button>
-          </div>
-        )}
       </div>
-
-      <p className="mt-6 text-center text-[10px] text-slate-400">
-        By signing you agree this is your legal signature. IP {DEMO_SIGNER_IP}{" "}
-        will be recorded.
-      </p>
 
       {/* Signature Creation Modal */}
       <SignatureModal

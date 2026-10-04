@@ -12,11 +12,41 @@ export type BookingEventType =
 export type BookingPageStatus = "Draft" | "Live";
 
 export const CONSULTANT_PRIORITIES = [
+  "Lowest",
   "Low",
   "Medium",
   "High",
+  "Highest",
 ] as const;
 export type ConsultantPriority = (typeof CONSULTANT_PRIORITIES)[number];
+
+/** Priority-based assignment on Assigned Users (edit). */
+export const ASSIGNMENT_PRIORITIES = [
+  "Highest",
+  "High",
+  "Low",
+  "Lowest",
+] as const;
+export type AssignmentPriority = (typeof ASSIGNMENT_PRIORITIES)[number];
+
+/** Split 100% across assigned users for Load based distribution. */
+export function evenConsultantLoads(names: string[]): Record<string, number> {
+  const n = names.length;
+  if (!n) return {};
+  const base = Math.floor(100 / n);
+  const extra = 100 - base * n;
+  const loads: Record<string, number> = {};
+  names.forEach((name, index) => {
+    loads[name] = base + (index === 0 ? extra : 0);
+  });
+  return loads;
+}
+
+export function clampLoadPercent(value: string | number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
 
 export const APPOINTMENT_DISTRIBUTIONS = [
   "Default",
@@ -98,6 +128,8 @@ export interface BookingQuestion {
   id: string;
   label: string;
   required: boolean;
+  /** When true the field stays on the booking form editor but not the public page. */
+  hidden?: boolean;
   /** single_line, multiline, email, checkbox, radio, dropdown, date, address, number */
   fieldType?: string;
   /** Treat answers as sensitive health or personal data. */
@@ -151,6 +183,8 @@ export interface BookingPage {
   consultants?: string[];
   /** Priority per assigned consultant name. */
   consultantPriorities?: Record<string, ConsultantPriority>;
+  /** Load-based share per assigned consultant name (0–100). */
+  consultantLoads?: Record<string, number>;
   /** How bookings are assigned across consultants. */
   appointmentDistribution?: AppointmentDistribution;
   calendlyEventTypeId?: string;
@@ -536,7 +570,9 @@ export function customDaySlots(
 }
 
 export function deleteBookingPage(id: string) {
-  const list = listBookingPages().filter((p) => p.id !== id);
+  const list = listBookingPages().filter(
+    (p) => p.id !== id && p.crmEventTypeId !== id,
+  );
   writeStore(list);
 }
 

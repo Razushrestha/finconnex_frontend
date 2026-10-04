@@ -31,6 +31,7 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { bookingConfirmEmailHtml } from "@/lib/booking/guest-confirm-email";
+import { inviteGuestEmailsFromAnswers } from "@/lib/booking/invite-guests";
 import { resolveEmailRouting } from "@/lib/booking/email-config";
 import {
   formatDatePattern,
@@ -308,6 +309,7 @@ export function confirmEmailCopy(
   page: BookingPage,
   booking: Booking,
   dateFormat?: string,
+  opts?: { invited?: boolean },
 ) {
   const start = parseLocalDateTime(booking.start);
   const dateLabel = formatDatePattern(start, normalizeDateFormat(dateFormat));
@@ -344,6 +346,7 @@ export function confirmEmailCopy(
     slug: page.slug,
     manageToken: booking.manageToken,
     origin,
+    invited: opts?.invited,
   });
 }
 
@@ -393,6 +396,28 @@ export async function dispatchBookingNotifications(input: {
         );
       } else {
         emailTasks.push(sendEmailSafe(tokens.email, subject, emailBody, route));
+      }
+      const invited = inviteGuestEmailsFromAnswers(
+        input.booking.answers,
+        input.page.questions,
+        [tokens.email, tokens.ownerEmail, tokens.staffEmail],
+      );
+      for (const extra of invited) {
+        const extraRoute = routing("customer", extra);
+        if (input.event === "confirmed") {
+          const copy = confirmEmailCopy(input.page, input.booking, row.dateFormat, {
+            invited: true,
+          });
+          emailTasks.push(
+            sendEmailSafe(extra, copy.subject, copy.html, {
+              html: copy.html,
+              text: copy.text,
+              ...extraRoute,
+            }),
+          );
+        } else {
+          emailTasks.push(sendEmailSafe(extra, subject, emailBody, extraRoute));
+        }
       }
     }
     if (user && tokens.ownerEmail) {

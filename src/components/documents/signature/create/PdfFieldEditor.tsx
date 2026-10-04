@@ -32,6 +32,29 @@ export interface PlacedField {
   colorIndex?: number;
   /** Sender-filled value for Prefill fields. */
   value?: string;
+  required?: boolean;
+  resizable?: boolean;
+  movable?: boolean;
+  fixedWidth?: boolean;
+  fieldName?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  textColor?: string;
+  textAlign?: "left" | "center" | "right";
+  description?: string;
+  nameFormat?: string;
+  dateFormat?: string;
+  readOnly?: boolean;
+  fixedHeight?: boolean;
+  defaultValue?: string;
+  characterLimit?: number;
+  validation?: string;
+  checked?: boolean;
+  options?: string[];
+  groupValidation?: string;
+  groupValidationCount?: number;
 }
 
 export interface DraggingFieldType {
@@ -70,6 +93,9 @@ interface PdfFieldEditorProps {
   onChangeFieldValue?: (id: string, value: string) => void;
   emptyFieldErrorId?: string | null;
   onPickSignature?: (field: PlacedField) => void;
+  selectedFieldId?: string | null;
+  onSelectField?: (field: PlacedField) => void;
+  onClearSelection?: () => void;
   /** Called once this document's page count is known, so the caller can show continuous numbering across documents. */
   onNumPagesResolved?: (documentId: string, numPages: number) => void;
   /** Fired after the last page has rendered so scroll-to-next-doc is not premature. */
@@ -99,6 +125,9 @@ export default function PdfFieldEditor({
   onChangeFieldValue,
   emptyFieldErrorId,
   onPickSignature,
+  selectedFieldId,
+  onSelectField,
+  onClearSelection,
   onNumPagesResolved,
   onDocumentReady,
   readOnly = false,
@@ -265,10 +294,11 @@ export default function PdfFieldEditor({
           onDragLeave={handleDragLeavePage}
           onDrop={handleDropOnPage(pageNum)}
           onClick={(e) => {
-            if (!draggingFieldType || readOnly) return;
             if ((e.target as HTMLElement).closest("[data-placed-field]")) {
               return;
             }
+            onClearSelection?.();
+            if (!draggingFieldType || readOnly) return;
             handleDropOnPage(pageNum)(e);
           }}
           style={{
@@ -314,6 +344,26 @@ export default function PdfFieldEditor({
                   field.type === "company" ||
                   field.type === "job_title");
               const showEmptyError = emptyFieldErrorId === field.id;
+              const selected = selectedFieldId === field.id;
+              const displayLabel = field.fieldName || field.label;
+              const textStyle =
+                field.type === "email" ||
+                field.type === "name" ||
+                field.type === "company" ||
+                field.type === "job_title" ||
+                field.type === "text" ||
+                field.type === "dropdown" ||
+                field.type === "date" ||
+                field.type === "sign_date"
+                  ? {
+                      fontFamily: field.fontFamily || undefined,
+                      fontSize: field.fontSize ? `${field.fontSize}px` : undefined,
+                      fontWeight: field.bold ? 700 : undefined,
+                      fontStyle: field.italic ? "italic" : undefined,
+                      color: field.textColor || undefined,
+                      textAlign: field.textAlign || undefined,
+                    }
+                  : undefined;
 
               return (
                 <div
@@ -325,12 +375,9 @@ export default function PdfFieldEditor({
                       ? undefined
                       : (e) => {
                           if (e.button !== 0) return;
+                          onSelectField?.(field);
                           const target = e.target as HTMLElement;
                           if (target.closest("input, textarea, select, button")) {
-                            e.stopPropagation();
-                            return;
-                          }
-                          if (isSignaturePick) {
                             e.stopPropagation();
                             return;
                           }
@@ -348,8 +395,12 @@ export default function PdfFieldEditor({
                           e.currentTarget.setPointerCapture(e.pointerId);
                         }
                   }
-                  onClick={
-                    isSignaturePick
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectField?.(field);
+                  }}
+                  onDoubleClick={
+                    isSignaturePick && isPrefill
                       ? (e) => {
                           e.stopPropagation();
                           onPickSignature?.(field);
@@ -371,7 +422,7 @@ export default function PdfFieldEditor({
                         : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
                   } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none ${
                     showEmptyError ? "" : "z-10"
-                  } ${
+                  } ${selected ? "ring-2 ring-slate-800/80 ring-offset-1" : ""} ${
                     readOnly
                       ? "cursor-default"
                       : isBeingDragged
@@ -393,8 +444,8 @@ export default function PdfFieldEditor({
                         className="h-full max-h-7 w-full object-contain object-left"
                       />
                     ) : (
-                      <span className="truncate">
-                        {field.value || field.label}
+                      <span className="truncate" style={textStyle}>
+                        {field.value || displayLabel}
                       </span>
                     )
                   ) : isSignaturePick ? (
@@ -406,13 +457,15 @@ export default function PdfFieldEditor({
                         className="h-full max-h-7 w-full object-contain object-left"
                       />
                     ) : (
-                      <span className="truncate">{field.value || field.label}</span>
+                      <span className="truncate" style={textStyle}>
+                        {field.value || displayLabel}
+                      </span>
                     )
                   ) : field.type === "checkbox" ? (
                     <input
                       type="checkbox"
                       disabled={readOnly || !isPrefill}
-                      checked={field.value === "true"}
+                      checked={field.checked === true || field.value === "true"}
                       onChange={(e) =>
                         onChangeFieldValue?.(field.id, e.target.checked ? "true" : "")
                       }
@@ -443,21 +496,23 @@ export default function PdfFieldEditor({
                         isPrefill && !readOnly ? "" : "pointer-events-none"
                       }`}
                     >
-                      <option value="">{field.label}</option>
-                      <option value={field.label}>{field.label}</option>
+                      <option value="">{displayLabel}</option>
+                      <option value={displayLabel}>{displayLabel}</option>
                     </select>
                   ) : isPrefill && !readOnly ? (
                     <input
                       type="text"
                       value={field.value ?? ""}
-                      placeholder={field.label}
+                      placeholder={displayLabel}
                       onChange={(e) =>
                         onChangeFieldValue?.(field.id, e.target.value)
                       }
                       className="w-full min-w-0 bg-transparent text-[11px] font-semibold outline-none placeholder:text-current/70"
                     />
                   ) : (
-                    <span className="truncate">{field.label}</span>
+                    <span className="truncate" style={textStyle}>
+                      {displayLabel}
+                    </span>
                   )}
                   {!readOnly ? (
                     <>
@@ -471,7 +526,7 @@ export default function PdfFieldEditor({
                       >
                         <X className="w-3 h-3" />
                       </button>
-                      {onResizeField ? (
+                      {onResizeField && field.resizable !== false ? (
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();

@@ -168,9 +168,13 @@ export function timezoneLabelFromIana(tz?: string): string {
   return IANA_TO_LABEL[tz] ?? WORLD_TIMEZONES.find((label) => label.includes(tz)) ?? tz;
 }
 
+const ZONE_ALIASES: Record<string, string> = {
+  "Asia/Katmandu": "Asia/Kathmandu",
+};
+
 /** CRM APIs want IANA ids, not the GMT display labels. */
 export function ianaTimezoneFromLabel(label?: string): string {
-  const raw = label?.trim() || "";
+  const raw = ZONE_ALIASES[label?.trim() || ""] || label?.trim() || "";
   if (!raw) return "Australia/Sydney";
   if (IANA_TO_LABEL[raw]) return raw;
   const match = Object.entries(IANA_TO_LABEL).find(([, value]) => value === raw);

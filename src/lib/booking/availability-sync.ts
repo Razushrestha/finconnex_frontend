@@ -10,6 +10,7 @@ import {
   type CrmAvailabilityWindow,
 } from "@/lib/booking/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { ianaTimezoneFromLabel } from "@/lib/booking/timezones";
 import {
   WEEKDAYS,
   type AvailabilityRule,
@@ -167,6 +168,7 @@ export async function syncConsultationAvailability(input: {
   names: string[];
   userIds?: Record<string, string>;
   values: AvailabilityLimitsValues;
+  timezone?: string;
 }): Promise<string[]> {
   const hosts = await resolveCrmBookingHosts(
     input.names.map((name) => ({
@@ -197,7 +199,9 @@ export async function syncConsultationAvailability(input: {
     const saved = await saveCrmHostSchedule(host!.id, {
       scheduleId: current?.id,
       name: "Working hours",
-      timezone: host!.timezone || current?.timezone || "Australia/Sydney",
+      timezone: input.timezone
+        ? ianaTimezoneFromLabel(input.timezone)
+        : host!.timezone || current?.timezone || "Australia/Sydney",
       isDefault: true,
       rules: weeklyToApiRules(source),
     });

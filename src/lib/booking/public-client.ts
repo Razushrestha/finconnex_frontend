@@ -72,7 +72,7 @@ const CODES: readonly PublicClientFailure[] = [
   "not_connected",
 ];
 
-function endpoint(slug: string, route: "slots" | "book" | "manage"): string {
+function endpoint(slug: string, route: "slots" | "book" | "manage" | "site"): string {
   return `/api/book/${encodeURIComponent(slug)}/${route}`;
 }
 
@@ -152,6 +152,16 @@ export async function fetchPublicSlots(
   const res = await call(`${endpoint(slug, "slots")}?${query.toString()}`);
   if (!res.ok) return res;
   return { ok: true, days: parsePublicSlotDays(res.json) };
+}
+
+export async function fetchPublicSiteBranding(slug: string): Promise<unknown | null> {
+  const res = await call(endpoint(slug, "site"));
+  if (!res.ok) return null;
+  const rec =
+    res.json && typeof res.json === "object" && !Array.isArray(res.json)
+      ? (res.json as Record<string, unknown>)
+      : null;
+  return rec?.branding ?? null;
 }
 
 export async function bookPublicSlot(

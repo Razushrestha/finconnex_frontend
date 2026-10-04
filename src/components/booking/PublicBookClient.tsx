@@ -11,16 +11,20 @@ import {
   Calendar,
   Globe,
   MoreHorizontal,
+  X,
 } from "lucide-react";
 import { confirmPublicBooking } from "@/lib/booking/actions";
 import { sanitizeDescriptionHtml } from "@/lib/booking/description-html";
 import {
   PublicBookingError,
+  fetchPublicSiteBranding,
   fetchPublicSlots,
   fetchPublishedCrmRef,
 } from "@/lib/booking/public-client";
 import {
+  formatWorkingHoursClock,
   timeInZone,
+  workingHoursDisplayZone,
   type PublicSlot,
   type PublicSlotDays,
 } from "@/lib/booking/public-crm";
@@ -46,16 +50,30 @@ import {
   upsertBookingPage,
   bookingPageMatchesSlug,
   assignedCalendarMembers,
+  availabilityRuleForDate,
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
 import { AssignedHosts } from "@/components/booking/AssignedHosts";
 import {
+  ianaTimezoneFromLabel,
   isPastBookingDate,
   isPastBookingStart,
   todayIsoInTimezone,
 } from "@/lib/booking/timezones";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import {
+  addInviteGuestEmails,
+  inviteGuestEmailsLabel,
+  inviteGuestsField,
+  isInviteGuestsQuestion,
+  MAX_INVITE_GUEST_EMAILS,
+} from "@/lib/booking/invite-guests";
+import {
+  normalizeBookingPageBranding,
+  readLocalBookingPageBranding,
+  type BookingPageBranding,
+} from "@/lib/booking/page-branding";
 import { cn } from "@/lib/utils";
 
 type Step = "date" | "details" | "done";
@@ -172,22 +190,18 @@ function BookFlow({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const inviteField = inviteGuestsField(page.questions);
+  const [inviteEmails, setInviteEmails] = useState<string[]>([]);
+  const [inviteDraft, setInviteDraft] = useState("");
+  const [pageBranding, setPageBranding] = useState<BookingPageBranding>(() =>
+    readLocalBookingPageBranding(),
+  );
   const [crmSlots, setCrmSlots] = useState<string[]>([]);
   const [crmSlotDays, setCrmSlotDays] = useState<Set<string>>(new Set());
-  const [guestTz, setGuestTz] = useState(() => {
-    const browser =
-      typeof Intl !== "undefined"
-        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-        : "";
-    return browser || page.timezone || "Asia/Kathmandu";
-  });
-  const [dialCode, setDialCode] = useState(() => {
-    const browser =
-      typeof Intl !== "undefined"
-        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-        : "";
-    return dialCodeForTimezone(browser || page.timezone || "Asia/Kathmandu");
-  });
+  const eventTz = ianaTimezoneFromLabel(page.timezone);
+  const [guestTz, setGuestTz] = useState(eventTz);
+  const [dialCode, setDialCode] = useState(() => dialCodeForTimezone(eventTz));
+  const alignedGuestTz = useRef(false);
 
   // Pages the host connected to the CRM list slots (and take bookings) through
   // the public API, which needs no login. `publicRefresh` re-reads them after a
@@ -205,6 +219,18 @@ function BookFlow({
   const publicKey = publicSlug
     ? `${publicSlug}|${guestTz}|${monthFrom}|${monthTo}|${publicRefresh}`
     : "";
+
+  useEffect(() => {
+    if (!publicSlug) return;
+    let alive = true;
+    void fetchPublicSiteBranding(publicSlug).then((raw) => {
+      if (!alive || !raw) return;
+      setPageBranding(normalizeBookingPageBranding(raw));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [publicSlug]);
 
   useEffect(() => {
     if (!publicKey) return;
@@ -230,6 +256,27 @@ function BookFlow({
   const publicDays = publicCurrent?.days;
   const publicLoading = !!publicKey && !publicCurrent;
   const publicError = publicCurrent?.error;
+
+  // Host hours are a wall clock (09:00–17:00). If the browser zone shifted
+  // those to 03:45 AM, snap the picker to the zone that still reads 09:00 AM.
+  useEffect(() => {
+    if (alignedGuestTz.current || !publicDays?.size) return;
+    const first = [...publicDays.values()].find((rows) => rows[0])?.[0];
+    if (!first) return;
+    const hoursStart =
+      page.availability.find((rule) => rule.enabled)?.start || "09:00";
+    const next = workingHoursDisplayZone(first.startAt, hoursStart, [
+      eventTz,
+      guestTz,
+      "Australia/Sydney",
+      "Asia/Kathmandu",
+    ]);
+    alignedGuestTz.current = true;
+    if (next && next !== guestTz) {
+      setGuestTz(next);
+      setDialCode(dialCodeForTimezone(next));
+    }
+  }, [publicDays, eventTz, guestTz, page.availability]);
 
   useEffect(() => {
     const eventTypeId = crmEventTypeIdOf(page);
@@ -305,40 +352,51 @@ function BookFlow({
     ? slotsForDate(slotPage, selectedDate, slotOpts)
     : [];
 
-  // The CRM's open times for the chosen day as the guest reads them (HH:mm in
-  // their timezone), earliest first. Two hosts free at the same time show once.
+  // The CRM's open times for the chosen day. Labels use the same wall clock as
+  // Dates and times (09:00 AM), not a shifted guest-zone reading (03:45 AM).
   const publicSlotList = useMemo(() => {
     if (!publicDays || !selectedDate) return [];
+    const rows = publicDays.get(toLocalDateStr(selectedDate)) ?? [];
+    const hoursStart =
+      availabilityRuleForDate(page, toLocalDateStr(selectedDate))?.start || "09:00";
+    const clockTz = rows[0]
+      ? workingHoursDisplayZone(rows[0].startAt, hoursStart, [
+          eventTz,
+          guestTz,
+          "Australia/Sydney",
+          "Asia/Kathmandu",
+        ])
+      : guestTz;
     const byTime = new Map<string, PublicSlot & { start: string }>();
-    for (const slot of publicDays.get(toLocalDateStr(selectedDate)) ?? []) {
-      const start = timeInZone(slot.startAt, guestTz);
+    for (const slot of rows) {
+      const start = timeInZone(slot.startAt, clockTz);
       if (start && !byTime.has(start)) byTime.set(start, { ...slot, start });
     }
     return [...byTime.values()].sort(
       (a, b) => Date.parse(a.startAt) - Date.parse(b.startAt),
     );
-  }, [publicDays, selectedDate, guestTz]);
+  }, [publicDays, selectedDate, guestTz, eventTz, page]);
 
-  const slots = (page.crmPublic
-    ? publicSlotList.map((slot) => slot.start)
-    : crmSlots.length
-      ? crmSlots
-      : localSlots
-  )
-    .map((item) =>
-      typeof item === "string"
-        ? { start: item, label: formatPublicSlotLabel(item) }
-        : { start: item.start, label: formatPublicSlotLabel(item.start) },
-    )
-    .filter((item) => {
-      if (!selectedDate) return false;
-      const day = toLocalDateStr(selectedDate);
-      return !isPastBookingStart(
-        day,
-        item.start.slice(0, 5),
-        guestTz || page.timezone,
-      );
-    });
+  const slots = (
+    page.crmPublic
+      ? publicSlotList.map((slot) => ({
+          start: slot.start,
+          label: formatPublicSlotLabel(slot.start),
+          startAt: slot.startAt,
+        }))
+      : (crmSlots.length ? crmSlots : localSlots).map((item) => {
+          const start = typeof item === "string" ? item : item.start;
+          return { start, label: formatPublicSlotLabel(start), startAt: undefined as string | undefined };
+        })
+  ).filter((item) => {
+    if (!selectedDate) return false;
+    if (item.startAt) return Date.parse(item.startAt) > Date.now();
+    return !isPastBookingStart(
+      toLocalDateStr(selectedDate),
+      item.start.slice(0, 5),
+      guestTz || page.timezone,
+    );
+  });
 
   const hostNames = assignedCalendarMembers(page);
   const hostName = hostNames[0] || "Host";
@@ -397,6 +455,19 @@ function BookFlow({
     if (!email.trim() || !email.includes("@")) next.email = "Valid email required";
     if (!phone.trim()) next.phone = "Required";
     const today = toLocalDateStr(new Date());
+    const submittedAnswers = { ...answers };
+    if (inviteField) {
+      const added = addInviteGuestEmails(inviteEmails, inviteDraft);
+      if (added.error) {
+        next[inviteField.id] = added.error;
+      } else if (inviteField.required && !added.emails.length) {
+        next[inviteField.id] = "Required";
+      } else {
+        setInviteEmails(added.emails);
+        setInviteDraft("");
+        submittedAnswers[inviteField.id] = inviteGuestEmailsLabel(added.emails);
+      }
+    }
     for (const q of extraGuestQuestions(page.questions)) {
       if (q.fieldType === "date" && answers[q.id] && answers[q.id] < today) {
         next[q.id] = "Choose today or a future date.";
@@ -420,12 +491,18 @@ function BookFlow({
     if (Object.keys(next).length) return;
     if (!selectedDate || !selectedSlot) return;
     const dateStr = toLocalDateStr(selectedDate);
+    // On a CRM-connected page the booking is the exact slot the CRM offered.
+    const chosen = page.crmPublic
+      ? publicSlotList.find((slot) => slot.start === selectedSlot)
+      : undefined;
     if (
-      isPastBookingStart(
-        dateStr,
-        selectedSlot.slice(0, 5),
-        guestTz || page.timezone,
-      )
+      chosen?.startAt
+        ? Date.parse(chosen.startAt) <= Date.now()
+        : isPastBookingStart(
+            dateStr,
+            selectedSlot.slice(0, 5),
+            guestTz || page.timezone,
+          )
     ) {
       setErrors((prev) => ({
         ...prev,
@@ -433,11 +510,6 @@ function BookFlow({
       }));
       return;
     }
-
-    // On a CRM-connected page the booking is the exact slot the CRM offered.
-    const chosen = page.crmPublic
-      ? publicSlotList.find((slot) => slot.start === selectedSlot)
-      : undefined;
     if (page.crmPublic && !chosen) {
       chooseAnotherTime("That time is no longer available. Please choose another time.");
       return;
@@ -458,7 +530,7 @@ function BookFlow({
         startAtIso: chosen?.startAt,
         hostId: chosen?.hostId,
         timezone: guestTz,
-        answers,
+        answers: submittedAnswers,
         rescheduleToken,
       });
       setManageToken(result.manageToken);
@@ -520,8 +592,38 @@ function BookFlow({
   const locationLabel = bookingLocationLabel(page);
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#F3F4F6] px-3 py-8 sm:py-12">
-      <div className="w-full max-w-[980px] overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80">
+    <div
+      className="flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
+      style={{
+        backgroundColor: "#F3F4F6",
+        backgroundImage: pageBranding.backgroundImageUrl
+          ? `url(${pageBranding.backgroundImageUrl})`
+          : undefined,
+        backgroundSize: "cover",
+      }}
+    >
+      {pageBranding.header.titleVisible ||
+      (pageBranding.header.logoVisible && pageBranding.header.logoUrl) ? (
+        <div className="mb-4 flex w-full max-w-[980px] items-center gap-2 px-1">
+          {pageBranding.header.logoVisible && pageBranding.header.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={pageBranding.header.logoUrl}
+              alt=""
+              className="h-8 w-8 rounded object-cover"
+            />
+          ) : null}
+          {pageBranding.header.titleVisible && pageBranding.header.title ? (
+            <p className="text-[16px] font-semibold text-slate-900">
+              {pageBranding.header.title}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <div
+        className="w-full max-w-[980px] overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80"
+        style={{ ["--booking-brand" as string]: pageBranding.primaryColor }}
+      >
         {step === "date" ? (
           <div className="grid lg:grid-cols-[240px_minmax(0,1fr)_230px]">
             <aside className="flex flex-col border-b border-slate-100 p-6 lg:border-r lg:border-b-0">
@@ -847,6 +949,39 @@ function BookFlow({
                     onPhoneChange={setPhone}
                   />
                 </div>
+                {inviteField ? (
+                  <InviteGuestEmailsField
+                    label={inviteField.label}
+                    required={inviteField.required}
+                    emails={inviteEmails}
+                    draft={inviteDraft}
+                    error={errors[inviteField.id]}
+                    onDraftChange={(value) => {
+                      setInviteDraft(value);
+                      if (errors[inviteField.id]) {
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[inviteField.id];
+                          return next;
+                        });
+                      }
+                    }}
+                    onAdd={(raw) => {
+                      const added = addInviteGuestEmails(inviteEmails, raw);
+                      setInviteEmails(added.emails);
+                      setInviteDraft(added.error ? raw.trim() : "");
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        if (added.error) next[inviteField.id] = added.error;
+                        else delete next[inviteField.id];
+                        return next;
+                      });
+                    }}
+                    onRemove={(email) =>
+                      setInviteEmails((prev) => prev.filter((row) => row !== email))
+                    }
+                  />
+                ) : null}
                 {extraGuestQuestions(page.questions).map((q) => (
                   <GuestQuestion
                     key={q.id}
@@ -1016,18 +1151,33 @@ function BookFlow({
           </div>
         ) : null}
       </div>
+      <PublicBrandFooter branding={pageBranding} />
+    </div>
+  );
+}
+
+function PublicBrandFooter({ branding }: { branding: BookingPageBranding }) {
+  const items = [
+    branding.footer.contactVisible && branding.footer.contact,
+    branding.footer.emailVisible && branding.footer.email,
+    branding.footer.addressVisible && branding.footer.address,
+    branding.footer.facebookVisible && branding.footer.facebook,
+    branding.footer.instagramVisible && branding.footer.instagram,
+    branding.footer.xVisible && branding.footer.x,
+    branding.footer.linkedinVisible && branding.footer.linkedin,
+  ].filter(Boolean);
+  if (!items.length) return null;
+  return (
+    <div className="mt-4 flex w-full max-w-[980px] flex-wrap gap-x-4 gap-y-1 px-1 text-[12px] text-slate-500">
+      {items.map((item) => (
+        <span key={String(item)}>{item}</span>
+      ))}
     </div>
   );
 }
 
 function formatPublicSlotLabel(hhmm: string) {
-  const [hourRaw, minuteRaw] = hhmm.split(":");
-  const hour = Number(hourRaw);
-  const minute = Number(minuteRaw) || 0;
-  if (!Number.isFinite(hour)) return hhmm;
-  const suffix = hour >= 12 ? "pm" : "am";
-  const hour12 = hour % 12 || 12;
-  return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${suffix}`;
+  return formatWorkingHoursClock(hhmm);
 }
 
 function publicTimezoneGmt(tz: string) {
@@ -1149,6 +1299,94 @@ function Field({
   );
 }
 
+function InviteGuestEmailsField({
+  label,
+  required,
+  emails,
+  draft,
+  error,
+  onDraftChange,
+  onAdd,
+  onRemove,
+}: {
+  label: string;
+  required?: boolean;
+  emails: string[];
+  draft: string;
+  error?: string;
+  onDraftChange: (value: string) => void;
+  onAdd: (raw: string) => void;
+  onRemove: (email: string) => void;
+}) {
+  const full = emails.length >= MAX_INVITE_GUEST_EMAILS;
+  return (
+    <div>
+      <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
+        {label}
+        {required ? <span className="text-rose-500"> *</span> : null}
+      </label>
+      <div
+        className={cn(
+          "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-white px-2 py-1.5",
+          error
+            ? "border-rose-300"
+            : "border-slate-200 hover:border-violet-300 focus-within:border-[#5B4BDB] focus-within:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]",
+        )}
+      >
+        {emails.map((email) => (
+          <span
+            key={email}
+            className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 py-0.5 pr-1 pl-2 text-[12px] text-slate-700"
+          >
+            <span className="truncate">{email}</span>
+            <button
+              type="button"
+              onClick={() => onRemove(email)}
+              className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-slate-700"
+              aria-label={`Remove ${email}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          type="email"
+          value={draft}
+          disabled={full}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === "," || event.key === "Tab") {
+              if (!draft.trim()) return;
+              event.preventDefault();
+              onAdd(draft);
+            }
+            if (event.key === "Backspace" && !draft && emails.length) {
+              onRemove(emails[emails.length - 1]!);
+            }
+          }}
+          onBlur={() => {
+            if (draft.trim()) onAdd(draft);
+          }}
+          placeholder={
+            emails.length
+              ? full
+                ? "Maximum 10 emails"
+                : "Add another email"
+              : "Guest email"
+          }
+          className="h-8 min-w-[140px] flex-1 border-0 bg-transparent px-1 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 disabled:placeholder:text-slate-300"
+        />
+      </div>
+      <p className="mt-1 text-[12px] text-slate-400">
+        Add up to {MAX_INVITE_GUEST_EMAILS} email addresses
+      </p>
+      {error ? (
+        <p className="mt-0.5 text-[10px] font-medium text-rose-500">{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 const PHONE_DIAL_CODES = [
   { code: "+977", iso: "NP" },
   { code: "+61", iso: "AU" },
@@ -1255,11 +1493,12 @@ function safeTermsHtml(html: string | undefined) {
 }
 
 function extraGuestQuestions<
-  T extends { id: string; label: string; required?: boolean },
+  T extends { id: string; label: string; required?: boolean; hidden?: boolean },
 >(questions: T[]) {
   return questions.filter((question) => {
+    if (question.hidden || isInviteGuestsQuestion(question)) return false;
     const id = question.id.trim().toLowerCase();
-    return !["name", "email", "phone", "guests", "contact"].includes(id);
+    return !["name", "email", "phone", "contact"].includes(id);
   });
 }
 

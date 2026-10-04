@@ -34,6 +34,7 @@ const KNOWN_KINDS = new Set<string>([
   "checkbox",
   "dropdown",
   "radio",
+  "checkbox_group",
   "payment",
   "attachment",
 ]);
@@ -68,7 +69,7 @@ export function signingFieldAction(kind: string | undefined): SigningFieldAction
   const k = normalizeFieldKind(kind);
   if (isSignatureCaptureKind(k)) return "signature";
   if (isDateFieldKind(k)) return "date";
-  if (k === "checkbox") return "checkbox";
+  if (k === "checkbox" || k === "checkbox_group") return "checkbox";
   if (k === "dropdown" || k === "radio") return "choice";
   if (k === "attachment" || k === "image") return "file";
   if (k === "stamp") return "stamp";

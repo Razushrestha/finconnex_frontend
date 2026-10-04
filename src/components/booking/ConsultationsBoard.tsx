@@ -66,12 +66,13 @@ import {
   createCrmEventType,
   listCrmEventTypePages,
   mergeCrmEventTypePages,
+  removeConsultationPage,
   tryCrmBooking,
 } from "@/lib/booking/api";
+import { toast } from "@/lib/notify/toast";
 import { mergeNotificationPrefs } from "@/lib/booking/notify-prefs";
 import {
   consultationModeLabel,
-  deleteBookingPage,
   nextBookingPageId,
   publicBookUrl,
   upsertBookingPage,
@@ -317,17 +318,16 @@ export function ConsultationsBoard() {
             userHours: availabilityValues.userHours,
           }
         : undefined,
-      questions: (form?.fields ?? [])
-        .filter((f) => !f.hidden)
-        .map((f) => ({
-          id: f.id,
-          label: f.label,
-          required: f.required,
-          fieldType: f.type,
-          ephi: f.ephi,
-          options: f.options,
-          addressParts: f.addressParts,
-        })),
+      questions: (form?.fields ?? []).map((f) => ({
+        id: f.id,
+        label: f.label,
+        required: f.required,
+        hidden: f.hidden,
+        fieldType: f.type,
+        ephi: f.ephi,
+        options: f.options,
+        addressParts: f.addressParts,
+      })),
       termsEnabled: Boolean(form?.terms),
       termsHtml: form?.termsText,
       confirmationTemplate:
@@ -478,6 +478,7 @@ export function ConsultationsBoard() {
         panel={availabilityPanel}
         consultants={assignedConsultants}
         consultantUserIds={assignedUserIds}
+        timezone="Australia/Sydney"
         initial={availabilityValues}
         onChange={setAvailabilityValues}
         onBack={() => {
@@ -1034,9 +1035,19 @@ function CardMenu({
             danger
             onClick={() => {
               if (!window.confirm(`Delete “${page.title}”?`)) return;
-              deleteBookingPage(page.id);
-              setOpen(false);
-              onRefresh();
+              void (async () => {
+                try {
+                  await removeConsultationPage(page);
+                  setOpen(false);
+                  onRefresh();
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : "Could not delete this consultation.",
+                  );
+                }
+              })();
             }}
           />
         </div>
