@@ -23,9 +23,6 @@ export default function AllRequestsRoute() {
   return (
     <AllDocumentRequestsPage
       rows={rows}
-      source={crm.source}
-      loading={crm.loading}
-      error={crm.error}
       onRefresh={() => setRows(listDocumentRequests())}
     />
   );

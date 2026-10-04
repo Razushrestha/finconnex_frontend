@@ -253,20 +253,55 @@ export function BookingsWorkspace({
   const searchParams = useSearchParams();
   const crm = useCrmBooking();
   const [bookOpen, setBookOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     if (searchParams.get("book") === "1") setBookOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    const updateOnline = () => setIsOnline(window.navigator.onLine);
+    updateOnline();
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
 
   function closeBook() {
     setBookOpen(false);
     if (searchParams.get("book") === "1") router.replace("/booking");
   }
 
+  const sectionTitle =
+    section === "consultations"
+      ? "Consultations"
+      : section === "schedules"
+        ? "Schedules"
+        : section === "consultants"
+          ? "Consultants"
+          : "Bookings";
+  const crmConnected = !crm.loading && !crm.error;
+  const liveStatus: "live" | "offline" =
+    isOnline && crmConnected ? "live" : "offline";
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8F9FB]">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden px-3 pt-4 pb-3 sm:px-5 sm:pt-5 lg:px-7">
+          <div className="mb-3 flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+              {sectionTitle}
+            </h1>
+            <span
+              aria-label={liveStatus === "live" ? "CRM live" : "CRM offline"}
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                liveStatus === "live" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
+          </div>
           {section === "home" ? (
             <HomeView
               appointments={crm.appointments}

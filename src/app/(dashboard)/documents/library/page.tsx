@@ -395,25 +395,6 @@ function DocumentLibraryPageInner() {
     <div className={BOARD_PAGE}>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                crm.source === "api"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-500",
-              )}
-            >
-              {crm.source === "api"
-                ? "Live CRM"
-                : crm.loading
-                  ? "Connecting…"
-                  : "Demo"}
-            </span>
-            {crm.error && crm.source === "demo" ? (
-              <span className="text-[10px] text-slate-500">{crm.error}</span>
-            ) : null}
-          </div>
           <div className="flex items-center gap-2">
           <Link
             href={

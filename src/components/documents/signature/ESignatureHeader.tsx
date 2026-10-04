@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Send, PenTool } from "lucide-react";
-import { CrmSourceBadge } from "@/components/documents/signature/CrmSourceBadge";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function ESignatureHeader({
@@ -19,22 +18,15 @@ export function ESignatureHeader({
   templatesError?: string | null;
   onNew?: () => void;
 }) {
+  void source;
+  void templatesSource;
+  void loading;
+  void templatesLoading;
+  void error;
+  void templatesError;
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <CrmSourceBadge
-          source={source}
-          loading={loading}
-          error={error}
-          label="Documents"
-        />
-        <CrmSourceBadge
-          source={templatesSource}
-          loading={templatesLoading}
-          error={templatesError}
-          label="Templates"
-        />
-      </div>
       <div className="flex items-center gap-2">
         <Link
           href="/signature/request/new?layoutid=standard&redirect=false&type=send"

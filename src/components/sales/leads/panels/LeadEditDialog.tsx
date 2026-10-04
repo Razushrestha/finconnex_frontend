@@ -656,7 +656,7 @@ function TasksSection({
       tasks.filter(
         (t) =>
           (t.status === "Done" || t.previous) &&
-          t.title.toLowerCase().includes(search.trim().toLowerCase()),
+        t.title.toLowerCase().includes(search.trim().toLowerCase()),
       ),
     [tasks, search],
   );
@@ -798,7 +798,7 @@ function TasksSection({
           emptyLabel="No previous tasks"
           items={previousTasks}
         />
-      </div>
+          </div>
     </div>
   );
 }
@@ -824,8 +824,8 @@ function TaskListBlock({
           {items.map((t) => (
             <li key={t.id} className="flex items-center justify-between py-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
-                <CheckSquare
-                  className={cn(
+                  <CheckSquare
+                    className={cn(
                     "h-4 w-4 shrink-0",
                     t.status === "Done" ? "text-emerald-500" : "text-slate-300",
                   )}
@@ -837,20 +837,20 @@ function TaskListBlock({
                       t.status === "Done" && "text-slate-500 line-through",
                     )}
                   >
-                    {t.title}
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    {t.dueLabel} · {t.assignedTo}
-                  </p>
+                      {t.title}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {t.dueLabel} · {t.assignedTo}
+                    </p>
+                  </div>
                 </div>
-              </div>
               <span className="ml-2 shrink-0 text-[10px] font-semibold text-slate-400">
-                {t.priority}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+                  {t.priority}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
     </section>
   );
 }
@@ -968,10 +968,10 @@ function NotesSection({
         },
         ...prev.filter((n) => n.id !== createdId),
       ]);
-      setTitle("");
-      setBody("");
-      setFormOpen(false);
-      onSuccess?.("Note added");
+    setTitle("");
+    setBody("");
+    setFormOpen(false);
+    onSuccess?.("Note added");
     } catch {
       setSaveError("Could not save this note. Try again.");
     } finally {
@@ -1054,23 +1054,23 @@ function NotesSection({
           <h4 className="mb-2 text-[11px] font-semibold tracking-[0.06em] text-slate-400 uppercase">
             Notes
           </h4>
-          {notes.length === 0 ? (
+        {notes.length === 0 ? (
             <p className="py-2 text-[12.5px] text-slate-400">No notes yet</p>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {notes.map((n) => (
-                <li key={n.id} className="py-2.5">
-                  <p className="text-[13px] font-semibold text-slate-800">
-                    {n.title}
-                  </p>
-                  <p className="mt-0.5 text-[13px] text-slate-600">{n.body}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {n.timestamp} · {n.owner}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+            {notes.map((n) => (
+              <li key={n.id} className="py-2.5">
+                <p className="text-[13px] font-semibold text-slate-800">
+                  {n.title}
+                </p>
+                <p className="mt-0.5 text-[13px] text-slate-600">{n.body}</p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {n.timestamp} · {n.owner}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
         </section>
 
         <section>

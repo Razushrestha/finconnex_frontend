@@ -29,15 +29,9 @@ const PAGE_SIZE = 10;
 
 export function AllDocumentRequestsPage({
   rows,
-  source,
-  loading,
-  error,
   onRefresh,
 }: {
   rows: DocumentRequest[];
-  source?: "api" | "demo";
-  loading?: boolean;
-  error?: string | null;
   onRefresh?: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -73,27 +67,6 @@ export function AllDocumentRequestsPage({
       <div className="mx-auto w-full max-w-[1920px] px-5 py-5">
         <section className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                  source === "api"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-500",
-                )}
-              >
-                {source === "api"
-                  ? "Live CRM"
-                  : loading
-                    ? "Connecting…"
-                    : "Demo"}
-              </span>
-              {error && source === "demo" ? (
-                <span className="text-[10px] font-normal text-slate-500">
-                  {error}
-                </span>
-              ) : null}
-            </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <div className="relative w-[220px]">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />

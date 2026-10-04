@@ -32,12 +32,6 @@ export function AnalyticsLibrary() {
   return (
     <div className="min-h-full bg-[#F4F6FB]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-        <div>
-          <h1 className="text-[22px] font-semibold text-slate-900">Analytics</h1>
-          <p className="mt-1 text-[13px] text-slate-500">
-            Open a section to view that area of the business.
-          </p>
-        </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {ANALYTICS_SECTIONS.map((section) => {
             const Icon = ICONS[section.icon as keyof typeof ICONS] ?? Users;

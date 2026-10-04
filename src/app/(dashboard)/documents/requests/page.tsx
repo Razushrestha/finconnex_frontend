@@ -24,9 +24,6 @@ export default function DocumentRequestsPage() {
     <div className="absolute inset-0 overflow-y-auto">
       <DocumentRequestsDashboard
         rows={rows}
-        source={crm.source}
-        loading={crm.loading}
-        error={crm.error}
         onRefresh={() => setRows(listDocumentRequests())}
       />
     </div>

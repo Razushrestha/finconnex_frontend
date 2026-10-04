@@ -196,11 +196,20 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
 
   return (
     <div className="p-6">
+      <div className="mb-3 flex min-w-0 items-center gap-2">
+        <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+          Automations
+        </h1>
+        <span
+          aria-label="CRM live"
+          className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500"
+        />
+      </div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-heading truncate text-2xl font-semibold text-slate-900">
+          <h2 className="font-heading truncate text-2xl font-semibold text-slate-900">
             {currentFolder?.name ?? "Workflows"}
-          </h1>
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
             {currentFolder
               ? "Workflows and folders filed in this folder."

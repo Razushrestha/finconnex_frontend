@@ -837,11 +837,11 @@ export function CreateEmailForm({
             onAiRegenerate={() => rewriteWith("professional")}
           />
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
             onChange={(e) => {
               handleFilesSelected(e.target.files);
               e.target.value = "";

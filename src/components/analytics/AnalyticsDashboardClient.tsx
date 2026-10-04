@@ -527,25 +527,16 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
 
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+              Analytics
+            </h1>
             <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                live.source === "api"
-                  ? "bg-violet-50 text-violet-700"
-                  : live.source === "mixed"
-                    ? "bg-amber-50 text-amber-700"
-                    : "bg-slate-100 text-slate-500",
-              )}
-            >
-              {live.loading
-                ? "Loading CRM…"
-                : live.source === "api"
-                  ? "Live CRM"
-                  : live.source === "mixed"
-                    ? "Live + demo"
-                    : "Demo"}
-            </span>
+              aria-label={live.source === "demo" ? "CRM offline" : "CRM live"}
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                live.source === "demo" ? "bg-rose-500" : "bg-emerald-500"
+              }`}
+            />
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <button
