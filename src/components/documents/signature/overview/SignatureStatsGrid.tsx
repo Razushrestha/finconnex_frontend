@@ -18,8 +18,7 @@ import { onRecordsChange } from "@/lib/records-sync";
 
 type StatCard = {
   icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
+  iconClass: string;
   value: number;
   label: string;
   link: string;
@@ -44,8 +43,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
   return [
     {
       icon: FileText,
-      iconBg: "bg-blue-50 dark:bg-blue-950/50",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      iconClass: "bg-slate-100 text-slate-600",
       value: docs.length,
       label: "All Documents",
       link: "View all documents",
@@ -53,8 +51,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
     },
     {
       icon: PenLine,
-      iconBg: "bg-blue-50 dark:bg-blue-950/50",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      iconClass: "bg-amber-100 text-amber-600",
       value: draft,
       label: "Draft",
       link: "View draft documents",
@@ -62,8 +59,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
     },
     {
       icon: Clock,
-      iconBg: "bg-blue-50 dark:bg-blue-950/50",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      iconClass: "bg-indigo-100 text-indigo-600",
       value: inProgress,
       label: "In Progress",
       link: "View in-progress documents",
@@ -71,8 +67,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
     },
     {
       icon: CheckCircle2,
-      iconBg: "bg-blue-50 dark:bg-blue-950/50",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      iconClass: "bg-emerald-100 text-emerald-600",
       value: signed,
       label: "Signed",
       link: "View signed documents",
@@ -80,8 +75,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
     },
     {
       icon: CalendarX2,
-      iconBg: "bg-blue-50 dark:bg-blue-950/50",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      iconClass: "bg-rose-100 text-rose-600",
       value: expired,
       label: "Expired",
       link: "View expired documents",
@@ -104,44 +98,33 @@ export function SignatureStatsGrid() {
   const stats = buildStats(requests);
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      {stats.map((stat) => {
-        const cardContent = (
-          <div className="group flex h-full cursor-pointer flex-col justify-between rounded-md border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_10px_25px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]">
-            <div className="flex items-center gap-4">
-              <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-105 ${stat.iconBg}`}
-              >
-                <stat.icon
-                  className={`h-5 w-5 ${stat.iconColor}`}
-                  strokeWidth={2}
-                />
-              </div>
-              <div>
-                <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  {stat.value}
-                </div>
-                <div className="text-sm font-medium text-slate-900 dark:text-zinc-200">
-                  {stat.label}
-                </div>
-              </div>
-            </div>
-            <div className="mt-4">
-              <span className="text-xs font-semibold text-blue-600 group-hover:underline dark:text-blue-400">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {stats.map((stat) => (
+        <Link
+          key={stat.label}
+          href={stat.href}
+          className="group rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-[#5A32A3]/25"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[12px] leading-tight font-medium text-slate-500">
+                {stat.label}
+              </p>
+              <p className="mt-1 text-[26px] leading-none font-bold tracking-tight text-slate-900">
+                {stat.value}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-snug font-medium text-[#5A32A3] group-hover:underline">
                 {stat.link}
-              </span>
+              </p>
             </div>
+            <span
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.iconClass}`}
+            >
+              <stat.icon className="h-5 w-5" strokeWidth={2} />
+            </span>
           </div>
-        );
-
-        return (
-          <div key={stat.label} className="flex flex-col">
-            <Link href={stat.href} className="flex h-full flex-col">
-              {cardContent}
-            </Link>
-          </div>
-        );
-      })}
+        </Link>
+      ))}
     </div>
   );
 }
