@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -37,7 +38,13 @@ import {
   updateCall,
 } from "@/lib/calls/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { placeOutboundCrmCall } from "@/lib/calls/api";
+import {
+  isCrmCallId,
+  placeOutboundCrmCall,
+  refreshCrmCallVoiceStatus,
+  syncCallStatus,
+  tryCrm,
+} from "@/lib/calls/api";
 import { requireDialablePhone } from "@/lib/contacts/phone";
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
@@ -50,6 +57,12 @@ import {
   type SoftphoneRelatedPick,
 } from "@/lib/softphone/resolve-record";
 import { emitRulesChange } from "@/lib/rules/storage";
+import {
+  matchCrmRecordsByPhone,
+  searchCrmRecords,
+  type CrmRecordSearchHit,
+  type CrmRecordSearchType,
+} from "@/lib/search/api";
 import type { Call, CallStatus } from "@/lib/calls/types";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -156,6 +169,10 @@ export function SoftphonePad({
   const [relatedKind, setRelatedKind] = React.useState<"" | SoftphoneRelatedKind>("");
   const [relatedPick, setRelatedPick] =
     React.useState<SoftphoneRelatedPick | null>(null);
+  // Set when the related record was filled in from the caller's number; a
+  // choice the user makes themselves is never overwritten by a late match.
+  const [autoMatched, setAutoMatched] = React.useState(false);
+  const userChoseRelated = React.useRef(false);
   const callStartedAt = React.useRef<number | null>(null);
   const [tick, setTick] = React.useState(0);
   const dragRef = React.useRef<{
@@ -168,6 +185,58 @@ export function SoftphonePad({
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Without a status callback (trial accounts) nothing tells the softphone
+  // the other side hung up, so it asks while the call is live and ends the
+  // call itself once the provider reports it finished.
+  const endCallRef = React.useRef(endCall);
+  React.useEffect(() => {
+    endCallRef.current = endCall;
+  });
+  React.useEffect(() => {
+    if (!calling || !activeCallId || !isCrmCallId(activeCallId)) return;
+    const callId = activeCallId;
+    let stopped = false;
+    const timer = window.setInterval(() => {
+      void tryCrm(() => refreshCrmCallVoiceStatus(callId)).then((call) => {
+        if (stopped || !call) return;
+        const finished: Partial<Record<CallStatus, CallStatus>> = {
+          Completed: "Completed",
+          "No Answer": "No Answer",
+          "Voicemail Left": "Voicemail Left",
+          Cancelled: "No Answer",
+        };
+        const disposition = finished[call.status];
+        if (disposition) {
+          stopped = true;
+          window.clearInterval(timer);
+          endCallRef.current(disposition);
+        }
+      });
+    }, 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [calling, activeCallId]);
+
+  const noteNumber = noteFor?.number;
+  React.useEffect(() => {
+    if (!noteNumber) return;
+    let alive = true;
+    void matchCrmRecordsByPhone(noteNumber)
+      .then((hits) => {
+        const pick = preferredPhoneMatch(hits);
+        if (!alive || !pick || userChoseRelated.current) return;
+        setRelatedKind(pick.kind);
+        setRelatedPick(pick);
+        setAutoMatched(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [noteNumber]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -322,7 +391,11 @@ export function SoftphonePad({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, placementKey, autoStart, presetNumber, presetName, presetRelatedTo]);
 
-  function endCall() {
+  /**
+   * Ends the call on this side. `disposition` comes from the provider when
+   * the other party hung up or never answered; otherwise the user ended it.
+   */
+  function endCall(disposition: CallStatus = "Completed") {
     const elapsed = callStartedAt.current
       ? Math.max(1, Math.round((Date.now() - callStartedAt.current) / 1000))
       : 0;
@@ -336,7 +409,7 @@ export function SoftphonePad({
       });
     }
     setCalling(false);
-    setDisposition("Completed");
+    setDisposition(disposition);
     setNoteFor({
       number: dial,
       name: resolveSoftphoneRecord({ phone: dial })?.name,
@@ -347,7 +420,21 @@ export function SoftphonePad({
     setNoteSaved("");
     setRelatedKind("");
     setRelatedPick(null);
+    setAutoMatched(false);
+    userChoseRelated.current = false;
     setTick((v) => v + 1);
+  }
+
+  /** Records how the call ended on the CRM call (completed, no answer, …). */
+  function finishCrmCall(callId: string | undefined, notes?: string) {
+    if (!callId || !isCrmCallId(callId)) return;
+    const outcome = DISPOSITIONS.find((item) => item.status === disposition)?.label;
+    void tryCrm(() => syncCallStatus(callId, disposition, { notes, outcome }));
+  }
+
+  function skipCallNote() {
+    finishCrmCall(noteFor?.callId);
+    setNoteFor(null);
   }
 
   function saveCallNote() {
@@ -375,6 +462,7 @@ export function SoftphonePad({
       createdBy: OWNER,
     });
     emitRulesChange("all");
+    finishCrmCall(noteFor.callId, body);
     if (noteFor.callId) {
       updateCall(noteFor.callId, {
         notes: body,
@@ -388,6 +476,8 @@ export function SoftphonePad({
     setNoteSaved("");
     setRelatedKind("");
     setRelatedPick(null);
+    setAutoMatched(false);
+    userChoseRelated.current = false;
     setTab("keypad");
     setTick((v) => v + 1);
   }
@@ -409,6 +499,8 @@ export function SoftphonePad({
     setNoteSaved("");
     setRelatedKind("");
     setRelatedPick(null);
+    setAutoMatched(false);
+    userChoseRelated.current = false;
   }
 
   function goRecord(record: SoftphoneRecord | null) {
@@ -525,18 +617,25 @@ export function SoftphonePad({
             savedTo={noteSaved}
             onChange={setNoteBody}
             onSave={saveCallNote}
-            onSkip={() => setNoteFor(null)}
+            onSkip={skipCallNote}
             hideActions
             relatedKind={relatedKind}
             relatedPick={relatedPick}
             relatedOptions={relatedOptions}
+            autoMatched={autoMatched}
             onRelatedKind={(kind) => {
+              userChoseRelated.current = true;
+              setAutoMatched(false);
               setRelatedKind(kind);
               setRelatedPick((current) =>
                 current && current.kind === kind ? current : null,
               );
             }}
-            onRelatedPick={setRelatedPick}
+            onRelatedPick={(pick) => {
+              userChoseRelated.current = true;
+              setAutoMatched(false);
+              setRelatedPick(pick);
+            }}
           />
           </div>
         ) : null}
@@ -629,7 +728,7 @@ export function SoftphonePad({
         <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-2">
           <button
             type="button"
-            onClick={() => setNoteFor(null)}
+            onClick={skipCallNote}
             className="h-9 flex-1 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
           >
             Skip
@@ -1181,12 +1280,36 @@ function VoicemailPane({
   );
 }
 
+const SEARCH_TYPE_FOR_KIND: Record<SoftphoneRelatedKind, CrmRecordSearchType> = {
+  Lead: "LEAD",
+  Deal: "DEAL",
+  Company: "COMPANY",
+};
+
+/**
+ * The phone match to pre-select: an open deal first (the backend only returns
+ * open ones), then a lead, then an organization.
+ */
+function preferredPhoneMatch(hits: CrmRecordSearchHit[]): SoftphoneRelatedPick | null {
+  for (const [type, kind] of [
+    ["DEAL", "Deal"],
+    ["LEAD", "Lead"],
+    ["COMPANY", "Company"],
+  ] as const) {
+    const hit = hits.find((row) => row.type.toUpperCase() === type);
+    if (hit) return { kind, id: hit.id, name: hit.title };
+  }
+  return null;
+}
+
 function RelatedRecordSearch({
+  kind,
   kindLabel,
   options,
   value,
   onChange,
 }: {
+  kind: SoftphoneRelatedKind;
   kindLabel: string;
   options: SoftphoneRelatedPick[];
   value: SoftphoneRelatedPick | null;
@@ -1211,9 +1334,38 @@ function RelatedRecordSearch({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [value?.name]);
 
-  const matches = options.filter((item) =>
-    item.name.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  // The local list only holds records this browser has already loaded, so
+  // the CRM is searched too once two characters are typed.
+  const [remote, setRemote] = React.useState<SoftphoneRelatedPick[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const term = query.trim();
+  const searchTerm = open && term.length >= 2 && term !== value?.name ? term : "";
+  React.useEffect(() => {
+    if (!searchTerm) return;
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      void searchCrmRecords({ q: searchTerm, limit: 20, types: [SEARCH_TYPE_FOR_KIND[kind]] })
+        .then((hits) => {
+          if (alive) setRemote(hits.map((hit) => ({ kind, id: hit.id, name: hit.title })));
+        })
+        .catch(() => {
+          if (alive) setRemote([]);
+        })
+        .finally(() => {
+          if (alive) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchTerm, kind]);
+
+  const matches = [
+    ...options.filter((item) => item.name.toLowerCase().includes(term.toLowerCase())),
+    ...(searchTerm ? remote : []),
+  ].filter((item, index, list) => list.findIndex((other) => other.id === item.id) === index);
 
   return (
     <div ref={wrapRef} className="relative mt-1.5">
@@ -1249,7 +1401,7 @@ function RelatedRecordSearch({
         <div className="absolute top-[calc(100%+4px)] left-0 z-50 max-h-36 w-full overflow-y-auto rounded-lg bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] ring-1 ring-black/5 [scrollbar-width:thin]">
           {matches.length === 0 ? (
             <p className="px-3 py-2 text-[12px] text-slate-400">
-              No matching {kindLabel}s
+              {searchTerm && searching ? "Searching…" : `No matching ${kindLabel}s`}
             </p>
           ) : (
             matches.slice(0, 40).map((item) => (
@@ -1295,6 +1447,7 @@ function CallNoteComposer({
   relatedKind,
   relatedPick,
   relatedOptions,
+  autoMatched,
   onRelatedKind,
   onRelatedPick,
 }: {
@@ -1317,6 +1470,7 @@ function CallNoteComposer({
     deals: SoftphoneRelatedPick[];
     companies: SoftphoneRelatedPick[];
   };
+  autoMatched?: boolean;
   onRelatedKind: (kind: "" | SoftphoneRelatedKind) => void;
   onRelatedPick: (pick: SoftphoneRelatedPick | null) => void;
 }) {
@@ -1409,12 +1563,21 @@ function CallNoteComposer({
           <option value="Company">Organization</option>
         </select>
         {relatedKind ? (
-          <RelatedRecordSearch
-            kindLabel={kindLabel}
-            options={kindOptions}
-            value={relatedPick}
-            onChange={onRelatedPick}
-          />
+          <>
+            <RelatedRecordSearch
+              kind={relatedKind}
+              kindLabel={kindLabel}
+              options={kindOptions}
+              value={relatedPick}
+              onChange={onRelatedPick}
+            />
+            {autoMatched && relatedPick ? (
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                <Check className="h-3 w-3" />
+                Matched by phone number. You can change it.
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="mt-1.5 text-[11px] text-slate-400">
             Note saves to this contact only.

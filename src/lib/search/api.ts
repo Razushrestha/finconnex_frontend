@@ -13,11 +13,21 @@ export type CrmRecordSearchHit = {
   href: string;
 };
 
+/** Record types the backend search understands (its RecordSearchType). */
+export type CrmRecordSearchType =
+  | "CONTACT"
+  | "LEAD"
+  | "COMPANY"
+  | "DEAL"
+  | "TASK"
+  | "CALL"
+  | "MEETING"
+  | "NOTE";
+
 export type CrmRecordSearchQuery = {
   q: string;
-  page?: number;
   limit?: number;
-  type?: string;
+  types?: CrmRecordSearchType[];
 };
 
 export function workspaceRecordSearchPath(
@@ -133,18 +143,37 @@ export async function searchCrmRecords(
   if (!q) return [];
   const session: CrmSession | null = await ensureCrmSession();
   if (!session) throw new Error("Sign in with a workspace to search records");
+  // Only the parameters the endpoint accepts: it rejects unknown ones, so
+  // extra aliases (query, search, page, type) made every search fail.
   const path = workspaceRecordSearchPath(
     session.workspaceId,
     toQuery({
       q,
-      query: q,
-      search: q,
-      page: query.page ?? 1,
       limit: query.limit ?? 12,
-      type: query.type,
+      types: query.types?.join(","),
     }),
   );
   const data = await crmFetch(session, path);
+  return extractRecords(data).map((row, index) =>
+    normalizeRecordSearchHit(row, index),
+  );
+}
+
+/**
+ * Leads, contacts, organizations and open deals whose phone matches `phone`
+ * (any format), open deals first. Empty when nothing matches.
+ */
+export async function matchCrmRecordsByPhone(
+  phone: string,
+): Promise<CrmRecordSearchHit[]> {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 7) return [];
+  const session: CrmSession | null = await ensureCrmSession();
+  if (!session) return [];
+  const data = await crmFetch(
+    session,
+    `/v1/workspaces/${session.workspaceId}/search/by-phone${toQuery({ phone })}`,
+  );
   return extractRecords(data).map((row, index) =>
     normalizeRecordSearchHit(row, index),
   );

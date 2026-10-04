@@ -479,6 +479,17 @@ export async function startCrmCall(id: string): Promise<Call | null> {
   return asCall(await callsMutate(`/${id}/start`, { method: "POST", body: "{}" }));
 }
 
+/**
+ * Asks the CRM to read this call's live status from the voice provider and
+ * return the updated call. Lets the softphone notice that the other side hung
+ * up when no status callback is configured.
+ */
+export async function refreshCrmCallVoiceStatus(id: string): Promise<Call | null> {
+  return asCall(
+    await callsMutate(`/${id}/refresh-voice-status`, { method: "POST", body: "{}" }),
+  );
+}
+
 export async function dialCrmCall(
   id: string,
   _extra: Record<string, unknown> = {},
@@ -618,6 +629,7 @@ export async function placeOutboundCrmCall(
     };
   }
   const subject = input.subject?.trim() || `Outbound call — ${input.name}`;
+  let createdId: string | undefined;
   try {
     const created = await createCrmCall({
       subject,
@@ -640,6 +652,7 @@ export async function placeOutboundCrmCall(
         message: "Sign in to a live CRM workspace to place the call.",
       };
     }
+    createdId = created.id;
     const { mergeCrmCalls } = await import("@/lib/calls/store");
     mergeCrmCalls([created]);
     const withPhone = await updateCrmCall(created.id, {
@@ -660,6 +673,16 @@ export async function placeOutboundCrmCall(
     if (started) mergeCrmCalls([started]);
     return { ok: true, call: started ?? dialed ?? created };
   } catch (err) {
+    // The call row exists but the call never went out (e.g. the voice provider
+    // refused it). Left SCHEDULED at the moment of dialling, it showed as an
+    // overdue call seconds later; cancel it so the record says what happened.
+    if (createdId) {
+      const cancelled = await cancelCrmCall(createdId).catch(() => null);
+      if (cancelled) {
+        const { mergeCrmCalls } = await import("@/lib/calls/store");
+        mergeCrmCalls([cancelled]);
+      }
+    }
     return {
       ok: false,
       call: null,
