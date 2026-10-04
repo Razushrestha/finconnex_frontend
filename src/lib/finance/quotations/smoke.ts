@@ -150,6 +150,12 @@ export function smokeQuotesWiring() {
   if (!create.includes("createCrmQuote")) {
     fail("create quotation form does not call createCrmQuote");
   }
+  if (!create.includes("useFinanceDirectory")) {
+    fail("create quotation form does not load live CRM clients and owners");
+  }
+  if (create.includes("Home loan packaging")) {
+    fail("create quotation form still seeds a dummy line item");
+  }
 
   const detail = readSrc(
     "src/components/finance/quotations/QuotationDetailClient.tsx",

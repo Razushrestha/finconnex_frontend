@@ -27,7 +27,11 @@ import {
   type Invoice,
 } from "@/lib/finance/invoices/types";
 import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
-import { FINANCE_OWNERS, formatAUD, formatFinanceDate } from "@/lib/finance/shared";
+import { formatAUD, formatFinanceDate } from "@/lib/finance/shared";
+import {
+  financeOwnerOptions,
+  useFinanceDirectory,
+} from "@/lib/finance/use-finance-directory";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
 import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
@@ -61,6 +65,7 @@ export function CreatePaymentForm({
   void _l;
   void _r;
   const router = useRouter();
+  const directory = useFinanceDirectory();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
@@ -69,22 +74,24 @@ export function CreatePaymentForm({
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [recordedBy, setRecordedBy] = useState<string>(defaultActorName());
+  const ownerOptions = financeOwnerOptions(directory.owners, recordedBy);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [gatewayMsg, setGatewayMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!directory.ready) return;
     const list = listInvoices().filter(
       (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
     );
     setInvoices(list);
     const preferred =
-      (initialInvoiceId && list.find((i) => i.id === initialInvoiceId)) || list[0];
+      initialInvoiceId && list.find((i) => i.id === initialInvoiceId);
     if (preferred) {
       setInvoiceId(preferred.id);
       setAmount(String(preferred.amountDue));
     }
-  }, [initialInvoiceId]);
+  }, [directory.ready, initialInvoiceId]);
 
   const invoice = invoices.find((i) => i.id === invoiceId) ?? getInvoiceById(invoiceId);
 
@@ -213,7 +220,7 @@ export function CreatePaymentForm({
           {gatewayMsg}
         </p>
       ) : null}
-      <Field label="Invoice" required error={errors.invoiceId} className="sm:col-span-2">
+      <Field label="Invoice" required error={errors.invoiceId} className="col-span-full">
         <InputShell icon={FileText} error={!!errors.invoiceId}>
           <select
             className={elevatedSelectClass(true)}
@@ -300,7 +307,8 @@ export function CreatePaymentForm({
             value={recordedBy}
             onChange={(e) => setRecordedBy(e.target.value)}
           >
-            {FINANCE_OWNERS.map((o) => (
+            <option value="">Select a person</option>
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>

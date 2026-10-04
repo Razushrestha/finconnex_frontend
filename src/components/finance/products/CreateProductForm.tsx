@@ -15,7 +15,11 @@ import {
   toCreateProductBody,
   tryCrmProduct,
 } from "@/lib/finance/products/api";
-import { FINANCE_OWNERS, formatFinanceDate } from "@/lib/finance/shared";
+import { formatFinanceDate } from "@/lib/finance/shared";
+import {
+  financeOwnerOptions,
+  useFinanceDirectory,
+} from "@/lib/finance/use-finance-directory";
 import { defaultActorName } from "@/lib/rules/actor";
 import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
@@ -48,19 +52,23 @@ export function CreateProductForm({
   void _l;
   void _r;
   const router = useRouter();
+  const directory = useFinanceDirectory();
   const [name, setName] = useState("");
   const [type, setType] = useState<ProductType>("Service");
-  const [unitPrice, setUnitPrice] = useState("0");
+  const [unitPrice, setUnitPrice] = useState("");
   const [taxRate, setTaxRate] = useState("10");
-  const [unit, setUnit] = useState("unit");
+  const [unit, setUnit] = useState("");
   const [description, setDescription] = useState("");
   const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
+  const ownerOptions = financeOwnerOptions(directory.owners, createdBy);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required";
-    if (Number(unitPrice) < 0) next.unitPrice = "Price must be ≥ 0";
+    if (unitPrice.trim() === "" || Number(unitPrice) < 0) {
+      next.unitPrice = "Enter a unit price";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -115,13 +123,13 @@ export function CreateProductForm({
 
   const fields = (
     <>
-      <Field label="Name" required error={errors.name} className="sm:col-span-2">
+      <Field label="Name" required error={errors.name} className="col-span-full">
         <InputShell icon={Package} error={!!errors.name}>
           <input
             className={elevatedInputClass(true)}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Home loan packaging"
+            placeholder="Name of the product or service"
           />
         </InputShell>
       </Field>
@@ -146,7 +154,7 @@ export function CreateProductForm({
             className={elevatedInputClass(true)}
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            placeholder="package / fee / hour"
+            placeholder="e.g. hour, package, fee"
           />
         </InputShell>
       </Field>
@@ -181,7 +189,8 @@ export function CreateProductForm({
             value={createdBy}
             onChange={(e) => setCreatedBy(e.target.value)}
           >
-            {FINANCE_OWNERS.map((o) => (
+            <option value="">Select a person</option>
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>

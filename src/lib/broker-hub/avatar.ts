@@ -43,12 +43,38 @@ function compressToDataUrl(file: File): Promise<string> {
   });
 }
 
+export function avatarFileError(file: File): string | null {
+  if (!ALLOWED_TYPES.has(file.type)) return "Use a JPG, PNG, or WEBP image";
+  if (file.size > HUB_AVATAR_MAX_BYTES) return "Image must be 5MB or smaller";
+  return null;
+}
+
 export function readImageFileAsDataUrl(file: File): Promise<string> {
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return Promise.reject(new Error("Use a JPG, PNG, or WEBP image"));
-  }
-  if (file.size > HUB_AVATAR_MAX_BYTES) {
-    return Promise.reject(new Error("Image must be 5MB or smaller"));
-  }
+  const error = avatarFileError(file);
+  if (error) return Promise.reject(new Error(error));
   return compressToDataUrl(file);
+}
+
+/** Draws the framed photo into a square the circle can show without a second crop. */
+export function cropAvatarToDataUrl(
+  image: HTMLImageElement,
+  frame: number,
+  scale: number,
+  offsetX: number,
+  offsetY: number,
+): string {
+  const output = 512;
+  const ratio = output / frame;
+  const canvas = document.createElement("canvas");
+  canvas.width = output;
+  canvas.height = output;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not process image");
+  const drawW = image.naturalWidth * scale * ratio;
+  const drawH = image.naturalHeight * scale * ratio;
+  const x = ((frame - image.naturalWidth * scale) / 2 + offsetX) * ratio;
+  const y = ((frame - image.naturalHeight * scale) / 2 + offsetY) * ratio;
+  ctx.clearRect(0, 0, output, output);
+  ctx.drawImage(image, x, y, drawW, drawH);
+  return canvas.toDataURL("image/png");
 }

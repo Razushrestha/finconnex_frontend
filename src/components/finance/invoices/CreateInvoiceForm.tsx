@@ -17,19 +17,23 @@ import {
   toCreateInvoiceBody,
 } from "@/lib/finance/invoices/api";
 import {
-  FINANCE_OWNERS,
+  isoFinanceDate,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
   defaultFinanceDealName,
+  defaultFinanceIsoUntil,
   defaultFinanceTitle,
-  defaultFinanceValidUntil,
   financeClientsWithRelated,
   financeDealOptions,
   financeRelatedTo,
   type RelatedFinancePrefill,
 } from "@/lib/finance/related-prefill";
+import {
+  financeOwnerOptions,
+  useFinanceDirectory,
+} from "@/lib/finance/use-finance-directory";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
@@ -70,8 +74,15 @@ export function CreateInvoiceForm({
     () => ({ relatedKind, relatedName, relatedId, email }),
     [relatedKind, relatedName, relatedId, email],
   );
-  const clients = useMemo(() => financeClientsWithRelated(prefill), [prefill]);
-  const dealOptions = useMemo(() => financeDealOptions(prefill), [prefill]);
+  const directory = useFinanceDirectory();
+  const clients = useMemo(
+    () => financeClientsWithRelated(prefill, directory.clients),
+    [prefill, directory.clients],
+  );
+  const dealOptions = useMemo(
+    () => financeDealOptions(prefill, directory.deals),
+    [prefill, directory.deals],
+  );
   const relatedTo = financeRelatedTo(prefill);
   const [title, setTitle] = useState(defaultFinanceTitle("invoice", prefill));
   const [status, setStatus] = useState<InvoiceStatus>("Draft");
@@ -80,20 +91,20 @@ export function CreateInvoiceForm({
     defaultFinanceDealName(prefill),
   );
   const [owner, setOwner] = useState<string>(defaultActorName());
-  const [issueDate, setIssueDate] = useState(formatFinanceDate());
-  const [dueDate, setDueDate] = useState(defaultFinanceValidUntil());
+  const [issueDate, setIssueDate] = useState(isoFinanceDate());
+  const [dueDate, setDueDate] = useState(defaultFinanceIsoUntil());
   const [notes, setNotes] = useState("");
-  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([
-    newLineItem({ name: "Brokerage fee", unitPrice: 1500, taxRate: 10 }),
-  ]);
+  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([]);
+  const ownerOptions = financeOwnerOptions(directory.owners, owner);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const client = clients.find((c) => c.id === clientId) ?? clients[0];
+  const client = clients.find((c) => c.id === clientId);
 
   function validate() {
     const next: Record<string, string> = {};
     if (!title.trim()) next.title = "Title is required";
+    if (!clientId) next.clientId = "Client is required";
     if (!dueDate.trim()) next.dueDate = "Due date is required";
     if (!lineItems.length || lineItems.some((i) => !i.name.trim()))
       next.lines = "Add at least one named line item";
@@ -188,7 +199,7 @@ export function CreateInvoiceForm({
   const fields = (
     <>
       {relatedTo ? (
-        <Field label="Related to" className="sm:col-span-2">
+        <Field label="Related to" className="col-span-full">
           <InputShell icon={Building2}>
             <input
               readOnly
@@ -199,12 +210,12 @@ export function CreateInvoiceForm({
         </Field>
       ) : null}
       {saveError ? (
-        <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
+        <p className="col-span-full text-[12px] text-rose-600">{saveError}</p>
       ) : null}
       {saving ? (
-        <p className="sm:col-span-2 text-[12px] text-slate-500">Saving…</p>
+        <p className="col-span-full text-[12px] text-slate-500">Saving…</p>
       ) : null}
-      <Field label="Title" required error={errors.title} className="sm:col-span-2">
+      <Field label="Title" required error={errors.title} className="col-span-full">
         <InputShell icon={Receipt} error={!!errors.title}>
           <input
             className={elevatedInputClass(true)}
@@ -214,13 +225,14 @@ export function CreateInvoiceForm({
           />
         </InputShell>
       </Field>
-      <Field label="Client" required>
-        <InputShell icon={Building2}>
+      <Field label="Client" required error={errors.clientId}>
+        <InputShell icon={Building2} error={!!errors.clientId}>
           <select
             className={elevatedSelectClass(true)}
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           >
+            <option value="">Select a client</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -236,7 +248,8 @@ export function CreateInvoiceForm({
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
           >
-            {FINANCE_OWNERS.map((o) => (
+            <option value="">Select an owner</option>
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
@@ -279,20 +292,20 @@ export function CreateInvoiceForm({
       <Field label="Issue date">
         <InputShell icon={Calendar}>
           <input
+            type="date"
             className={elevatedInputClass(true)}
             value={issueDate}
             onChange={(e) => setIssueDate(e.target.value)}
-            placeholder="DD/MM/YYYY"
           />
         </InputShell>
       </Field>
       <Field label="Due date" required error={errors.dueDate}>
         <InputShell icon={Calendar} error={!!errors.dueDate}>
           <input
+            type="date"
             className={elevatedInputClass(true)}
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            placeholder="DD/MM/YYYY"
           />
         </InputShell>
       </Field>
@@ -304,7 +317,7 @@ export function CreateInvoiceForm({
           placeholder="Internal notes… Type @ to assign someone."
         />
       </Field>
-      <div className="col-span-full">
+      <div className="col-span-full min-w-0">
         <h3 className="mb-3 text-[12px] font-bold tracking-wide text-slate-700 uppercase">
           Line items
         </h3>

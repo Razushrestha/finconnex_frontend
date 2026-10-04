@@ -64,7 +64,7 @@ import {
 } from "@/lib/leads/convert-actions";
 import { findLeadById } from "@/lib/leads/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { createContact, findContactByEmail } from "@/lib/contacts/store";
+import { mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
 import {
   assignableOwnerLabel,
   defaultAssignableOwnerId,
@@ -184,31 +184,74 @@ function toRequestApplicants(
   }));
 }
 
+function applicantParentIds(row: RequestApplicant | undefined): {
+  leadId?: string;
+  contactId?: string;
+  companyId?: string;
+  dealId?: string;
+} {
+  const id = row?.recordId ?? "";
+  if (!isUuid(id)) return {};
+  if (row?.source === "lead") return { leadId: id };
+  if (row?.source === "deal") return { dealId: id };
+  if (row?.source === "organization") return { companyId: id };
+  return {};
+}
+
+/** A document request is always sent to a CRM contact. Leads, deals, and companies stay linked as the related record. */
 export async function resolveApplicantContactId(
   row: RequestApplicant | undefined,
 ): Promise<string> {
-  if (row?.recordId && isUuid(row.recordId)) return row.recordId;
-  const email = row?.email.trim() ?? "";
-  if (email) {
-    const local = findContactByEmail(email);
-    if (local && isUuid(local.id)) return local.id;
+  const email = row?.email.trim().toLowerCase() ?? "";
+  const { createCrmContact, isCrmContactId, listCrmContacts } = await import(
+    "@/lib/contacts/api"
+  );
+
+  const matchByEmail = async () => {
+    if (!email) return "";
+    const rows = await listCrmContacts({ search: email, limit: 50 });
+    const match = rows.find(
+      (item) => item.contact.email.trim().toLowerCase() === email,
+    );
+    return match && isCrmContactId(match.contact.id) ? match.contact.id : "";
+  };
+
+  const existing = await matchByEmail();
+  if (existing) return existing;
+
+  if (
+    row?.source === "contact" &&
+    row.recordId &&
+    isCrmContactId(row.recordId)
+  ) {
+    return row.recordId;
   }
+
   const parts = (row?.name ?? "").trim().split(/\s+/).filter(Boolean);
   const firstName = parts[0] || "Client";
   const lastName = parts.slice(1).join(" ") || firstName;
-  const created = await createContact({
-    firstName,
-    lastName,
-    email: email || `${Date.now()}@added.finconnex.local`,
-    status: "Active",
-    owner: getRulesActor().name || "",
-  });
-  if (!isUuid(created.id)) {
-    throw new Error(
-      "Pick or add a live CRM contact before creating this document request.",
-    );
+  try {
+    const created = await createCrmContact({
+      firstName,
+      lastName,
+      email: email || `${Date.now()}@added.finconnex.local`,
+      status: "Active",
+      owner: getRulesActor().name || "",
+    });
+    if (created && isCrmContactId(created.contact.id)) {
+      mergeCrmContactsIntoBoard([created]);
+      return created.contact.id;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/409|already exists|conflict|emailExists/i.test(message)) throw err;
+    const again = await matchByEmail();
+    if (again) return again;
+    throw err;
   }
-  return created.id;
+  throw new Error(
+    "Pick or add a live CRM contact before creating this document request.",
+  );
 }
 
 function resolvePrefill(props: CreateDocumentRequestFormProps): {
@@ -968,7 +1011,7 @@ export function CreateDocumentRequestForm({
       }
 
       const relatedKindKey = (prefill.relatedKind || relatedKind || "").toLowerCase();
-      const parentIds = relatedKindKey.includes("contact")
+      const relatedParent = relatedKindKey.includes("contact")
         ? { contactId: relatedId }
         : relatedKindKey.includes("compan")
           ? { companyId: relatedId }
@@ -977,6 +1020,10 @@ export function CreateDocumentRequestForm({
             : relatedId
               ? { leadId: relatedId }
               : {};
+      const parentIds = {
+        ...applicantParentIds(applicants[0]),
+        ...relatedParent,
+      };
 
       const draft = {
         id: ids.id,
@@ -1023,16 +1070,24 @@ export function CreateDocumentRequestForm({
         clientEmail,
       };
 
-      let remote = await tryCrmDocumentRequest(() =>
-        createCrmDocumentRequest(
+      let remote: Awaited<ReturnType<typeof createCrmDocumentRequest>>;
+      try {
+        remote = await createCrmDocumentRequest(
           toCreateDocumentRequestBody({
             ...draft,
             dueDate,
             requestedFromId,
             ...parentIds,
           }),
-        ),
-      );
+        );
+      } catch (err) {
+        notify(
+          err instanceof Error
+            ? err.message
+            : "Could not create this request in the CRM. Check the contact and try again.",
+        );
+        return;
+      }
 
       if (!remote) {
         notify(

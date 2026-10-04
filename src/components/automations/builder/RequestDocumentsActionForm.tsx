@@ -138,7 +138,10 @@ export function RequestDocumentsActionForm({
     // turned into a CRM contact, since a request is sent to a contact.
     if (form.step === 1 && !formRef.current.applicantFromTrigger) {
       const first = formRef.current.applicants[0];
-      if (first && !isUuid(first.recordId ?? "")) {
+      const needsContact =
+        first &&
+        (first.source !== "contact" || !isUuid(first.recordId ?? ""));
+      if (needsContact && first) {
         setResolving(true);
         try {
           const recordId = await resolveApplicantContactId(first);

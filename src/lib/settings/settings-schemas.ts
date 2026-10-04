@@ -396,6 +396,28 @@ const CURATED: Record<string, SettingsSchema> = {
     ],
   },
 
+  "organization/holidays": {
+    title: "Holidays",
+    description:
+      "Dates this workspace treats as closed. Task and call reminders skip them. Ticket SLA keeps its own holiday list.",
+    fields: [
+      {
+        id: "observe",
+        label: "Skip these dates",
+        type: "toggle",
+        defaultValue: true,
+        help: "Turn off to ignore the list below. Weekends still follow Business hours.",
+      },
+      {
+        id: "dates",
+        label: "Holiday dates",
+        type: "textarea",
+        placeholder: "2026-12-25 Christmas Day\n2026-12-26 Boxing Day",
+        help: "One date per line, YYYY-MM-DD. A name after the date is optional.",
+      },
+    ],
+  },
+
   "crm-configuration/industry-preset": {
     title: "Industry Preset",
     description:

@@ -17,6 +17,7 @@ import {
   type CrmSecuritySettings,
   type CrmWorkspaceSettings,
 } from "@/lib/settings/api";
+import { mirrorOfficeCalendar } from "@/lib/settings/office-calendar";
 
 export type SettingsDataSource = "api" | "demo";
 
@@ -175,6 +176,7 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       const catalog =
         pages[0]?.status === "fulfilled" ? pages[0].value.catalog : null;
       if (!catalog) return;
+      mirrorOfficeCalendar(catalog);
       setSettings((prev) => {
         const next = {
           ...ws.value,

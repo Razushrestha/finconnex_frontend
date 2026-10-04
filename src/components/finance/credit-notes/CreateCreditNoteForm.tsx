@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Receipt, User, Building2, Calendar } from "lucide-react";
 import {
@@ -15,13 +15,17 @@ import {
   upsertCreditNote,
   type CreditNoteStatus,
 } from "@/lib/finance/credit-notes/types";
+import { listInvoices, type Invoice } from "@/lib/finance/invoices/types";
 import {
-  FINANCE_CLIENTS,
-  FINANCE_OWNERS,
   formatFinanceDate,
+  isoFinanceDate,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
+import {
+  financeOwnerOptions,
+  useFinanceDirectory,
+} from "@/lib/finance/use-finance-directory";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
@@ -40,22 +44,28 @@ interface Props {
 
 export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
+  const directory = useFinanceDirectory();
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<CreditNoteStatus>("Draft");
-  const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0]?.id ?? "");
+  const [clientId, setClientId] = useState("");
   const [owner, setOwner] = useState<string>(defaultActorName());
-  const [issueDate, setIssueDate] = useState(formatFinanceDate());
-  const [invoiceRef, setInvoiceRef] = useState("");
+  const [issueDate, setIssueDate] = useState(isoFinanceDate());
+  const [invoiceId, setInvoiceId] = useState("");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
-  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([
-    newLineItem({ name: "Fee credit", unitPrice: 220, taxRate: 10 }),
-  ]);
+  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const client =
-    FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
+  const ownerOptions = financeOwnerOptions(directory.owners, owner);
+  const client = directory.clients.find((c) => c.id === clientId);
+  const linkedInvoice = invoices.find((row) => row.id === invoiceId);
+
+  useEffect(() => {
+    if (!directory.ready) return;
+    setInvoices(listInvoices());
+  }, [directory.ready]);
 
   function validate() {
     const next: Record<string, string> = {};
@@ -75,7 +85,15 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
     const draft = {
       title: title.trim(),
       clientName: client?.name ?? "",
-      invoiceRef: invoiceRef.trim() || undefined,
+      clientId,
+      invoiceId:
+        linkedInvoice &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          linkedInvoice.id,
+        )
+          ? linkedInvoice.id
+          : undefined,
+      invoiceRef: linkedInvoice?.invoiceId,
       reason: reason.trim() || undefined,
       notes: notes.trim() || undefined,
       status,
@@ -133,7 +151,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
       setTitle("");
       setReason("");
       setNotes("");
-      setInvoiceRef("");
+      setInvoiceId("");
       setLineItems([newLineItem()]);
       setErrors({});
       return;
@@ -160,7 +178,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
           {saveError}
         </p>
       ) : null}
-      <Field label="Title" required error={errors.title} className="sm:col-span-2">
+      <Field label="Title" required error={errors.title} className="col-span-full">
         <InputShell icon={Receipt} error={!!errors.title}>
           <input
             className={elevatedInputClass(true)}
@@ -170,14 +188,15 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
           />
         </InputShell>
       </Field>
-      <Field label="Client" required>
-        <InputShell icon={Building2}>
+      <Field label="Client" required error={errors.client}>
+        <InputShell icon={Building2} error={!!errors.client}>
           <select
             className={elevatedSelectClass(true)}
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           >
-            {FINANCE_CLIENTS.map((c) => (
+            <option value="">Select a client</option>
+            {directory.clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -192,7 +211,8 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
           >
-            {FINANCE_OWNERS.map((o) => (
+            <option value="">Select an owner</option>
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
@@ -202,12 +222,19 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
       </Field>
       <Field label="Linked invoice">
         <InputShell icon={Receipt}>
-          <input
-            className={elevatedInputClass(true)}
-            value={invoiceRef}
-            onChange={(e) => setInvoiceRef(e.target.value)}
-            placeholder="INV-3201"
-          />
+          <select
+            className={elevatedSelectClass(true)}
+            value={invoiceId}
+            onChange={(e) => setInvoiceId(e.target.value)}
+          >
+            <option value="">None</option>
+            {invoices.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.invoiceId}
+                {row.clientName ? ` · ${row.clientName}` : ""}
+              </option>
+            ))}
+          </select>
         </InputShell>
       </Field>
       <Field label="Status">
@@ -230,14 +257,14 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
       <Field label="Issue date">
         <InputShell icon={Calendar}>
           <input
+            type="date"
             className={elevatedInputClass(true)}
             value={issueDate}
             onChange={(e) => setIssueDate(e.target.value)}
-            placeholder="DD/MM/YYYY"
           />
         </InputShell>
       </Field>
-      <Field label="Reason" className="sm:col-span-2">
+      <Field label="Reason" className="col-span-full">
         <InputShell>
           <input
             className={elevatedInputClass(false)}
@@ -255,7 +282,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
           placeholder="Internal notes… Type @ to assign someone."
         />
       </Field>
-      <div className="col-span-full">
+      <div className="col-span-full min-w-0">
         <h3 className="mb-3 text-[12px] font-bold tracking-wide text-slate-700 uppercase">
           Line items
         </h3>

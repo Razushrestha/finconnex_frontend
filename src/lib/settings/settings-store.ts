@@ -35,11 +35,12 @@ export function loadSettingsValues(schemaKey: string): SettingsValues {
 export function saveSettingsValues(
   schemaKey: string,
   values: SettingsValues,
-  meta: { path: string; title: string; actor?: string },
+  meta: { path: string; title: string; actor?: string; audit?: boolean },
 ) {
   const all = readJson<Record<string, SettingsValues>>(VALUES_KEY, {});
   all[schemaKey] = values;
   writeJson(VALUES_KEY, all);
+  if (meta.audit === false) return;
 
   const audit = readJson<SettingsAuditEvent[]>(AUDIT_KEY, []);
   audit.unshift({

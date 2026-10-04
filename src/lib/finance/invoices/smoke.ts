@@ -151,6 +151,12 @@ export function smokeInvoicesWiring() {
   if (!create.includes("createCrmInvoice")) {
     fail("create invoice form does not call createCrmInvoice");
   }
+  if (!create.includes("useFinanceDirectory")) {
+    fail("create invoice form does not load live CRM clients and owners");
+  }
+  if (create.includes("Brokerage fee")) {
+    fail("create invoice form still seeds a dummy line item");
+  }
 
   const detail = readSrc(
     "src/components/finance/invoices/InvoiceDetailClient.tsx",

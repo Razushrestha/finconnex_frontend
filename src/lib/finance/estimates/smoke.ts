@@ -138,6 +138,12 @@ export function smokeEstimatesWiring() {
   if (!create.includes("createCrmEstimate")) {
     fail("create estimate form does not call createCrmEstimate");
   }
+  if (!create.includes("useFinanceDirectory")) {
+    fail("create estimate form does not load live CRM clients and owners");
+  }
+  if (create.includes("Home loan packaging")) {
+    fail("create estimate form still seeds a dummy line item");
+  }
 
   const detail = readSrc(
     "src/components/finance/estimates/EstimateDetailClient.tsx",

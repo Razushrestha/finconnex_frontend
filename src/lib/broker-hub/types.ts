@@ -100,7 +100,7 @@ export function prepareHubForSave(config: BrokerHubConfig): BrokerHubConfig {
       ...config.profile,
       title,
       slug,
-      bio: config.profile.bio ?? "",
+      bio: (config.profile.bio ?? "").slice(0, 2000),
       avatarUrl: config.profile.avatarUrl || null,
     },
     links: Array.isArray(config.links) ? config.links : [],

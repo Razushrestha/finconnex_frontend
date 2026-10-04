@@ -5,10 +5,8 @@ import { Camera, User2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkIcon } from "@/components/smart-links/LinkIcon";
 import { SOCIAL_PLATFORM_META } from "@/components/smart-links/SocialMeta";
-import {
-  HUB_AVATAR_ACCEPT,
-  readImageFileAsDataUrl,
-} from "@/lib/broker-hub/avatar";
+import { avatarFileError, HUB_AVATAR_ACCEPT } from "@/lib/broker-hub/avatar";
+import { AvatarAdjustDialog } from "@/components/smart-links/AvatarAdjustDialog";
 import type { BrokerHubConfig } from "@/lib/broker-hub/types";
 
 const BIO_LINE_COUNT = 6;
@@ -78,6 +76,8 @@ interface HubPreviewScreenProps {
   config: BrokerHubConfig;
   onAvatarChange?: (avatarUrl: string | null) => void;
   interactive?: boolean;
+  /** Builder preview: the phone frame fits the window and does not scroll. */
+  contained?: boolean;
   className?: string;
 }
 
@@ -85,10 +85,19 @@ export function HubPreviewScreen({
   config,
   onAvatarChange,
   interactive = false,
+  contained = false,
   className,
 }: HubPreviewScreenProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const adjustObjectUrl = useRef<string | null>(null);
+  const [adjustSource, setAdjustSource] = useState<string | null>(null);
   const editable = typeof onAvatarChange === "function";
+
+  const closeAdjust = () => {
+    if (adjustObjectUrl.current) URL.revokeObjectURL(adjustObjectUrl.current);
+    adjustObjectUrl.current = null;
+    setAdjustSource(null);
+  };
   const activeLinks = config.links
     .filter((link) => link.active)
     .sort((a, b) => a.order - b.order);
@@ -97,7 +106,8 @@ export function HubPreviewScreen({
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-[520px] flex-col overflow-hidden text-center",
+        "relative flex h-full flex-col overflow-hidden text-center",
+        !contained && "min-h-[520px]",
         className,
       )}
     >
@@ -120,7 +130,12 @@ export function HubPreviewScreen({
         />
       </svg>
 
-      <div className="relative z-10 flex h-full min-h-0 flex-col items-center overflow-y-auto px-6 pb-7 pt-14">
+      <div
+        className={cn(
+          "relative z-10 flex h-full min-h-0 flex-col items-center px-6 pb-6 pt-12",
+          contained ? "overflow-hidden" : "overflow-y-auto",
+        )}
+      >
         <div className="relative shrink-0">
           {editable ? (
             <button
@@ -134,7 +149,7 @@ export function HubPreviewScreen({
                 <img
                   src={config.profile.avatarUrl}
                   alt={config.profile.title || "Profile photo"}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-white/80">
@@ -149,7 +164,7 @@ export function HubPreviewScreen({
                 <img
                   src={config.profile.avatarUrl}
                   alt={config.profile.title || "Profile photo"}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-white/80">
@@ -176,10 +191,13 @@ export function HubPreviewScreen({
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
-                  if (!file || !onAvatarChange) return;
-                  void readImageFileAsDataUrl(file)
-                    .then(onAvatarChange)
-                    .catch(() => undefined);
+                  if (!file || !onAvatarChange || avatarFileError(file)) return;
+                  if (adjustObjectUrl.current) {
+                    URL.revokeObjectURL(adjustObjectUrl.current);
+                  }
+                  const url = URL.createObjectURL(file);
+                  adjustObjectUrl.current = url;
+                  setAdjustSource(url);
                 }}
               />
             </>
@@ -263,6 +281,16 @@ export function HubPreviewScreen({
           POWERED BY FINCONNEX
         </p>
       </div>
+      {adjustSource && onAvatarChange ? (
+        <AvatarAdjustDialog
+          source={adjustSource}
+          onClose={closeAdjust}
+          onApply={(avatarUrl) => {
+            onAvatarChange(avatarUrl);
+            closeAdjust();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

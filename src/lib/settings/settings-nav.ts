@@ -57,11 +57,13 @@ export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
         title: "Hours & holidays",
         blurb: "When the office is open",
         href: "/settings/organization/business-hours",
+        live: true,
       },
       {
         title: "Holidays",
         blurb: "Closures and public holidays",
         href: "/settings/organization/holidays",
+        live: true,
       },
     ],
   },

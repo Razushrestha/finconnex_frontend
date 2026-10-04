@@ -159,6 +159,12 @@ export function smokeCreditNotesWiring() {
   if (!create.includes("createCrmCreditNote")) {
     fail("create credit note form does not call createCrmCreditNote");
   }
+  if (!create.includes("useFinanceDirectory")) {
+    fail("create credit note form does not load live CRM clients and invoices");
+  }
+  if (create.includes("Fee credit")) {
+    fail("create credit note form still seeds a dummy line item");
+  }
 
   const detail = readSrc(
     "src/components/finance/credit-notes/CreditNoteDetailClient.tsx",
