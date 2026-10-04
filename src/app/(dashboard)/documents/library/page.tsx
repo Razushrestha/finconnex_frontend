@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
 import {
   ACCESS_LEVELS,
   LIBRARY_FOLDERS,
+  isLibraryView,
   listLibraryDocuments,
   removeLibraryDocument,
   upsertLibraryDocument,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/documents/library/types";
 import { useCrmDocuments } from "@/lib/documents/library/use-crm-documents";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { MoveFileDialog } from "@/components/documents/library/MoveFileDialog";
 import {
   bulkDeleteCrmDocuments,
   deleteCrmDocument,
@@ -91,6 +93,38 @@ function DocumentLibraryPageInner() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [menuId, setMenuId] = useState<string | null>(null);
+  // The file whose Move dialog is open.
+  const [moving, setMoving] = useState<LibraryDocument | null>(null);
+  // Where the open row menu sits, in viewport coordinates: the table scrolls
+  // and clips its cells, so the menu is fixed to the window instead.
+  const [menuAt, setMenuAt] = useState<{ top: number; right: number } | null>(null);
+  const menuAnchor = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!menuId) return;
+    function onMouseDown(event: MouseEvent) {
+      if ((event.target as HTMLElement | null)?.closest("[data-row-menu]")) return;
+      setMenuId(null);
+    }
+    // The menu follows its button as the page or table scrolls, and closes
+    // only once that button has left the screen.
+    function follow() {
+      const rect = menuAnchor.current?.getBoundingClientRect();
+      if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) {
+        setMenuId(null);
+        return;
+      }
+      setMenuAt({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+  }, [menuId]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -133,35 +167,40 @@ function DocumentLibraryPageInner() {
     );
   }
 
+  // A file appears only in the folder it was filed in (and All Files); the
+  // My files and Recent views list what the CRM returns for them.
+  const myFiles = useMemo(
+    () => (crm.source === "api" ? crm.mine : docs.filter((d) => d.owner === defaultActorName())),
+    [crm.mine, crm.source, docs],
+  );
+  const recentFiles = useMemo(
+    () => (crm.source === "api" ? crm.recent : docs),
+    [crm.recent, crm.source, docs],
+  );
+
   const folderCounts = useMemo(() => {
     const map: Record<string, number> = { "All Files": docs.length };
     for (const f of folders) {
       if (f === "All Files") continue;
       if (f === "My files") {
-        map[f] =
-          crm.source === "api"
-            ? crm.mine.length
-            : docs.filter((d) => d.owner === defaultActorName()).length;
+        map[f] = myFiles.length;
         continue;
       }
       if (f === "Recent") {
-        map[f] = crm.source === "api" ? crm.recent.length : docs.length;
+        map[f] = recentFiles.length;
         continue;
       }
       map[f] = docs.filter((d) => d.folder === f).length;
     }
     return map;
-  }, [crm.mine.length, crm.recent.length, crm.source, docs, folders]);
+  }, [docs, folders, myFiles.length, recentFiles.length]);
 
   const filtered = useMemo(() => {
     let data = docs;
     if (folder === "My files") {
-      data =
-        crm.source === "api"
-          ? crm.mine
-          : docs.filter((d) => d.owner === defaultActorName());
+      data = myFiles;
     } else if (folder === "Recent") {
-      data = crm.source === "api" ? crm.recent : docs;
+      data = recentFiles;
     } else if (folder !== "All Files") {
       data = data.filter((d) => d.folder === folder);
     }
@@ -178,7 +217,7 @@ function DocumentLibraryPageInner() {
       );
     }
     return data;
-  }, [accessFilter, crm.mine, crm.recent, crm.source, docs, folder, search]);
+  }, [accessFilter, docs, folder, myFiles, recentFiles, search]);
 
   function flash(msg: string) {
     notify(msg);
@@ -206,10 +245,13 @@ function DocumentLibraryPageInner() {
   }
 
   function moveDoc(doc: LibraryDocument) {
-    const options = folders.filter((f) => f !== "All Files").join(", ");
-    const next = window.prompt(`Move to folder (${options})`, doc.folder);
-    if (!next || !folders.includes(next)) return;
-    if (next === "All Files") return;
+    setMoving(doc);
+    setMenuId(null);
+  }
+
+  function moveDocTo(doc: LibraryDocument, next: string) {
+    setMoving(null);
+    if (next === doc.folder || isLibraryView(next) || !folders.includes(next)) return;
     const moved = { ...doc, folder: next };
     upsertLibraryDocument(moved);
     setDocs((prev) => prev.map((d) => (d.id === doc.id ? moved : d)));
@@ -491,10 +533,10 @@ function DocumentLibraryPageInner() {
             </div>
 
             <ResizableColumns
-              storageKey="library-list"
+              storageKey="library-list:v2"
               className="min-h-0 flex-1 overflow-auto"
             >
-              <table className="w-full min-w-[900px] text-left text-[12px]">
+              <table className="w-full min-w-[1280px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
                     <th className="w-10 px-4 py-2.5">
@@ -514,15 +556,18 @@ function DocumentLibraryPageInner() {
                         aria-label="Select all visible documents"
                       />
                     </th>
-                    <th className="px-4 py-2.5">File name</th>
-                    <th className="px-4 py-2.5">Folder</th>
-                    <th className="px-4 py-2.5">Owner</th>
-                    <th className="px-4 py-2.5">Related To</th>
-                    <th className="px-4 py-2.5">Version</th>
-                    <th className="px-4 py-2.5">Tags</th>
-                    <th className="px-4 py-2.5">Uploaded</th>
-                    <th className="px-4 py-2.5">Access</th>
-                    <th className="px-4 py-2.5 text-right">Actions</th>
+                    <th className="w-[260px] px-4 py-2.5">File name</th>
+                    <th className="w-[120px] px-4 py-2.5">Folder</th>
+                    <th className="w-[180px] px-4 py-2.5">Owner</th>
+                    <th className="w-[170px] px-4 py-2.5">Related To</th>
+                    <th className="w-[90px] px-4 py-2.5">Version</th>
+                    <th className="w-[220px] px-4 py-2.5">Tags</th>
+                    <th className="w-[120px] px-4 py-2.5">Uploaded</th>
+                    <th className="w-[110px] px-4 py-2.5">Access</th>
+                    {/* Like the other lists: the column-settings button sits in this header. */}
+                    <th data-col-id="options" className="w-14 px-2 py-2.5 text-right">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -539,11 +584,14 @@ function DocumentLibraryPageInner() {
                           aria-label={`Select ${doc.fileName}`}
                         />
                       </td>
-                      <td className="max-w-[220px] px-4 py-3">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 shrink-0 text-violet-500" />
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-slate-900">
+                            <p
+                              className="truncate font-semibold text-slate-900"
+                              title={doc.fileName}
+                            >
                               {doc.fileName}
                             </p>
                             <p className="text-[10px] text-slate-400">
@@ -554,20 +602,24 @@ function DocumentLibraryPageInner() {
                       </td>
                       <td className="px-4 py-3 text-slate-600">{doc.folder}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <span
                             className={cn(
-                              "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
+                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                               avatarColor(doc.owner),
                             )}
                           >
                             {initials(doc.owner)}
                           </span>
-                          {doc.owner}
+                          <span className="truncate whitespace-nowrap" title={doc.owner}>
+                            {doc.owner}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        {doc.relatedTo ?? ""}
+                        <span className="block truncate" title={doc.relatedTo || undefined}>
+                          {doc.relatedTo || <span className="text-slate-300">—</span>}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -579,10 +631,21 @@ function DocumentLibraryPageInner() {
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {doc.tags.map((t) => (
+                        <div className="flex flex-wrap items-center gap-1">
+                          {doc.tags.slice(0, 2).map((t) => (
                             <RecordTagChip key={t} tag={t} compact />
                           ))}
+                          {doc.tags.length > 2 ? (
+                            <span
+                              className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600"
+                              title={doc.tags.join(", ")}
+                            >
+                              +{doc.tags.length - 2}
+                            </span>
+                          ) : null}
+                          {doc.tags.length === 0 ? (
+                            <span className="text-slate-300">—</span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-slate-500">
@@ -601,15 +664,35 @@ function DocumentLibraryPageInner() {
                       <td className="relative px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() =>
-                            setMenuId(menuId === doc.id ? null : doc.id)
-                          }
+                          data-row-menu
+                          aria-label={`Actions for ${doc.fileName}`}
+                          aria-expanded={menuId === doc.id}
+                          onClick={(e) => {
+                            if (menuId === doc.id) {
+                              setMenuId(null);
+                              return;
+                            }
+                            menuAnchor.current = e.currentTarget;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setMenuAt({
+                              top: rect.bottom + 4,
+                              right: window.innerWidth - rect.right,
+                            });
+                            setMenuId(doc.id);
+                          }}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
-                        {menuId === doc.id ? (
-                          <div className="absolute right-4 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                        {menuId === doc.id && menuAt ? (
+                          <div
+                            data-row-menu
+                            className="fixed z-50 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-lg"
+                            style={{
+                              top: Math.min(menuAt.top, window.innerHeight - 300),
+                              right: menuAt.right,
+                            }}
+                          >
                             <MenuItem
                               icon={Download}
                               label="Download"
@@ -669,6 +752,18 @@ function DocumentLibraryPageInner() {
       </div>
 
       {/* New Folder Modal */}
+      {moving ? (
+        <MoveFileDialog
+          fileName={moving.fileName}
+          sizeLabel={moving.sizeLabel}
+          currentFolder={moving.folder}
+          folders={folders.filter((f) => !isLibraryView(f))}
+          counts={folderCounts}
+          onMove={(folder) => moveDocTo(moving, folder)}
+          onClose={() => setMoving(null)}
+        />
+      ) : null}
+
       {isFolderModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-[1px]">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">

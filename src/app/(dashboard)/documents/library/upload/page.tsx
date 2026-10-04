@@ -80,9 +80,9 @@ function UploadLibraryFilePageInner() {
               }
               upsertLibraryDocument(saved);
               pushLibraryDoc(saved);
-              const folder = searchParams.get("folder");
+              // Land in the folder the file was filed in, so it's in view.
               const params = new URLSearchParams();
-              if (folder) params.set("folder", folder);
+              if (saved.folder) params.set("folder", saved.folder);
               params.set("uploaded", "1");
               router.push(`/documents/library?${params.toString()}`);
             }}

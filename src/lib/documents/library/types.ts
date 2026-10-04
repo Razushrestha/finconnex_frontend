@@ -62,6 +62,18 @@ export const LIBRARY_FOLDERS = [
 
 export type LibraryFolder = (typeof LIBRARY_FOLDERS)[number];
 
+/** Sidebar entries that list files by rule; a file can't be filed in one. */
+export const LIBRARY_VIEWS: readonly string[] = ["All Files", "My files", "Recent"];
+
+export function isLibraryView(folder: string): boolean {
+  return LIBRARY_VIEWS.includes(folder);
+}
+
+/** Files once moved into a view show up nowhere but All Files; refile them. */
+function withRealFolder(doc: LibraryDocument): LibraryDocument {
+  return isLibraryView(doc.folder) ? { ...doc, folder: "Clients" } : { ...doc };
+}
+
 export const libraryDocuments: LibraryDocument[] = [];
 
 const STORE_KEY = "documents:library:v2";
@@ -93,14 +105,33 @@ export function readExtraLibraryDocs(): LibraryDocument[] {
   }
 }
 
+function writeExtraLibraryDocs(list: LibraryDocument[]) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem("library:extras", JSON.stringify(list));
+}
+
+/**
+ * Local-only files (not saved to the CRM) live in the extras list, which
+ * replaceLibraryDocuments re-reads on every library load, so an edit made to
+ * one has to land there too or it reverts on the next load.
+ */
+function patchExtraLibraryDoc(id: string, doc: LibraryDocument | null) {
+  const extras = readExtraLibraryDocs();
+  const i = extras.findIndex((d) => d.id === id);
+  if (i < 0) return;
+  if (doc) extras[i] = { ...doc };
+  else extras.splice(i, 1);
+  writeExtraLibraryDocs(extras);
+}
+
 export function listLibraryDocuments(): LibraryDocument[] {
   const stored = readStore();
-  if (stored) return stored.map((doc) => ({ ...doc }));
+  if (stored) return stored.map(withRealFolder);
   const extras = readExtraLibraryDocs();
-  const seed = libraryDocuments.map((doc) => ({ ...doc }));
+  const seed = libraryDocuments.map(withRealFolder);
   if (!extras.length) return seed;
   const ids = new Set(seed.map((d) => d.id));
-  return [...extras.filter((e) => !ids.has(e.id)), ...seed];
+  return [...extras.filter((e) => !ids.has(e.id)).map(withRealFolder), ...seed];
 }
 
 export function replaceLibraryDocuments(list: LibraryDocument[]) {
@@ -118,6 +149,7 @@ export function upsertLibraryDocument(doc: LibraryDocument) {
   if (i >= 0) list[i] = { ...doc };
   else list.unshift({ ...doc });
   writeStore(list);
+  patchExtraLibraryDoc(doc.id, doc);
   return doc;
 }
 
@@ -126,6 +158,7 @@ export function removeLibraryDocument(id: string): LibraryDocument | null {
   const found = list.find((d) => d.id === id) ?? null;
   if (!found) return null;
   writeStore(list.filter((d) => d.id !== id));
+  patchExtraLibraryDoc(id, null);
   return found;
 }
 
@@ -133,6 +166,6 @@ export function pushLibraryDoc(doc: LibraryDocument) {
   if (typeof window === "undefined") return;
   const extras = readExtraLibraryDocs();
   extras.unshift(doc);
-  sessionStorage.setItem("library:extras", JSON.stringify(extras));
+  writeExtraLibraryDocs(extras);
   if (readStore()) upsertLibraryDocument(doc);
 }

@@ -6,6 +6,7 @@ import {
   ACCESS_LEVELS,
   CRM_DOCUMENT_TYPES,
   LIBRARY_FOLDERS,
+  isLibraryView,
   type CrmDocumentType,
   type DocumentAccessLevel,
   type LibraryDocument,
@@ -29,6 +30,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { defaultActorName } from "@/lib/rules/actor";
+import { TagListInput } from "@/components/shared/tags/TagListInput";
 
 export function UploadLibraryFileForm({
   defaultFolder = "Clients",
@@ -58,7 +60,7 @@ export function UploadLibraryFileForm({
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [relatedId, setRelatedId] = useState("");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [accessLevel, setAccessLevel] = useState<DocumentAccessLevel>("Team");
   const [error, setError] = useState("");
   const related = useCrmRelatedRecords(relatedKind);
@@ -128,10 +130,7 @@ export function UploadLibraryFileForm({
         relatedTo,
         ...relatedIds,
         version: 1,
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
+        tags,
         uploadedAt: today,
         accessLevel,
         sizeLabel,
@@ -218,7 +217,7 @@ export function UploadLibraryFileForm({
             }}
             className={elevatedSelectClass(true)}
           >
-            {LIBRARY_FOLDERS.filter((f) => f !== "All Files").map((f) => (
+            {LIBRARY_FOLDERS.filter((f) => !isLibraryView(f)).map((f) => (
               <option key={f} value={f}>
                 {f}
               </option>
@@ -310,11 +309,11 @@ export function UploadLibraryFileForm({
       </Field>
       <Field label="Tags">
         <InputShell icon={Tag}>
-          <input
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="legal, kyc (comma separated)"
-            className={elevatedInputClass(true)}
+          <TagListInput
+            tags={tags}
+            onChange={setTags}
+            placeholder="Type a tag and press comma, e.g. legal"
+            className="pr-3 pl-9"
           />
         </InputShell>
       </Field>
