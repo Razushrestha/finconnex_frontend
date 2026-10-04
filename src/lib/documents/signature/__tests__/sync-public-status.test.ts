@@ -31,6 +31,7 @@ function stubRequest(
     status: "Sent",
     createdBy: "Owner",
     manageToken: "sig-1-test",
+    expiryDate: "",
     audit: [],
   };
 }

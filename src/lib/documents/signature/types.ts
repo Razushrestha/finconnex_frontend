@@ -318,6 +318,7 @@ export function makeSigner(partial: {
   colorIndex?: number;
   status?: SignerStatus;
   role?: SignerRole;
+  roleLabel?: string;
   entityType?: RecipientSource;
   signedAt?: string;
   signatureData?: string;
@@ -329,6 +330,7 @@ export function makeSigner(partial: {
     phone: partial.phone,
     order: partial.order,
     role: partial.role ?? "Signer",
+    roleLabel: partial.roleLabel,
     deliveryMethod: "email",
     status: partial.status ?? "Pending",
     token: partial.token,

@@ -132,7 +132,6 @@ describe("finance unit: normalize", () => {
       clientName: "Client",
       status: "Draft",
       owner: "Ada",
-      issueDate: "20/09/2026",
       validUntil: "20/10/2026",
       lineItems: [{ id: "l1", name: "Fee", quantity: 1, unitPrice: 100, taxRate: 10 }],
     });
