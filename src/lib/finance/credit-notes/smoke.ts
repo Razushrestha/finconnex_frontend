@@ -134,8 +134,12 @@ export function smokeCreditNotesWiring() {
   const createPage = readSrc(
     "src/app/(dashboard)/finance/credit-notes/create/page.tsx",
   );
-  if (!createPage.includes("CreateCreditNoteForm")) {
-    fail("credit-notes create page does not render CreateCreditNoteForm");
+  // Creating opens as a popup on the list page; /create just redirects there.
+  if (!createPage.includes('redirect("/finance/credit-notes?create=1")')) {
+    fail("credit-notes create page must open the create popup on the list");
+  }
+  if (!page.includes("<CreateCreditNoteForm")) {
+    fail("credit-notes list page does not render CreateCreditNoteForm");
   }
 
   const detailPage = readSrc(
