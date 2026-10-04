@@ -547,11 +547,21 @@ export function normalizeCrmBooking(
     guestName: pickStr(
       row.guestName,
       row.guest_name,
+      // The CRM booking API names the person who booked the invitee.
+      row.inviteeName,
+      row.invitee_name,
       row.name,
       guest.name,
       guest.fullName,
     ) || "Guest",
-    guestEmail: pickStr(row.guestEmail, row.guest_email, row.email, guest.email),
+    guestEmail: pickStr(
+      row.guestEmail,
+      row.guest_email,
+      row.inviteeEmail,
+      row.invitee_email,
+      row.email,
+      guest.email,
+    ),
     startTime: pickStr(row.startTime, row.start_time, row.startAt, row.start_at),
     endTime: pickStr(row.endTime, row.end_time, row.endAt, row.end_at),
     status: pickStr(row.status, row.state) || "Scheduled",

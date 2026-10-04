@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Eye,
   MoreVertical,
   Clock,
   Phone,
@@ -25,8 +24,13 @@ import {
   X,
   Pencil,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fetchLeadById } from "@/lib/leads/api";
+import { getCrmContact } from "@/lib/contacts/api";
+import { getCrmDeal } from "@/lib/deals/api";
+import { getCrmCompany } from "@/lib/companies/api";
 import { toast } from "@/lib/notify/toast";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
@@ -136,6 +140,31 @@ const STATUS_STYLE: Record<AppointmentStatus, string> = {
   Pending: "bg-[#FEF3C7] text-[#D97706]",
   Scheduled: "bg-[#DBEAFE] text-[#2563EB]",
 };
+
+const STATUS_DOT: Record<AppointmentStatus, string> = {
+  Confirmed: "bg-[#10B981]",
+  Pending: "bg-[#F59E0B]",
+  Scheduled: "bg-[#3B82F6]",
+};
+
+/** The table's compact status: a coloured dot that names itself on hover or focus. */
+function StatusDot({ status }: { status: AppointmentStatus }) {
+  return (
+    <span
+      tabIndex={0}
+      aria-label={status}
+      className="group relative inline-flex h-6 w-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#5A32A3]/40"
+    >
+      <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_DOT[status])} />
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      >
+        {status}
+      </span>
+    </span>
+  );
+}
 
 const RELATED_ICON: Record<RelatedKind, typeof User> = {
   Lead: User,
@@ -356,10 +385,15 @@ function HomeView({
     : rows.slice((page - 1) * pageSize, page * pageSize);
   const shownFrom = kpiFilter ? (rows.length ? 1 : 0) : (page - 1) * pageSize + 1;
   const shownTo = kpiFilter ? rows.length : Math.min(page * pageSize, rows.length);
-  const busyDays = useMemo(
-    () => new Set(appointments.map((a) => appointmentDateKey(a.start))),
-    [appointments],
-  );
+  // Each day's appointments in start order, for the calendar's hover card.
+  const appointmentsByDay = useMemo(() => {
+    const byDay = new Map<string, DashboardAppointment[]>();
+    for (const a of [...appointments].sort((x, y) => x.start.localeCompare(y.start))) {
+      const key = appointmentDateKey(a.start);
+      byDay.set(key, [...(byDay.get(key) ?? []), a]);
+    }
+    return byDay;
+  }, [appointments]);
   const todayKey = dateKeyFromDate(now);
 
   function openView(row: DashboardAppointment) {
@@ -664,7 +698,7 @@ function HomeView({
             month={month}
             selected={selectedDate}
             today={todayKey}
-            busyDays={busyDays}
+            appointmentsByDay={appointmentsByDay}
             onPrev={() =>
               setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
             }
@@ -846,14 +880,6 @@ function AppointmentCard({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onClick={onView}
-                className="flex h-8 w-8 items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-                aria-label="View"
-              >
-                <Eye className="h-4 w-4" />
-              </button>
               <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
             </div>
           </div>
@@ -985,14 +1011,7 @@ function AppointmentRow({
         </div>
       </td>
       <td className="px-3 py-3 align-middle">
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-            STATUS_STYLE[row.status],
-          )}
-        >
-          {row.status}
-        </span>
+        <StatusDot status={row.status} />
       </td>
       <td className="px-3 py-3 align-middle">
         <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-slate-600">
@@ -1002,14 +1021,6 @@ function AppointmentRow({
       </td>
       <td className="px-3 py-3 align-middle text-right" onClick={(e) => e.stopPropagation()}>
         <div className="inline-flex items-center justify-end overflow-hidden rounded-lg border border-[#E5E7EB]">
-          <button
-            type="button"
-            onClick={onView}
-            className="flex h-8 w-8 items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            aria-label="View"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
           <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
         </div>
       </td>
@@ -1017,11 +1028,14 @@ function AppointmentRow({
   );
 }
 
+const DAY_CARD_WIDTH = 288;
+const DAY_CARD_MAX_ROWS = 6;
+
 function MiniCalendar({
   month,
   selected,
   today,
-  busyDays,
+  appointmentsByDay,
   onPrev,
   onNext,
   onSelect,
@@ -1029,11 +1043,35 @@ function MiniCalendar({
   month: Date;
   selected: string;
   today: string;
-  busyDays: Set<string>;
+  appointmentsByDay: Map<string, DashboardAppointment[]>;
   onPrev: () => void;
   onNext: () => void;
   onSelect: (iso: string) => void;
 }) {
+  // The day under the pointer (or keyboard focus) and where its card goes.
+  // Fixed to the viewport so the page's scrolling panels cannot clip it.
+  const [hovered, setHovered] = useState<{
+    iso: string;
+    style: { top?: number; bottom?: number; left: number };
+  } | null>(null);
+
+  function showDay(iso: string, target: HTMLElement) {
+    const rect = target.getBoundingClientRect();
+    const rows = Math.min(appointmentsByDay.get(iso)?.length ?? 0, DAY_CARD_MAX_ROWS);
+    const estimatedHeight = 64 + Math.max(rows, 1) * 52;
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2 - DAY_CARD_WIDTH / 2, 8),
+      window.innerWidth - DAY_CARD_WIDTH - 8,
+    );
+    const fitsBelow = rect.bottom + 8 + estimatedHeight <= window.innerHeight;
+    setHovered({
+      iso,
+      style: fitsBelow
+        ? { top: rect.bottom + 6, left }
+        : { bottom: window.innerHeight - rect.top + 6, left },
+    });
+  }
+
   const year = month.getFullYear();
   const mo = month.getMonth();
   const firstDow = new Date(year, mo, 1).getDay();
@@ -1083,12 +1121,17 @@ function MiniCalendar({
           const iso = `${year}-${String(mo + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isSelected = iso === selected;
           const isToday = iso === today;
-          const busy = busyDays.has(iso);
+          const busy = appointmentsByDay.has(iso);
           return (
             <button
               key={iso}
               type="button"
               onClick={() => onSelect(iso)}
+              onMouseEnter={(e) => showDay(iso, e.currentTarget)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={(e) => showDay(iso, e.currentTarget)}
+              onBlur={() => setHovered(null)}
+              aria-describedby={hovered?.iso === iso ? "calendar-day-card" : undefined}
               className="relative flex h-full min-h-9 items-center justify-center"
             >
               <span
@@ -1114,7 +1157,85 @@ function MiniCalendar({
           );
         })}
       </div>
+      {hovered ? (
+        <DayBookingsCard
+          iso={hovered.iso}
+          appointments={appointmentsByDay.get(hovered.iso) ?? []}
+          style={hovered.style}
+        />
+      ) : null}
     </section>
+  );
+}
+
+/** Hover card listing one day's bookings with their statuses. */
+function DayBookingsCard({
+  iso,
+  appointments,
+  style,
+}: {
+  iso: string;
+  appointments: DashboardAppointment[];
+  style: { top?: number; bottom?: number; left: number };
+}) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const title = new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+  const shown = appointments.slice(0, DAY_CARD_MAX_ROWS);
+  const hidden = appointments.length - shown.length;
+  return (
+    <div
+      id="calendar-day-card"
+      role="tooltip"
+      className="pointer-events-none fixed z-50 rounded-xl border border-[#E5E7EB] bg-white p-3 text-left shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+      style={{ ...style, width: DAY_CARD_WIDTH }}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[13px] font-bold text-slate-900">{title}</p>
+        <p className="text-[11px] text-slate-400">
+          {appointments.length
+            ? `${appointments.length} booking${appointments.length === 1 ? "" : "s"}`
+            : ""}
+        </p>
+      </div>
+      {appointments.length === 0 ? (
+        <p className="py-1 text-[12px] text-slate-400">No bookings on this day.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {shown.map((a) => (
+            <li key={a.id} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+              <span className="w-[58px] shrink-0 pt-px text-[11px] font-semibold tabular-nums text-slate-700">
+                {formatApptTime(a.start)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-semibold text-slate-800">
+                  {a.guestName}
+                </span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {a.consultantName || appointmentConsultantName(a.consultantId) || a.type}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  STATUS_STYLE[a.status],
+                )}
+              >
+                {a.status}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {hidden > 0 ? (
+        <p className="mt-2 text-[11px] text-slate-500">
+          +{hidden} more. Click the date to see them all.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -1259,7 +1380,12 @@ function AppointmentDrawer({
             </div>
           ) : (
             <dl className="space-y-3 text-[13px]">
-              <Row label="Related to" value={`${row.relatedKind} · ${row.relatedId}`} />
+              <div className="flex justify-between gap-3 border-b border-slate-50 pb-2">
+                <dt className="text-slate-400">Related to</dt>
+                <dd className="min-w-0 text-right font-semibold text-slate-800">
+                  <RelatedRecordLink kind={row.relatedKind} id={row.relatedId} />
+                </dd>
+              </div>
               <Row
                 label="Consultant"
                 value={
@@ -1308,6 +1434,64 @@ function AppointmentDrawer({
         </div>
       </div>
     </div>
+  );
+}
+
+const RELATED_RECORD_PATH: Record<RelatedKind, string> = {
+  Lead: "/sales/leads/detail",
+  Contact: "/sales/contacts/detail",
+  Deal: "/sales/deals/detail",
+  Company: "/sales/companies/detail",
+};
+
+/** The related record's name, fetched by id. Null when it can't be read. */
+async function relatedRecordName(kind: RelatedKind, id: string): Promise<string | null> {
+  if (kind === "Lead") {
+    const lead = await fetchLeadById(id);
+    return lead ? `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() || null : null;
+  }
+  if (kind === "Contact") return (await getCrmContact(id))?.contact.name || null;
+  if (kind === "Deal") return (await getCrmDeal(id))?.name || null;
+  return (await getCrmCompany(id))?.company.name || null;
+}
+
+/**
+ * Links to the appointment's related record in a new tab, labelled with its
+ * name rather than its id. Until the name loads, or if it can't be read, the
+ * link says "View lead" (or contact, deal, company) so it still works.
+ */
+function RelatedRecordLink({ kind, id }: { kind: RelatedKind; id: string }) {
+  const [name, setName] = useState<string | null>(null);
+  const linkable = !!id && id !== "—";
+
+  useEffect(() => {
+    if (!linkable) return;
+    let alive = true;
+    void relatedRecordName(kind, id)
+      .then((value) => {
+        if (alive) setName(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      setName(null);
+    };
+  }, [kind, id, linkable]);
+
+  if (!linkable) return <span>—</span>;
+  return (
+    <a
+      href={`${RELATED_RECORD_PATH[kind]}/${encodeURIComponent(id)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex max-w-full items-center gap-1 text-[#5A32A3] hover:underline"
+      title={`Open this ${kind.toLowerCase()} in a new tab`}
+    >
+      <span className="truncate">
+        {kind} · {name || `View ${kind.toLowerCase()}`}
+      </span>
+      <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+    </a>
   );
 }
 

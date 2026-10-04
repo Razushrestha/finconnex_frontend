@@ -63,6 +63,11 @@ export function dateKeyFromDate(date: Date) {
 export function parseAppointmentStart(iso: string) {
   const raw = iso?.trim() ?? "";
   if (!raw) return new Date(NaN);
+  // An instant with a zone ("…Z", "…+05:45") is converted to this browser's
+  // clock; reading only its digits showed a UTC time as if it were local.
+  if (/T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    return new Date(raw);
+  }
   const ymd = raw.match(
     /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/,
   );
