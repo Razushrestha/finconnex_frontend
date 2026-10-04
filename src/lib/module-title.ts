@@ -37,6 +37,7 @@ const MODULE_TITLES: { href: string; label: string }[] = [
   { href: "/marketing/linktree", label: "Broker pages" },
   { href: "/finance/estimates", label: "Estimates" },
   { href: "/finance/quotations", label: "Quotations" },
+  { href: "/finance/credit-notes", label: "Credit notes" },
   { href: "/finance/invoices", label: "Invoices" },
   { href: "/finance/payments", label: "Payments" },
   { href: "/finance/products", label: "Items / Services" },

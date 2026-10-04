@@ -258,15 +258,12 @@ export default function DocumentsList() {
     <div className="relative mx-auto flex w-full flex-col px-4 py-2">
       {/* Header section */}
       <div className="mb-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
-            Signature Documents
-            <CrmSourceBadge
-              source={crm.source}
-              loading={crm.loading}
-              error={crm.error}
-            />
-          </h1>
+        <div className="flex items-center gap-2">
+          <CrmSourceBadge
+            source={crm.source}
+            loading={crm.loading}
+            error={crm.error}
+          />
         </div>
       </div>
 

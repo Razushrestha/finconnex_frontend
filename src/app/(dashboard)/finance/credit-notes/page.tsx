@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import { formatAUD } from "@/lib/finance/shared";
 import { CREDIT_NOTE_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { onRecordsChange } from "@/lib/records-sync";
 import { cn } from "@/lib/utils";
+import { CreateCreditNoteForm } from "@/components/finance/credit-notes/CreateCreditNoteForm";
 
 interface CreditNoteRow {
   id: string;
@@ -36,6 +37,14 @@ export default function CreditNotesPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
   const [data, setData] = useState<CreditNote[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    setCreateOpen(true);
+    router.replace("/finance/credit-notes", { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -195,6 +204,12 @@ export default function CreditNotesPage() {
         data={tableData}
         paginationText={`Showing 1 to ${tableData.length} of ${data.length} entries`}
         onRowClick={(row) => router.push(`/finance/credit-notes/${row.id}`)}
+      />
+      <CreateCreditNoteForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => setData(listCreditNotes())}
       />
     </div>
   );

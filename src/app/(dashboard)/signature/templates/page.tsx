@@ -175,14 +175,13 @@ export default function SignatureTemplatesPage() {
     <div className="relative mx-auto flex w-full flex-col p-4 space-y-4">
       {/* Header & Controls Section */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
-          Signature Templates
+        <div className="flex flex-wrap items-center gap-2">
           <CrmSourceBadge
             source={crm.source}
             loading={crm.loading}
             error={crm.error}
           />
-        </h1>
+        </div>
 
         <div className="flex items-center gap-3">
           <SearchInput

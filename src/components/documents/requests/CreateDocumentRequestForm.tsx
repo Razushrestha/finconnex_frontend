@@ -11,6 +11,7 @@ import {
   Banknote,
   Trash2,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 import {
   nextDocumentRequestIds,
@@ -1215,179 +1216,192 @@ export function CreateDocumentRequestForm({
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden bg-slate-50">
-      <div className="flex shrink-0 items-center justify-end px-4 py-3 sm:px-6 2xl:px-8">
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={goBack}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            {step === 1 ? "Cancel" : "Back"}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={goNext}
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60"
-          >
-            {step === 3 ? (saving ? "Creating…" : "Create") : "Next"}
-          </button>
+    <div className="min-h-full bg-slate-100/80 px-3 py-4 sm:px-5 sm:py-6">
+      <div className="mx-auto flex h-[calc(100dvh-6rem)] max-h-[1100px] w-full max-w-[1920px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 2xl:px-8">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#5A32A3] text-white">
+            <FileText className="h-4 w-4" />
+          </span>
+          <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900">
+            Create document request
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={goBack}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {step === 1 ? "Cancel" : "Back"}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={goNext}
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60"
+            >
+              {step === 3 ? (saving ? "Creating…" : "Create") : "Next"}
+            </button>
+          </div>
         </div>
-      </div>
-      {errors.dueDate || errors.reminderDate || errors.docs || errors.applicants || errors.sendOnBehalfOf ? (
-        <p className="px-4 text-[12px] font-medium text-rose-600 sm:px-6 2xl:px-8">
-          {errors.dueDate ||
-            errors.reminderDate ||
-            errors.docs ||
-            errors.applicants ||
-            errors.sendOnBehalfOf}
-        </p>
-      ) : null}
 
-      <div className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6 2xl:px-8">
-        <Stepper step={step} />
+        {errors.dueDate || errors.reminderDate || errors.docs || errors.applicants || errors.sendOnBehalfOf ? (
+          <p className="shrink-0 px-4 pt-2 text-[12px] font-medium text-rose-600 sm:px-6 2xl:px-8">
+            {errors.dueDate ||
+              errors.reminderDate ||
+              errors.docs ||
+              errors.applicants ||
+              errors.sendOnBehalfOf}
+          </p>
+        ) : null}
 
-        <div
-          className={cn(
-            "mt-4 grid min-h-0 flex-1 grid-cols-1 items-stretch gap-6 overflow-hidden",
-            step === 3
-              ? "lg:grid-cols-1"
-              : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)]",
-          )}
-        >
-          <div
-            className={cn(
-              "flex min-h-0 min-w-0 flex-col",
-              step === 3 ? "overflow-y-auto" : "overflow-hidden",
-            )}
-          >
-            {step === 1 ? (
-              <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
-                <SenderOnBehalfField
-                  value={sendOnBehalfOf}
-                  options={senders}
-                  invalid={Boolean(errors.sendOnBehalfOf)}
-                  onChange={(next) => {
-                    setSendOnBehalfOf(next);
-                    if (errors.sendOnBehalfOf) {
-                      setErrors((prev) => {
-                        const copy = { ...prev };
-                        delete copy.sendOnBehalfOf;
-                        return copy;
-                      });
-                    }
-                  }}
-                />
-                {errors.sendOnBehalfOf ? (
-                  <p className="-mt-4 mb-4 text-[12px] font-medium text-rose-500">
-                    {errors.sendOnBehalfOf}
-                  </p>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto flex min-h-full w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6 2xl:px-8">
+            <div className="pt-3">
+              <Stepper step={step} />
+            </div>
+
+            <div
+              className={cn(
+                "mt-4 grid min-h-0 flex-1 grid-cols-1 items-stretch gap-6 overflow-hidden",
+                step === 3
+                  ? "lg:grid-cols-1"
+                  : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)]",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex min-h-0 min-w-0 flex-col",
+                  step === 3 ? "overflow-y-auto" : "overflow-hidden",
+                )}
+              >
+                {step === 1 ? (
+                  <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                    <SenderOnBehalfField
+                      value={sendOnBehalfOf}
+                      options={senders}
+                      invalid={Boolean(errors.sendOnBehalfOf)}
+                      onChange={(next) => {
+                        setSendOnBehalfOf(next);
+                        if (errors.sendOnBehalfOf) {
+                          setErrors((prev) => {
+                            const copy = { ...prev };
+                            delete copy.sendOnBehalfOf;
+                            return copy;
+                          });
+                        }
+                      }}
+                    />
+                    {errors.sendOnBehalfOf ? (
+                      <p className="-mt-4 mb-4 text-[12px] font-medium text-rose-500">
+                        {errors.sendOnBehalfOf}
+                      </p>
+                    ) : null}
+
+                    <div className="relative z-0 border-t border-slate-100 pt-5">
+                      <RequestApplicantsSection
+                        applicants={applicants}
+                        onChange={(next) => {
+                          setApplicants(next);
+                          if (errors.applicants) {
+                            setErrors((prev) => {
+                              const copy = { ...prev };
+                              delete copy.applicants;
+                              return copy;
+                            });
+                          }
+                        }}
+                        error={errors.applicants}
+                      />
+                    </div>
+                  </section>
                 ) : null}
 
-                <div className="relative z-0 border-t border-slate-100 pt-5">
-                  <RequestApplicantsSection
-                    applicants={applicants}
-                    onChange={(next) => {
-                      setApplicants(next);
-                      if (errors.applicants) {
-                        setErrors((prev) => {
-                          const copy = { ...prev };
-                          delete copy.applicants;
-                          return copy;
-                        });
-                      }
+                {step === 2 ? (
+                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                    <RequestDocumentsPicker
+                      applicant1={applicant1}
+                      applicant2={applicant2}
+                      twoApplicants={applicantCount === "2" && !skipCoApplicant}
+                      selected={selectedByApplicant}
+                      onChange={setSelectedByApplicant}
+                      extras={extraDocs}
+                      onExtrasChange={setExtraDocs}
+                      descriptionOverrides={docDescOverrides}
+                      onDescriptionOverridesChange={setDocDescOverrides}
+                      template={template}
+                      onTemplateChange={setTemplate}
+                      error={errors.docs}
+                    />
+                    <div className="mt-4">
+                      <label className="mb-1 block text-[12px] font-medium text-slate-600">
+                        Notes for the client
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Anything they should know before uploading…"
+                        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {step === 3 ? (
+                  <RequestQuickReview
+                    clientName={requestedFrom || "Client"}
+                    sendOnBehalfOf={sendOnBehalfOf}
+                    requestTitle={requestTitle}
+                    onRequestTitleChange={(value) => {
+                      setTitleEdited(true);
+                      setRequestTitle(value);
                     }}
-                    error={errors.applicants}
+                    groups={reviewGroups}
+                    dueDate={
+                      dueDate ? formatRequestDateTime(dueDate) : "Not set"
+                    }
+                    reminderDate={
+                      reminderOn && reminderDate
+                        ? formatRequestDateTime(reminderDate)
+                        : "Not set"
+                    }
+                    repeatLabel={
+                      reminderOn
+                        ? reminderRepeat.preset === "none"
+                          ? "Once"
+                          : formatRequestRepeat(reminderRepeat)
+                        : "Off"
+                    }
+                    notifyBy={reminderOn ? notifyBy : []}
+                    notes={notes}
+                    onNotesChange={setNotes}
                   />
-                </div>
-              </section>
-            ) : null}
-
-            {step === 2 ? (
-              <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
-                <RequestDocumentsPicker
-                  applicant1={applicant1}
-                  applicant2={applicant2}
-                  twoApplicants={applicantCount === "2" && !skipCoApplicant}
-                  selected={selectedByApplicant}
-                  onChange={setSelectedByApplicant}
-                  extras={extraDocs}
-                  onExtrasChange={setExtraDocs}
-                  descriptionOverrides={docDescOverrides}
-                  onDescriptionOverridesChange={setDocDescOverrides}
-                  template={template}
-                  onTemplateChange={setTemplate}
-                  error={errors.docs}
-                />
-                <div className="mt-4">
-                  <label className="mb-1 block text-[12px] font-medium text-slate-600">
-                    Notes for the client
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Anything they should know before uploading…"
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
-                  />
-                </div>
+                ) : null}
               </div>
-            ) : null}
 
-            {step === 3 ? (
-              <RequestQuickReview
-                clientName={requestedFrom || "Client"}
-                sendOnBehalfOf={sendOnBehalfOf}
-                requestTitle={requestTitle}
-                onRequestTitleChange={(value) => {
-                  setTitleEdited(true);
-                  setRequestTitle(value);
-                }}
-                groups={reviewGroups}
-                dueDate={
-                  dueDate ? formatRequestDateTime(dueDate) : "Not set"
-                }
-                reminderDate={
-                  reminderOn && reminderDate
-                    ? formatRequestDateTime(reminderDate)
-                    : "Not set"
-                }
-                repeatLabel={
-                  reminderOn
-                    ? reminderRepeat.preset === "none"
-                      ? "Once"
-                      : formatRequestRepeat(reminderRepeat)
-                    : "Off"
-                }
-                notifyBy={reminderOn ? notifyBy : []}
-                notes={notes}
-                onNotesChange={setNotes}
-              />
-            ) : null}
+              {step !== 3 ? (
+                <aside className="flex min-h-0 flex-col overflow-hidden">
+                  <RequestScheduleCard
+                    className="flex-1 overflow-y-auto"
+                    dueDate={dueDate}
+                    reminderDate={reminderDate}
+                    reminderEnabled={reminderOn}
+                    reminderRepeat={reminderRepeat}
+                    notifyBy={notifyBy}
+                    errors={{
+                      dueDate: errors.dueDate,
+                      reminderDate: errors.reminderDate,
+                    }}
+                    onDueDateChange={handleDueDateChange}
+                    onReminderDateChange={handleReminderDateChange}
+                    onReminderEnabledChange={handleReminderEnabledChange}
+                    onReminderRepeatChange={setReminderRepeat}
+                    onToggleNotify={toggleNotify}
+                  />
+                </aside>
+              ) : null}
+            </div>
           </div>
-
-          {step !== 3 ? (
-            <aside className="flex min-h-0 flex-col overflow-hidden">
-              <RequestScheduleCard
-                className="flex-1 overflow-y-auto"
-                dueDate={dueDate}
-                reminderDate={reminderDate}
-                reminderEnabled={reminderOn}
-                reminderRepeat={reminderRepeat}
-                notifyBy={notifyBy}
-                errors={{
-                  dueDate: errors.dueDate,
-                  reminderDate: errors.reminderDate,
-                }}
-                onDueDateChange={handleDueDateChange}
-                onReminderDateChange={handleReminderDateChange}
-                onReminderEnabledChange={handleReminderEnabledChange}
-                onReminderRepeatChange={setReminderRepeat}
-                onToggleNotify={toggleNotify}
-              />
-            </aside>
-          ) : null}
         </div>
       </div>
     </div>

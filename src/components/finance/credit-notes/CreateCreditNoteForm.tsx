@@ -29,6 +29,7 @@ import {
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
+import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
   CreateEntityFormShell,
   Field,
@@ -38,11 +39,24 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
-export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateCreditNoteForm({
+  layoutId: _l,
+  redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+}: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const directory = useFinanceDirectory();
   const [title, setTitle] = useState("");
@@ -154,25 +168,19 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
       setInvoiceId("");
       setLineItems([newLineItem()]);
       setErrors({});
+      setSaveError(null);
+      return;
+    }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
       return;
     }
     router.push(`/finance/credit-notes/${created.id}`);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Credit Notes", href: "/finance/credit-notes" }}
-      badge="Live CRM"
-      title="Create Credit Note"
-      subtitle="Credit a client against an invoice or fee adjustment."
-      tip="Title and line items are required."
-      cardIcon={Receipt}
-      cardTitle="Credit note details"
-      cardDescription="POST /v1/credit-notes — sign in if CRM is offline"
-      listHref="/finance/credit-notes"
-      saveLabel={saving ? "Saving…" : "Save credit note"}
-      onSave={onSave}
-    >
+  const fields = (
+    <>
       {saveError ? (
         <p className="col-span-full text-[12px] font-medium text-rose-600">
           {saveError}
@@ -291,6 +299,40 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
         ) : null}
         <LineItemsEditor items={lineItems} onChange={setLineItems} />
       </div>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <FinanceCreateDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Create Credit Note"
+        icon={Receipt}
+        saving={saving}
+        saveLabel="Save credit note"
+        onSave={onSave}
+      >
+        {fields}
+      </FinanceCreateDialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Credit Notes", href: "/finance/credit-notes" }}
+      badge="Live CRM"
+      title="Create Credit Note"
+      subtitle="Credit a client against an invoice or fee adjustment."
+      tip="Title and line items are required."
+      cardIcon={Receipt}
+      cardTitle="Credit note details"
+      cardDescription="POST /v1/credit-notes — sign in if CRM is offline"
+      listHref="/finance/credit-notes"
+      saveLabel={saving ? "Saving…" : "Save credit note"}
+      onSave={onSave}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

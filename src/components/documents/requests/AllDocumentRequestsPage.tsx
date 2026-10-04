@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  FileText,
   Filter,
   Plus,
   Search,
@@ -73,9 +72,7 @@ export function AllDocumentRequestsPage({
       <div className="mx-auto w-full max-w-[1920px] px-5 py-5">
         <section className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
-            <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-              <FileText className="h-4 w-4 shrink-0 text-[#5A32A3]" />
-              All Requests
+            <div className="flex items-center gap-2">
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-semibold",
@@ -95,7 +92,7 @@ export function AllDocumentRequestsPage({
                   {error}
                 </span>
               ) : null}
-            </h2>
+            </div>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <div className="relative w-[220px]">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />

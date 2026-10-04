@@ -395,9 +395,6 @@ function DocumentLibraryPageInner() {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Library
-            </h1>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",

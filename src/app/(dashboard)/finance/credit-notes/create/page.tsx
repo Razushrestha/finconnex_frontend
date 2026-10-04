@@ -1,15 +1,10 @@
-﻿import { CreateCreditNoteForm } from "@/components/finance/credit-notes/CreateCreditNoteForm";
+import { redirect } from "next/navigation";
 
 export default async function CreateCreditNotePage({
   searchParams,
 }: {
   searchParams: Promise<{ layoutid?: string; redirect?: string }>;
 }) {
-  const sp = await searchParams;
-  return (
-    <CreateCreditNoteForm
-      layoutId={sp.layoutid ?? "standard"}
-      redirect={sp.redirect !== "false"}
-    />
-  );
+  await searchParams;
+  redirect("/finance/credit-notes?create=1");
 }

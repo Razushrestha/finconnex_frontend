@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type UIEvent } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BrokerHubConfig } from "@/lib/broker-hub/types";
@@ -16,6 +16,10 @@ export function BrokerHubPreview({
   onAvatarChange,
 }: BrokerHubPreviewProps) {
   const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
+  const lockPreviewScroll = (event: UIEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -63,7 +67,11 @@ export function BrokerHubPreview({
         </div>
       </div>
 
-      <div className="flex justify-center overflow-hidden bg-slate-50/80 py-4">
+      <div
+        className="flex justify-center overflow-hidden overscroll-none bg-slate-50/80 py-4"
+        onWheel={lockPreviewScroll}
+        onTouchMove={lockPreviewScroll}
+      >
         {device === "mobile" ? (
           <div className="relative h-[min(640px,calc(100dvh-12rem))] w-[min(280px,calc((100dvh-12rem)*0.46))] overflow-hidden rounded-[2.2rem] border-[7px] border-slate-950 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
             <div className="absolute left-1/2 top-2 z-20 h-[18px] w-[88px] -translate-x-1/2 rounded-full bg-slate-950" />

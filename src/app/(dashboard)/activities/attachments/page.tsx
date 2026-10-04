@@ -234,12 +234,19 @@ export default function AttachmentsPage() {
   return (
     <div className={cn(BOARD_PAGE, "gap-4")}>
       <FocusHighlight />
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            {activeFolder ? activeFolder : "Attachments"}
-          </h1>
-        </div>
+      <div
+        className={cn(
+          "flex flex-wrap items-start gap-3",
+          activeFolder ? "justify-between" : "justify-end",
+        )}
+      >
+        {activeFolder ? (
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              {activeFolder}
+            </h1>
+          </div>
+        ) : null}
         <div className="flex items-center gap-2">
           <ActivityTimelineButton
             active={view === "timeline"}
