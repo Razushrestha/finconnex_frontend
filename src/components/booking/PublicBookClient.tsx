@@ -199,7 +199,7 @@ function BookFlow({
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [inviteDraft, setInviteDraft] = useState("");
   const [pageBranding, setPageBranding] = useState<BookingPageBranding>(() =>
-    readLocalBookingPageBranding(),
+    readLocalBookingPageBranding(page.id),
   );
   // The Fresh layout books in separate steps (day, then time, then details)
   // and pages through days a week at a time instead of showing a month.

@@ -24,7 +24,8 @@ export async function GET(
 
   const result = await callPublicCrm(
     crmAuthBaseUrl(),
-    publicBookingSitePath(ref.workspaceSlug),
+    // This page's consultation, so it gets its own theme.
+    publicBookingSitePath(ref.workspaceSlug, ref.eventTypeSlug),
   );
   if (!result.ok) return crmFailureResponse(result);
   return NextResponse.json(result.data);

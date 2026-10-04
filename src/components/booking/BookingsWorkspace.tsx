@@ -27,10 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchLeadById } from "@/lib/leads/api";
-import { getCrmContact } from "@/lib/contacts/api";
-import { getCrmDeal } from "@/lib/deals/api";
-import { getCrmCompany } from "@/lib/companies/api";
+import { crmRecordHref, useCrmRecordName } from "@/lib/crm/related-record";
 import { toast } from "@/lib/notify/toast";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
@@ -1437,51 +1434,19 @@ function AppointmentDrawer({
   );
 }
 
-const RELATED_RECORD_PATH: Record<RelatedKind, string> = {
-  Lead: "/sales/leads/detail",
-  Contact: "/sales/contacts/detail",
-  Deal: "/sales/deals/detail",
-  Company: "/sales/companies/detail",
-};
-
-/** The related record's name, fetched by id. Null when it can't be read. */
-async function relatedRecordName(kind: RelatedKind, id: string): Promise<string | null> {
-  if (kind === "Lead") {
-    const lead = await fetchLeadById(id);
-    return lead ? `${lead.firstName ?? ""} ${lead.lastName ?? ""}`.trim() || null : null;
-  }
-  if (kind === "Contact") return (await getCrmContact(id))?.contact.name || null;
-  if (kind === "Deal") return (await getCrmDeal(id))?.name || null;
-  return (await getCrmCompany(id))?.company.name || null;
-}
-
 /**
  * Links to the appointment's related record in a new tab, labelled with its
  * name rather than its id. Until the name loads, or if it can't be read, the
  * link says "View lead" (or contact, deal, company) so it still works.
  */
 function RelatedRecordLink({ kind, id }: { kind: RelatedKind; id: string }) {
-  const [name, setName] = useState<string | null>(null);
   const linkable = !!id && id !== "—";
-
-  useEffect(() => {
-    if (!linkable) return;
-    let alive = true;
-    void relatedRecordName(kind, id)
-      .then((value) => {
-        if (alive) setName(value);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-      setName(null);
-    };
-  }, [kind, id, linkable]);
+  const name = useCrmRecordName(linkable ? kind : undefined, id);
 
   if (!linkable) return <span>—</span>;
   return (
     <a
-      href={`${RELATED_RECORD_PATH[kind]}/${encodeURIComponent(id)}`}
+      href={crmRecordHref(kind, id)}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex max-w-full items-center gap-1 text-[#5A32A3] hover:underline"

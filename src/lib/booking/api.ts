@@ -1051,6 +1051,25 @@ export async function saveBookingWorkspacePage(branding: unknown): Promise<{
   };
 }
 
+/** One consultation's booking page theme, separate from every other one. */
+export async function getBookingEventTypePage(
+  eventTypeId: string,
+): Promise<{ branding: unknown }> {
+  const data = await bookingCall(`/event-types/${eventTypeId}/page`);
+  return { branding: asRecord(data)?.branding };
+}
+
+export async function saveBookingEventTypePage(
+  eventTypeId: string,
+  branding: unknown,
+): Promise<{ branding: unknown }> {
+  const data = await bookingCall(
+    `/event-types/${eventTypeId}/page`,
+    jsonInit("PATCH", branding),
+  );
+  return { branding: asRecord(data)?.branding ?? branding };
+}
+
 export async function patchCrmEventType(
   eventTypeId: string,
   body: Record<string, unknown>,

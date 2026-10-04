@@ -263,8 +263,8 @@ export function smokeBookingWiring() {
     fail("PublicBookClient must show Invite Guest emails when the field is visible");
   }
   const designer = readSrc("src/components/booking/BookingPageDesigner.tsx");
-  if (!designer.includes("saveBookingWorkspacePage")) {
-    fail("Booking Page designer must save branding to the CRM");
+  if (!designer.includes("saveBookingEventTypePage")) {
+    fail("Booking Page designer must save each consultation's own branding to the CRM");
   }
   if (!designer.includes("ModernThemePreview") || !designer.includes("buttonText")) {
     fail("Booking Page designer must preview Modern with a color-tinted book button");

@@ -49,8 +49,10 @@ export function parseCrmPublicRef(value: unknown): CrmPublicRef | null {
   return { workspaceSlug, hostSlug, eventTypeSlug };
 }
 
-export function publicBookingSitePath(workspaceSlug: string): string {
-  return `/v1/public/booking/sites/${encodeURIComponent(workspaceSlug)}`;
+/** The public booking site; with `eventTypeSlug`, that consultation's own theme. */
+export function publicBookingSitePath(workspaceSlug: string, eventTypeSlug?: string): string {
+  const base = `/v1/public/booking/sites/${encodeURIComponent(workspaceSlug)}`;
+  return eventTypeSlug ? `${base}?eventType=${encodeURIComponent(eventTypeSlug)}` : base;
 }
 
 export function publicBookingPath(

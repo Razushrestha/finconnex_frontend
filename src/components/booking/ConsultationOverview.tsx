@@ -1460,7 +1460,7 @@ export function ConsultationOverview({
             />
           ) : null}
 
-          {section === "page" ? <BookingPageDesigner page={page} /> : null}
+          {section === "page" ? <BookingPageDesigner key={page.id} page={page} /> : null}
 
           {section === "form" ? (
             <BookingFormStep

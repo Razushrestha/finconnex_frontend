@@ -51,11 +51,12 @@ export type BookingPageService = {
   isActive?: boolean;
 };
 
-const STORE = "booking:workspace-page:v1";
+// One cached theme per consultation: a page's theme never applies to another.
+const STORE = "booking:page-theme:v2";
 
 export function defaultBookingPageBranding(): BookingPageBranding {
   return {
-    layout: "compact",
+    layout: "basic",
     primaryColor: "#5A32A3",
     showBanner: true,
     showUserAsCards: false,
@@ -153,18 +154,25 @@ export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding 
   return next;
 }
 
-export function readLocalBookingPageBranding(): BookingPageBranding {
+/** This consultation's cached theme; the Basic defaults when it has none. */
+export function readLocalBookingPageBranding(pageId: string): BookingPageBranding {
   if (typeof window === "undefined") return defaultBookingPageBranding();
   try {
-    return normalizeBookingPageBranding(JSON.parse(localStorage.getItem(STORE) || "null"));
+    return normalizeBookingPageBranding(
+      JSON.parse(localStorage.getItem(`${STORE}:${pageId}`) || "null"),
+    );
   } catch {
     return defaultBookingPageBranding();
   }
 }
 
-export function writeLocalBookingPageBranding(branding: BookingPageBranding) {
+export function writeLocalBookingPageBranding(pageId: string, branding: BookingPageBranding) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORE, JSON.stringify(branding));
+  try {
+    localStorage.setItem(`${STORE}:${pageId}`, JSON.stringify(branding));
+  } catch {
+    /* storage full or blocked; the server copy still holds it */
+  }
 }
 
 export const BOOKING_PAGE_COLORS = [

@@ -17,8 +17,10 @@ import {
   User,
 } from "lucide-react";
 import {
+  crmEventTypeIdOf,
+  getBookingEventTypePage,
   getBookingWorkspacePage,
-  saveBookingWorkspacePage,
+  saveBookingEventTypePage,
   tryCrmBooking,
 } from "@/lib/booking/api";
 import {
@@ -60,8 +62,11 @@ const LAYOUT_LABEL: Record<BookingPageLayout, string> = {
 };
 
 export function BookingPageDesigner({ page }: { page: BookingPage }) {
+  // The theme belongs to this consultation alone: it is loaded from and saved
+  // to this consultation's own record, never the workspace's shared one.
+  const eventTypeId = crmEventTypeIdOf(page);
   const [branding, setBranding] = useState<BookingPageBranding>(() =>
-    readLocalBookingPageBranding(),
+    readLocalBookingPageBranding(page.id),
   );
   const [services, setServices] = useState<BookingPageService[]>(() =>
     localServices(page),
@@ -71,29 +76,36 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
 
   useEffect(() => {
     let alive = true;
+    // The workspace's service list is shared; only the theme is per consultation.
     void tryCrmBooking(() => getBookingWorkspacePage()).then((res) => {
-      if (!alive || !res) return;
-      setBranding(normalizeBookingPageBranding(res.branding));
-      if (res.services?.length) setServices(res.services);
-      writeLocalBookingPageBranding(normalizeBookingPageBranding(res.branding));
+      if (alive && res?.services?.length) setServices(res.services);
     });
+    if (eventTypeId) {
+      void tryCrmBooking(() => getBookingEventTypePage(eventTypeId)).then((res) => {
+        if (!alive || !res) return;
+        const loaded = normalizeBookingPageBranding(res.branding);
+        setBranding(loaded);
+        writeLocalBookingPageBranding(page.id, loaded);
+      });
+    }
     return () => {
       alive = false;
     };
-  }, []);
+  }, [eventTypeId, page.id]);
 
   async function save(partial: Partial<BookingPageBranding>, panel: PanelId) {
     const next = { ...branding, ...partial };
     setBranding(next);
-    writeLocalBookingPageBranding(next);
+    writeLocalBookingPageBranding(page.id, next);
     setSaving(panel);
     try {
-      const saved = await tryCrmBooking(() => saveBookingWorkspacePage(next));
+      const saved = eventTypeId
+        ? await tryCrmBooking(() => saveBookingEventTypePage(eventTypeId, next))
+        : null;
       if (saved?.branding) {
         const normalized = normalizeBookingPageBranding(saved.branding);
         setBranding(normalized);
-        writeLocalBookingPageBranding(normalized);
-        if (saved.services?.length) setServices(saved.services);
+        writeLocalBookingPageBranding(page.id, normalized);
       }
       toast("Booking page saved");
     } catch (err) {
