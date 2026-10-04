@@ -1,5 +1,7 @@
 /** SRS §18 Notifications: event inbox for the CRM */
 
+import type { CrmRecordKind } from "@/lib/crm/related-record";
+
 export type NotificationType =
   | "Task Assigned"
   | "Deal Won"
@@ -20,6 +22,9 @@ export interface AppNotification {
   message: string;
   relatedTo: string;
   relatedHref: string;
+  /** The CRM record the notification is about, when it names one. */
+  relatedKind?: CrmRecordKind;
+  relatedId?: string;
   recipient: string;
   status: NotificationStatus;
   sentAt: string;

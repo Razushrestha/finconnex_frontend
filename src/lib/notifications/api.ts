@@ -12,6 +12,7 @@ import {
   type NotificationType,
   upsertNotification,
 } from "@/lib/notifications/types";
+import { crmRecordHref, type CrmRecordKind } from "@/lib/crm/related-record";
 
 export function workspaceNotificationsPath(
   workspaceId: string,
@@ -96,15 +97,39 @@ export function mapNotificationStatus(raw: string): NotificationStatus {
 
 function relatedHref(relatedType: string, relatedId: string): string {
   const kind = relatedType.toLowerCase();
-  if (kind.includes("lead")) return relatedId ? `/sales/leads/${relatedId}` : "/sales/leads";
-  if (kind.includes("deal")) return relatedId ? `/sales/deals/${relatedId}` : "/sales/deals";
-  if (kind.includes("contact")) return relatedId ? `/sales/contacts/${relatedId}` : "/sales/contacts";
-  if (kind.includes("compan")) return relatedId ? `/sales/companies/${relatedId}` : "/sales/companies";
+  if (kind.includes("lead")) return relatedId ? crmRecordHref("Lead", relatedId) : "/sales/leads";
+  if (kind.includes("deal")) return relatedId ? crmRecordHref("Deal", relatedId) : "/sales/deals";
+  if (kind.includes("contact")) return relatedId ? crmRecordHref("Contact", relatedId) : "/sales/contacts";
+  if (kind.includes("compan")) return relatedId ? crmRecordHref("Company", relatedId) : "/sales/companies";
   if (kind.includes("meeting")) return relatedId ? `/activities/meetings/detail/${relatedId}` : "/activities/meetings";
   if (kind.includes("task")) return "/activities/tasks";
   if (kind.includes("ticket")) return "/support";
   if (kind.includes("campaign")) return "/marketing/email";
   return "/notifications";
+}
+
+/** Where a notification of each type leads when it names no specific record. */
+const TYPE_DESTINATION: Partial<Record<NotificationType, { href: string; label: string }>> = {
+  "Meeting Reminder": { href: "/activities/meetings", label: "Go to meetings" },
+  "Task Assigned": { href: "/activities/tasks", label: "Go to tasks" },
+  "Lead Assigned": { href: "/sales/leads", label: "Go to leads" },
+  "Deal Won": { href: "/sales/deals", label: "Go to deals" },
+  "Ticket Updated": { href: "/support", label: "Go to support" },
+  "Campaign Sent": { href: "/marketing/email", label: "Go to campaigns" },
+};
+
+/**
+ * The notification panel's action: its record when it names one, else the
+ * section for its type, else nothing. The old fallback pointed back at
+ * /notifications, so the button looked broken.
+ */
+export function notificationDestination(
+  n: Pick<AppNotification, "relatedHref" | "type">,
+): { href: string; label: string } | null {
+  if (n.relatedHref && n.relatedHref !== "/notifications") {
+    return { href: n.relatedHref, label: "View related record" };
+  }
+  return TYPE_DESTINATION[n.type] ?? null;
 }
 
 function formatWhen(raw: unknown): string {
@@ -115,6 +140,30 @@ function formatWhen(raw: unknown): string {
   return formatRulesAt(new Date(parsed));
 }
 
+/**
+ * Older booking notifications stored a translation key as their message; show
+ * the sentence it stands for. New ones carry real text from the server.
+ */
+const LEGACY_MESSAGE_TEXT: Record<string, string> = {
+  "booking.notification.booked": "A new booking was made on your calendar.",
+  "booking.notification.cancelled": "A booking on your calendar was cancelled.",
+};
+
+/** The CRM record a notification row points at through its typed foreign keys. */
+function linkedRecord(raw: Record<string, unknown>): { kind: CrmRecordKind; id: string } | null {
+  const keys: [CrmRecordKind, unknown][] = [
+    ["Lead", raw.leadId],
+    ["Contact", raw.contactId],
+    ["Deal", raw.dealId],
+    ["Company", raw.companyId],
+  ];
+  for (const [kind, value] of keys) {
+    const id = pickStr(value);
+    if (id) return { kind, id };
+  }
+  return null;
+}
+
 export function normalizeNotification(
   raw: Record<string, unknown>,
   index: number,
@@ -123,23 +172,29 @@ export function normalizeNotification(
     raw.relatedTo && typeof raw.relatedTo === "object"
       ? (raw.relatedTo as Record<string, unknown>)
       : null;
-  const relatedType = pickStr(raw.relatedType, related && related.type);
-  const relatedId = pickStr(raw.relatedId, related && related.id);
+  const linked = linkedRecord(raw);
+  const relatedType = pickStr(raw.relatedType, related && related.type, linked?.kind);
+  const relatedId = pickStr(raw.relatedId, related && related.id, linked?.id);
+  const message = pickStr(raw.message, raw.body, raw.text, raw.content, "");
   const id = pickStr(raw.id, raw.notificationId, raw.uuid) || `crm-ntf-${index}`;
   return {
     id,
-    notificationId: pickStr(raw.code, raw.notificationId, raw.reference, id),
+    // A human reference when the server has one; never the raw row id.
+    notificationId: pickStr(raw.code, raw.notificationId, raw.reference),
     type: mapNotificationType(pickStr(raw.type, raw.kind, raw.eventType, "SYSTEM")),
     title: pickStr(raw.title, raw.subject, raw.name, "Notification"),
-    message: pickStr(raw.message, raw.body, raw.text, raw.content, ""),
+    message: LEGACY_MESSAGE_TEXT[message] ?? message,
     relatedTo:
       pickStr(
         related && pickStr(related.name, related.title, related.label),
         raw.relatedName,
+        linked ? linked.kind : "",
         relatedType && relatedId ? `${relatedType}: ${relatedId}` : "",
         typeof raw.relatedTo === "string" ? raw.relatedTo : "",
       ) || "—",
     relatedHref: relatedHref(relatedType, relatedId),
+    relatedKind: linked?.kind,
+    relatedId: linked?.id,
     recipient: pickStr(raw.recipient, raw.userName, raw.to, "You"),
     status: mapNotificationStatus(pickStr(raw.status, raw.state, "UNREAD")),
     sentAt: formatWhen(raw.sentAt ?? raw.createdAt ?? raw.insertedAt),

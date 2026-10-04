@@ -41,10 +41,12 @@ import {
   markAllCrmNotificationsRead,
   markCrmNotificationRead,
   markCrmNotificationUnread,
+  notificationDestination,
   persistRemoteNotification,
   tryCrmNotification,
 } from "@/lib/notifications/api";
 import { useCrmNotifications } from "@/lib/notifications/use-crm-notifications";
+import { useCrmRecordName } from "@/lib/crm/related-record";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
 
@@ -102,6 +104,9 @@ export function NotificationsCenterClient() {
     filtered.find((n) => n.id === selectedId) ??
     rows.find((n) => n.id === selectedId) ??
     null;
+  // The selected notification's record, named instead of shown as an id.
+  const selectedRecordName = useCrmRecordName(selected?.relatedKind, selected?.relatedId);
+  const selectedDestination = selected ? notificationDestination(selected) : null;
 
   const unread = crm.source === "api" ? crm.unreadCount : countUnread(rows);
 
@@ -368,7 +373,7 @@ export function NotificationsCenterClient() {
                         {n.message}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-x-3 text-[10px] text-slate-400">
-                        <span>{n.notificationId}</span>
+                        {n.notificationId ? <span>{n.notificationId}</span> : null}
                         <span>{n.relatedTo}</span>
                         <span>{n.sentAt}</span>
                       </div>
@@ -390,7 +395,9 @@ export function NotificationsCenterClient() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                      {selected.notificationId}
+                      {selectedRecordName && selected.relatedKind
+                        ? `${selected.relatedKind} · ${selectedRecordName}`
+                        : selected.notificationId || selected.type}
                     </div>
                     <h2 className="mt-0.5 text-[14px] font-bold text-slate-900">
                       {selected.title}
@@ -431,7 +438,9 @@ export function NotificationsCenterClient() {
                       Related to
                     </dt>
                     <dd className="mt-0.5 font-medium text-slate-800">
-                      {selected.relatedTo}
+                      {selectedRecordName && selected.relatedKind
+                        ? `${selected.relatedKind}: ${selectedRecordName}`
+                        : selected.relatedTo}
                     </dd>
                   </div>
                   <div>
@@ -460,14 +469,16 @@ export function NotificationsCenterClient() {
                   </div>
                 </dl>
                 <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => router.push(selected.relatedHref)}
-                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-violet-600 text-[11px] font-semibold text-white hover:bg-violet-700"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    View related record
-                  </button>
+                  {selectedDestination ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push(selectedDestination.href)}
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-violet-600 text-[11px] font-semibold text-white hover:bg-violet-700"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {selectedDestination.label}
+                    </button>
+                  ) : null}
                   {selected.status === "Unread" ? (
                     <button
                       type="button"
