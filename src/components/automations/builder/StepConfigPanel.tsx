@@ -446,14 +446,14 @@ function WaitDurationForm({
         min={1}
         value={amount}
         onChange={(e) => setAmount(Math.max(1, Number(e.target.value) || 1))}
-        className="w-24"
+        className="h-9 w-24 rounded-lg text-sm shadow-none"
       />
       <Select
         items={units.map(([label, ms]) => ({ label, value: String(ms) }))}
         value={String(unitMs)}
         onValueChange={(v) => setUnitMs(Number(v))}
       >
-        <SelectTrigger className="h-9 flex-1 text-sm">
+        <SelectTrigger className="h-9 flex-1 rounded-lg text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -483,7 +483,7 @@ interface Props {
  * an effect to reset local state on prop change.
  */
 export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }: Props) {
-  const [draft, setDraft] = useState<AutomationStep>(step);
+  const [draft, setDraft] = useState<AutomationStep>(() => withRecipientList(step));
   const { members, status: membersStatus } = useMembers();
 
   const meta = useMemo(() => {
@@ -671,4 +671,20 @@ function JsonField({
       {error && <p className="mt-1 text-xs text-amber-600">{error}</p>}
     </>
   );
+}
+
+/**
+ * Send Internal Notification once named a single `recipientId`; it now takes
+ * `recipientIds`. An older step opens with its one recipient already in the
+ * list, so saving it keeps them.
+ */
+function withRecipientList(step: AutomationStep): AutomationStep {
+  if (step.type !== "ACTION" || step.action !== "SEND_NOTIFICATION") return step;
+  const { recipientId, recipientIds, ...rest } = (step.config ?? {}) as Record<string, unknown>;
+  if (typeof recipientId !== "string" || !recipientId) return step;
+  const list = Array.isArray(recipientIds) ? recipientIds.map(String) : [];
+  return {
+    ...step,
+    config: { ...rest, recipientIds: [...new Set([recipientId, ...list])] },
+  };
 }

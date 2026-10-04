@@ -224,7 +224,24 @@ export const FIELD_META: Record<string, FieldMeta> = {
   remindAt: { label: "Remind At (ISO date)", widget: "datetime" },
   targetUserId: { label: "Remind", widget: "member" },
   recipientId: { label: "Recipient", widget: "member" },
+  recipientIds: {
+    label: "Recipients",
+    widget: "members",
+    helpText: "Search and add every teammate who should get this notification.",
+  },
   notificationType: { label: "Notification Type", widget: "text", placeholder: "GENERAL" },
+  // How Send Internal Notification reaches the teammate. Unset means In-App.
+  deliveryChannel: {
+    label: "Notification Type",
+    widget: "select",
+    options: [
+      { label: "In-App Notification (Android / iOS)", value: "IN_APP" },
+      { label: "Web Notification", value: "WEB" },
+      { label: "Email", value: "EMAIL" },
+      { label: "SMS", value: "SMS" },
+    ],
+    helpText: "In-App also pushes to the teammate's phone; Web shows only in the web app. Defaults to In-App.",
+  },
   // SEND_EMAIL renders To/Cc/Bcc through EmailRecipientsField instead of
   // these generic widgets; they remain as the fallback for any other action
   // that takes an address.

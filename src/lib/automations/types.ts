@@ -467,8 +467,8 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["tag"],
   },
   SEND_NOTIFICATION: {
-    allowed: ["recipientId", "notificationType", "title", "message", "taskId", "ticketId", "relatedType", "leadId", "contactId", "companyId", "dealId"],
-    required: ["recipientId", "title", "message"],
+    allowed: ["recipientIds", "deliveryChannel", "title", "message", "taskId", "ticketId", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    required: ["recipientIds", "title", "message"],
   },
   SEND_EMAIL: {
     // `toEmail` is allowed but not required: left unset, the executor sends
