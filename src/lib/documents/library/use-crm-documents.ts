@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  listCrmDocumentFolders,
   listCrmDocumentLibrary,
   listMyCrmDocuments,
   listRecentCrmDocuments,
@@ -21,6 +22,7 @@ export function useCrmDocuments() {
   const [tick, setTick] = useState(0);
   const [mine, setMine] = useState<LibraryDocument[]>([]);
   const [recent, setRecent] = useState<LibraryDocument[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -31,21 +33,24 @@ export function useCrmDocuments() {
 
     void (async () => {
       try {
-        const [library, myFiles, recentFiles] = await Promise.all([
+        const [library, myFiles, recentFiles, folderRows] = await Promise.all([
           listCrmDocumentLibrary(),
           tryCrmDocument(() => listMyCrmDocuments()),
           tryCrmDocument(() => listRecentCrmDocuments()),
+          tryCrmDocument(() => listCrmDocumentFolders()),
         ]);
         if (cancelled) return;
         replaceLibraryDocuments(library);
         setMine(myFiles ?? []);
         setRecent(recentFiles ?? []);
+        setFolders((folderRows ?? []).map((folder) => folder.name));
         setSource("api");
       } catch (err) {
         if (cancelled) return;
         setSource("demo");
         setMine([]);
         setRecent([]);
+        setFolders([]);
         setError(err instanceof Error ? err.message : "Documents unavailable");
       } finally {
         if (!cancelled) setLoading(false);
@@ -57,5 +62,5 @@ export function useCrmDocuments() {
     };
   }, [tick]);
 
-  return { source, loading, error, refresh, mine, recent };
+  return { source, loading, error, refresh, mine, recent, folders };
 }

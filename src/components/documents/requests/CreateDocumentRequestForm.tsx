@@ -1079,6 +1079,12 @@ export function CreateDocumentRequestForm({
           toCreateDocumentRequestBody({
             ...draft,
             dueDate,
+            reminderDate: reminderOn ? reminderDate : undefined,
+            repeat:
+              reminderOn && reminderRepeat.preset !== "none"
+                ? formatRequestRepeat(reminderRepeat)
+                : undefined,
+            notifyBy: reminderOn ? notifyBy : undefined,
             requestedFromId,
             ...parentIds,
           }),

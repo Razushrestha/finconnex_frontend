@@ -4,6 +4,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   makeSigner,
@@ -165,8 +166,13 @@ export function normalizeSignatureRequestRemote(
   const signers = mapSigners(raw.signers ?? raw.recipients ?? raw.actors);
   const primary = signers[0];
   const id = pickStr(raw.id, raw.uuid) || `crm-sr-${index}`;
+  const document =
+    raw.document && typeof raw.document === "object"
+      ? (raw.document as Record<string, unknown>)
+      : null;
   const documentName = pickStr(
     raw.documentName,
+    document && document.name,
     raw.title,
     raw.name,
     raw.subject,
@@ -203,12 +209,23 @@ export function normalizeSignatureRequestRemote(
       pickStr(raw.signingOrder, raw.orderMode).toLowerCase() === "parallel"
         ? "parallel"
         : "sequential",
-    relatedTo: pickStr(raw.relatedTo, raw.relatedLabel) || undefined,
+    relatedTo:
+      pickStr(
+        typeof raw.relatedTo === "string" ? raw.relatedTo : "",
+        raw.relatedLabel,
+        document ? relatedActivityLabel(document) : "",
+      ) || undefined,
     status: mapSignatureStatus(pickStr(raw.status, raw.state, "DRAFT")),
     sentDate: formatDisplayDate(raw.sentDate ?? raw.sentAt) || undefined,
     signedDate: formatDisplayDate(raw.signedDate ?? raw.signedAt) || undefined,
     expiryDate: formatDisplayDate(raw.expiryDate ?? raw.expiresAt) || "",
-    createdBy: pickStr(raw.createdBy, raw.ownerName, raw.owner, "—"),
+    createdBy:
+      pickStr(
+        typeof raw.createdBy === "string" ? raw.createdBy : "",
+        partyName(raw.createdBy),
+        raw.ownerName,
+        partyName(raw.owner),
+      ) || "—",
     manageToken: pickStr(raw.manageToken, raw.token, primary?.token) || `sig-${id}`,
     audit: [],
     updatedAt: pickStr(raw.updatedAt) || undefined,

@@ -3,6 +3,7 @@ import {
   isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   DOCUMENT_REQUEST_TYPES,
@@ -29,20 +30,6 @@ function pickStr(...values: unknown[]): string {
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
-}
-
-function nestedName(value: unknown): string {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const rec = value as Record<string, unknown>;
-  const first = pickStr(rec.firstName, rec.givenName);
-  const last = pickStr(rec.lastName, rec.familyName);
-  return pickStr(
-    rec.name,
-    rec.fullName,
-    rec.displayName,
-    rec.title,
-    [first, last].filter(Boolean).join(" "),
-  );
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -167,6 +154,25 @@ function formatDisplayDate(raw: unknown): string {
     .replace(/ (\d{4})$/, ", $1");
 }
 
+function toIsoDateTime(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  const local = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (local) {
+    const [, year, month, day, hour, minute] = local;
+    const parsed = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+    );
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
 function toIsoDate(raw: string | undefined): string | undefined {
   const value = raw?.trim();
   if (!value) return undefined;
@@ -212,8 +218,44 @@ function mapItems(raw: unknown): RequestedDocLine[] | undefined {
           : pickStr(row.status).toLowerCase().includes("upload")
             ? "Uploaded"
             : "Awaiting",
-    fileName: pickStr(row.fileName, row.filename) || undefined,
+    fileName:
+      pickStr(
+        row.fileName,
+        row.filename,
+        row.document && typeof row.document === "object"
+          ? (row.document as Record<string, unknown>).name
+          : "",
+      ) || undefined,
   }));
+}
+
+function progressPercent(raw: unknown, status: DocumentRequestStatus): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+  if (raw && typeof raw === "object") {
+    const rec = raw as Record<string, unknown>;
+    const total = Number(rec.total);
+    const received = Number(rec.received);
+    if (total > 0 && Number.isFinite(received)) {
+      return Math.max(0, Math.min(100, Math.round((received / total) * 100)));
+    }
+  }
+  return progressForStatus(status);
+}
+
+function formatDisplayDateTime(raw: unknown): string {
+  const date = formatDisplayDate(raw);
+  if (!date) return "";
+  const parsed = Date.parse(typeof raw === "string" ? raw : "");
+  if (Number.isNaN(parsed)) return date;
+  const value = new Date(parsed);
+  if (value.getHours() === 0 && value.getMinutes() === 0) return date;
+  const time = value.toLocaleTimeString("en-AU", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${date} ${time}`;
 }
 
 export function normalizeDocumentRequest(
@@ -227,8 +269,13 @@ export function normalizeDocumentRequest(
   const status = mapDocumentRequestStatus(
     pickStr(raw.status, raw.state, "REQUESTED"),
   );
+  const requestedFromPerson =
+    raw.requestedFrom && typeof raw.requestedFrom === "object"
+      ? raw.requestedFrom
+      : null;
   const requestedFrom = pickStr(
-    raw.requestedFrom,
+    typeof raw.requestedFrom === "string" ? raw.requestedFrom : "",
+    partyName(requestedFromPerson),
     raw.recipientName,
     raw.clientName,
     raw.applicantName,
@@ -247,13 +294,10 @@ export function normalizeDocumentRequest(
     requestedFromId: pickStr(raw.requestedFromId, client && client.id) || undefined,
     relatedTo:
       pickStr(
-        raw.relatedTo,
+        typeof raw.relatedTo === "string" ? raw.relatedTo : "",
         raw.relatedLabel,
         raw.relatedName,
-        nestedName(raw.deal),
-        nestedName(raw.lead),
-        nestedName(raw.contact),
-        nestedName(raw.company),
+        relatedActivityLabel(raw),
       ) || undefined,
     leadId: pickStr(raw.leadId) || undefined,
     contactId: pickStr(raw.contactId) || undefined,
@@ -264,25 +308,29 @@ export function normalizeDocumentRequest(
     ),
     status,
     dueDate: formatDisplayDate(raw.dueDate ?? raw.dueAt ?? raw.deadline),
-    reminderDate: formatDisplayDate(raw.reminderDate ?? raw.remindAt) || undefined,
+    reminderDate:
+      formatDisplayDateTime(raw.reminderDate ?? raw.reminderAt ?? raw.remindAt) ||
+      undefined,
+    repeat: pickStr(raw.repeat, raw.reminderRepeat) || undefined,
     notifyBy: Array.isArray(raw.notifyBy)
       ? raw.notifyBy.map(String)
       : undefined,
     requestedBy: pickStr(
-      raw.requestedBy,
-      nestedName(raw.requestedByUser),
-      nestedName(raw.requestedBy),
-      nestedName(raw.owner),
+      typeof raw.requestedBy === "string" ? raw.requestedBy : "",
+      partyName(raw.requestedBy),
+      partyName(raw.requestedByUser),
+      partyName(raw.owner),
       raw.ownerName,
       raw.createdByName,
-      "—",
-    ),
+    ) || "—",
     requestedById: pickStr(raw.requestedById, raw.ownerId, raw.createdById) || undefined,
     requestedDate: formatDisplayDate(
       raw.requestedDate ?? raw.createdAt ?? raw.sentAt,
     ),
     lastUpdated: formatDisplayDate(raw.updatedAt ?? raw.lastUpdated ?? raw.createdAt),
-    progress: progressForStatus(status),
+    progress: progressPercent(raw.progress, status),
+    receivedDate:
+      formatDisplayDate(raw.receivedDate ?? raw.receivedAt) || undefined,
     priority:
       pickStr(raw.priority).toLowerCase() === "high"
         ? "High"
@@ -293,8 +341,15 @@ export function normalizeDocumentRequest(
             : undefined,
     notes: pickStr(raw.notes, raw.description, raw.internalNotes) || undefined,
     items: mapItems(raw.items ?? raw.documents ?? raw.requestedDocuments),
-    clientName: pickStr(raw.clientName, client && client.name) || undefined,
-    clientEmail: pickStr(raw.clientEmail, client && client.email) || undefined,
+    clientName:
+      pickStr(raw.clientName, client && client.name, requestedFrom) || undefined,
+    clientEmail:
+      pickStr(
+        raw.clientEmail,
+        client && client.email,
+        requestedFromPerson &&
+          (requestedFromPerson as Record<string, unknown>).email,
+      ) || undefined,
   };
 }
 
@@ -427,14 +482,30 @@ export function toCreateDocumentRequestBody(
       : compactBody({
           [parentKeys[0]]: parents[parentKeys[0]],
         });
+  const documentType = input.documentType
+    ? apiDocumentRequestType(input.documentType)
+    : "OTHER";
+  const items = (input.items ?? [])
+    .map((item) => ({
+      name: item.title.trim(),
+      documentType,
+    }))
+    .filter((item) => item.name)
+    .slice(0, 25);
+  const notifyBy = (input.notifyBy ?? [])
+    .map((method) => method.trim())
+    .filter(Boolean)
+    .slice(0, 4);
   return compactBody({
     title: input.title.trim(),
-    documentType: input.documentType
-      ? apiDocumentRequestType(input.documentType)
-      : "OTHER",
+    documentType,
     requestedFromId,
-    dueDate: toIsoDate(input.dueDate),
+    dueDate: toIsoDateTime(input.dueDate) ?? toIsoDate(input.dueDate),
     notes: (input.notes ?? input.internalNotes)?.trim(),
+    reminderAt: toIsoDateTime(input.reminderDate),
+    reminderRepeat: input.repeat?.trim(),
+    notifyBy: notifyBy.length ? notifyBy : undefined,
+    items: items.length ? items : undefined,
     ...singleParent,
   });
 }

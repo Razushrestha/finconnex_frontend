@@ -85,6 +85,14 @@ function DocumentLibraryPageInner() {
   const [docs, setDocs] = useState<LibraryDocument[]>([]);
   const [folders, setFolders] = useState<string[]>([...LIBRARY_FOLDERS]);
   const [folder, setFolder] = useState<LibraryFolder>("All Files");
+
+  useEffect(() => {
+    if (!crm.folders.length) return;
+    setFolders((prev) => {
+      const extra = crm.folders.filter((name) => !prev.includes(name));
+      return extra.length ? [...prev, ...extra] : prev;
+    });
+  }, [crm.folders]);
   const [search, setSearch] = useState("");
   const [accessFilter, setAccessFilter] = useState<DocumentAccessLevel | "All">(
     "All",

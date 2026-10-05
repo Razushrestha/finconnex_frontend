@@ -3,11 +3,13 @@ import {
   isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   type CrmDocumentType,
   CRM_DOCUMENT_TYPES,
   type DocumentAccessLevel,
+  isLibraryView,
   type LibraryDocument,
 } from "@/lib/documents/library/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -193,9 +195,9 @@ export function normalizeLibraryDocument(
   raw: Record<string, unknown>,
   index: number,
 ): LibraryDocument {
-  const ownerObj =
-    raw.owner && typeof raw.owner === "object"
-      ? (raw.owner as Record<string, unknown>)
+  const folderRecord =
+    raw.folder && typeof raw.folder === "object"
+      ? (raw.folder as Record<string, unknown>)
       : null;
   const fileName = pickStr(
     raw.fileName,
@@ -208,12 +210,13 @@ export function normalizeLibraryDocument(
     raw.uploadedAt ?? raw.createdAt ?? raw.updatedAt,
   );
   const owner = pickStr(
+    partyName(raw.uploadedBy),
+    typeof raw.uploadedBy === "string" ? raw.uploadedBy : "",
     raw.ownerName,
-    raw.uploadedBy,
+    partyName(raw.owner),
+    typeof raw.owner === "string" ? raw.owner : "",
     raw.createdByName,
-    ownerObj && pickStr(ownerObj.name, ownerObj.fullName),
-    "—",
-  );
+  ) || "—";
   const sizeBytes =
     typeof raw.sizeBytes === "number"
       ? raw.sizeBytes
@@ -235,10 +238,21 @@ export function normalizeLibraryDocument(
     id: pickStr(raw.id, raw.uuid, raw.documentId) || `crm-doc-${index}`,
     fileName,
     folder:
-      pickStr(raw.folder, raw.category, raw.collection, meta.folder) ||
-      documentTypeToFolder(documentType, description),
+      pickStr(
+        typeof raw.folder === "string" ? raw.folder : "",
+        folderRecord && folderRecord.name,
+        raw.category,
+        raw.collection,
+        meta.folder,
+      ) || documentTypeToFolder(documentType, description),
     owner,
-    relatedTo: pickStr(raw.relatedTo, raw.relatedLabel, meta.relatedTo) || undefined,
+    relatedTo:
+      pickStr(
+        typeof raw.relatedTo === "string" ? raw.relatedTo : "",
+        raw.relatedLabel,
+        meta.relatedTo,
+        relatedActivityLabel(raw),
+      ) || undefined,
     version,
     tags: mapTags(raw.tags ?? raw.labels).length
       ? mapTags(raw.tags ?? raw.labels)
@@ -535,6 +549,34 @@ function crmDocumentMimeType(body: Record<string, unknown>) {
   return mime || "application/pdf";
 }
 
+export async function listCrmDocumentFolders(): Promise<
+  { id: string; name: string }[]
+> {
+  const rows = extractRecords(await documentsGet("/folders"));
+  return rows
+    .map((row) => ({ id: pickStr(row.id), name: pickStr(row.name) }))
+    .filter((row) => row.id && row.name);
+}
+
+async function ensureCrmFolderId(name: string): Promise<string | undefined> {
+  try {
+    const folders = await listCrmDocumentFolders();
+    const match = folders.find(
+      (folder) => folder.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (match) return match.id;
+    const created = await documentsMutate("/folders", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    const row = extractRecords(created)[0];
+    const id = row ? pickStr(row.id) : "";
+    return isUuid(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function createCrmDocument(
   body: Record<string, unknown>,
 ): Promise<LibraryDocument | null> {
@@ -562,6 +604,13 @@ export async function createCrmDocument(
   const visibility = pickStr(body.visibility).toUpperCase();
   if (visibility === "PRIVATE" || visibility === "TEAM" || visibility === "ORGANIZATION") {
     payload.visibility = visibility;
+  }
+  if (!payload.folderId && description) {
+    const folderName = parseMeta(description).folder;
+    if (folderName && !isLibraryView(folderName)) {
+      const folderId = await ensureCrmFolderId(folderName);
+      if (folderId) payload.folderId = folderId;
+    }
   }
   if (!payload.name || !payload.key || !payload.mimeType || sizeBytes < 1) {
     throw new Error("CRM document needs a file name, storage key, type, and size.");
