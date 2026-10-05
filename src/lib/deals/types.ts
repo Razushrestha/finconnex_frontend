@@ -45,6 +45,9 @@ export interface DealRecord {
   contact?: string;
   /** Stable link to ContactCardData.id when set. */
   contactId?: string;
+  /** Email from the linked CRM contact when the contact is not in the local store. */
+  contactEmail?: string;
+  ownerId?: string;
   value: string;
   currency: DealCurrency;
   probability: number;

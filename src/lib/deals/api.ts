@@ -22,9 +22,19 @@ export type CrmDealQuery = {
   stage?: string;
 };
 
+export type CrmDealForecastOwner = {
+  id: string;
+  owner: string;
+  pipeline: number;
+  bestCase: number;
+  committed: number;
+  closed: number;
+};
+
 export type CrmDealForecast = {
   expected: number;
   actual: number;
+  owners: CrmDealForecastOwner[];
   raw: unknown;
 };
 
@@ -32,6 +42,7 @@ export type CrmDealContact = {
   id: string;
   contactId: string;
   name: string;
+  email?: string;
   role?: string;
 };
 
@@ -45,6 +56,23 @@ const AVATAR_COLORS = [
   "bg-emerald-50 text-emerald-600",
   "bg-rose-50 text-rose-600",
 ];
+
+function firstRecord(value: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(value)) return null;
+  const row = value[0];
+  return row && typeof row === "object" && !Array.isArray(row)
+    ? (row as Record<string, unknown>)
+    : null;
+}
+
+function personName(person: Record<string, unknown> | null): string {
+  if (!person) return "";
+  return pickStr(
+    person.name,
+    person.fullName,
+    [person.firstName, person.lastName].filter((part) => typeof part === "string" && part.trim()).join(" "),
+  );
+}
 
 function pickStr(...values: unknown[]): string {
   for (const value of values) {
@@ -222,6 +250,15 @@ export function normalizeDeal(
       : raw.primaryContact && typeof raw.primaryContact === "object"
         ? (raw.primaryContact as Record<string, unknown>)
         : null;
+  const owner =
+    raw.owner && typeof raw.owner === "object"
+      ? (raw.owner as Record<string, unknown>)
+      : null;
+  const link = firstRecord(raw.dealContacts);
+  const linkedContact =
+    link?.contact && typeof link.contact === "object"
+      ? (link.contact as Record<string, unknown>)
+      : null;
   const name = pickStr(raw.name, raw.title, raw.dealName, `Deal ${index + 1}`);
   const stageTitle = mapDealStageTitle(
     pickStr(raw.stage, raw.status, raw.pipelineStage, "PROSPECTING"),
@@ -240,13 +277,26 @@ export function normalizeDeal(
     ),
     contact:
       pickStr(
-        contact && pickStr(contact.name, contact.fullName),
+        personName(linkedContact) || personName(contact),
         raw.contactName,
-        raw.contact,
+        typeof raw.contact === "string" ? raw.contact : "",
       ) || undefined,
     contactId:
-      pickStr(contact && contact.id, raw.contactId, raw.primaryContactId) ||
-      undefined,
+      pickStr(
+        linkedContact && linkedContact.id,
+        link && link.contactId,
+        contact && contact.id,
+        raw.contactId,
+        raw.primaryContactId,
+      ) || undefined,
+    contactEmail:
+      pickStr(
+        linkedContact && linkedContact.email,
+        contact && contact.email,
+        raw.contactEmail,
+      ) || undefined,
+    ownerId:
+      pickStr(raw.ownerId, owner && owner.id) || undefined,
     value: formatMoney(raw.value ?? raw.amount ?? raw.pipelineValue),
     currency: (pickStr(raw.currency, "AUD").toUpperCase() ||
       "AUD") as DealCurrency,
@@ -401,9 +451,41 @@ function forecastRange(): { from: string; to: string } {
   };
 }
 
-export async function getCrmDealForecast(): Promise<CrmDealForecast> {
+export function forecastOwnersFromPayload(data: unknown): CrmDealForecastOwner[] {
+  const rec =
+    data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const rows = Array.isArray(rec.owners) ? rec.owners : [];
+  return rows.flatMap((row, index) => {
+    if (!row || typeof row !== "object") return [];
+    const item = row as Record<string, unknown>;
+    const owner = pickStr(item.ownerName, item.owner, item.name, "Unassigned");
+    return [
+      {
+        id: pickStr(item.ownerId, item.id) || `owner-${index}`,
+        owner,
+        pipeline: toNum(item.pipeline ?? item.openValue),
+        bestCase: toNum(item.bestCase ?? item.openWeightedValue),
+        committed: toNum(item.committed),
+        closed: toNum(item.closed ?? item.wonValue),
+      },
+    ];
+  });
+}
+
+export async function getCrmDealForecast(opts?: {
+  from?: string;
+  to?: string;
+  currency?: string;
+}): Promise<CrmDealForecast> {
   const range = forecastRange();
-  const data = await dealsGet("/forecast", toQuery(range));
+  const data = await dealsGet(
+    "/forecast",
+    toQuery({
+      from: opts?.from ?? range.from,
+      to: opts?.to ?? range.to,
+      currency: (opts?.currency ?? "AUD").toUpperCase(),
+    }),
+  );
   const rec =
     data && typeof data === "object" ? (data as Record<string, unknown>) : {};
   return {
@@ -418,6 +500,7 @@ export async function getCrmDealForecast(): Promise<CrmDealForecast> {
     actual: toNum(
       rec.actual ?? rec.actualClose ?? rec.won ?? rec.wonValue ?? rec.closedWonValue,
     ),
+    owners: forecastOwnersFromPayload(data),
     raw: data,
   };
 }
@@ -634,11 +717,12 @@ export async function listCrmDealContacts(id: string): Promise<CrmDealContact[]>
       id: pickStr(row.id, contactId) || `dc-${index}`,
       contactId,
       name: pickStr(
-        contact && pickStr(contact.name, contact.fullName),
+        contact && personName(contact),
         row.name,
         row.contactName,
         "Contact",
       ),
+      email: pickStr(contact && contact.email, row.email) || undefined,
       role: pickStr(row.role, row.contactRole) || undefined,
     };
   });

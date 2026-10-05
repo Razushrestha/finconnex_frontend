@@ -190,6 +190,8 @@ export function normalizeCrmCompany(
         undefined,
       annualRevenue: pickStr(raw.annualRevenue, raw.revenue) || undefined,
       city: pickStr(raw.city, raw.location, raw.addressCity) || undefined,
+      state: pickStr(raw.state, raw.region) || undefined,
+      country: pickStr(raw.country) || undefined,
       version: pickNum(raw.version, raw.expectedVersion, raw.recordVersion),
       accentColorClass: STATUS_DOT[status],
       avatarBgClass: AVATAR_COLORS[index % AVATAR_COLORS.length],

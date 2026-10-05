@@ -1,15 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FORECAST_PERIODS,
-  FORECAST_ROWS,
-  TERRITORIES,
   formatAud,
   type ForecastPeriod,
+  type ForecastRow,
+  type TerritoryRule,
 } from "@/lib/forecasting/types";
+import { getCrmDealForecast } from "@/lib/deals/api";
+import { listCrmCompanies } from "@/lib/companies/api";
 import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+
+function periodRange(period: ForecastPeriod, now = new Date()) {
+  const start = new Date(now);
+  const end = new Date(now);
+  if (period === "Month") {
+    start.setDate(1);
+    end.setMonth(end.getMonth() + 1, 0);
+  } else if (period === "Quarter") {
+    const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+    start.setMonth(quarterStart, 1);
+    end.setMonth(quarterStart + 3, 0);
+  } else {
+    start.setMonth(0, 1);
+    end.setMonth(11, 31);
+  }
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function moneyOrDash(value: number, quota = false) {
+  if (quota && !value) return "—";
+  return formatAud(value);
+}
 
 function attainmentPct(closed: number, quota: number) {
   if (!quota) return 0;
@@ -18,9 +44,58 @@ function attainmentPct(closed: number, quota: number) {
 
 export default function ForecastingPage() {
   const [period, setPeriod] = useState<ForecastPeriod>("Quarter");
+  const [rows, setRows] = useState<ForecastRow[]>([]);
+  const [territories, setTerritories] = useState<TerritoryRule[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const range = periodRange(period);
+    void (async () => {
+      const [forecast, companies] = await Promise.all([
+        getCrmDealForecast({ ...range, currency: "AUD" }).catch(() => null),
+        listCrmCompanies({ limit: 100 }).catch(() => []),
+      ]);
+      if (cancelled) return;
+      setRows(
+        (forecast?.owners ?? []).map((owner) => ({
+          id: owner.id,
+          owner: owner.owner,
+          territory: "",
+          pipeline: owner.pipeline,
+          bestCase: owner.bestCase,
+          committed: owner.committed,
+          closed: owner.closed,
+          quota: 0,
+        })),
+      );
+      const grouped = new Map<string, TerritoryRule>();
+      for (const row of companies) {
+        const company = row.company;
+        const name = company.state || company.country || company.city || "Unassigned";
+        const current = grouped.get(name) ?? {
+          id: name,
+          name,
+          owner: company.owner || "—",
+          rules: company.industry || "Companies in this region",
+          accountCount: 0,
+        };
+        current.accountCount += 1;
+        grouped.set(name, current);
+      }
+      setTerritories(
+        [...grouped.values()].sort((a, b) => b.accountCount - a.accountCount),
+      );
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [period]);
 
   const totals = useMemo(() => {
-    return FORECAST_ROWS.reduce(
+    return rows.reduce(
       (acc, row) => ({
         pipeline: acc.pipeline + row.pipeline,
         bestCase: acc.bestCase + row.bestCase,
@@ -30,7 +105,7 @@ export default function ForecastingPage() {
       }),
       { pipeline: 0, bestCase: 0, committed: 0, closed: 0, quota: 0 },
     );
-  }, []);
+  }, [rows]);
 
   const teamAttainment = attainmentPct(totals.closed, totals.quota);
 
@@ -51,7 +126,7 @@ export default function ForecastingPage() {
               Sales Forecasting
             </h1>
             <p className="text-[12px] text-slate-500">
-              Owner roll-up · {period}
+              {loading ? "Loading CRM deals" : `Owner roll-up · ${period} · AUD`}
             </p>
           </div>
         </div>
@@ -93,7 +168,7 @@ export default function ForecastingPage() {
                   m.emphasize ? "text-violet-700" : "text-slate-900",
                 )}
               >
-                {formatAud(m.value)}
+                {moneyOrDash(m.value, m.label === "Quota")}
               </p>
             </div>
           ))}
@@ -123,7 +198,7 @@ export default function ForecastingPage() {
             Forecast by owner
           </h2>
           <p className="text-[12px] text-slate-400">
-            {FORECAST_ROWS.length} owners
+            {rows.length} owners
           </p>
         </div>
         <ResizableColumns storageKey="forecasting-list" className="overflow-x-auto">
@@ -143,7 +218,16 @@ export default function ForecastingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {FORECAST_ROWS.map((row) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-slate-500">
+                    {loading
+                      ? "Loading forecast…"
+                      : "No deals close in this period."}
+                  </td>
+                </tr>
+              ) : null}
+              {rows.map((row) => {
                 const attainment = attainmentPct(row.closed, row.quota);
                 return (
                   <tr
@@ -154,7 +238,7 @@ export default function ForecastingPage() {
                       {row.owner}
                     </td>
                     <td className="px-3 py-1.5 text-slate-600">
-                      {row.territory}
+                      {row.territory || "—"}
                     </td>
                     <td className="px-3 py-1.5 tabular-nums">
                       {formatAud(row.pipeline)}
@@ -169,7 +253,7 @@ export default function ForecastingPage() {
                       {formatAud(row.closed)}
                     </td>
                     <td className="px-3 py-1.5 tabular-nums">
-                      {formatAud(row.quota)}
+                      {moneyOrDash(row.quota, true)}
                     </td>
                     <td className="px-3 py-1.5">
                       <div className="flex items-center gap-2">
@@ -208,7 +292,7 @@ export default function ForecastingPage() {
                   {formatAud(totals.closed)}
                 </td>
                 <td className="px-3 py-2.5 tabular-nums">
-                  {formatAud(totals.quota)}
+                  {moneyOrDash(totals.quota, true)}
                 </td>
                 <td className="px-3 py-2.5 tabular-nums text-violet-700">
                   {teamAttainment}%
@@ -226,7 +310,7 @@ export default function ForecastingPage() {
             Territories
           </h2>
           <p className="text-[11px] text-slate-400">
-            {TERRITORIES.length} regions
+            {territories.length} regions
           </p>
         </div>
         <ResizableColumns storageKey="forecasting-territories-list" className="overflow-x-auto">
@@ -240,7 +324,16 @@ export default function ForecastingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {TERRITORIES.map((t) => (
+              {territories.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-slate-500">
+                    {loading
+                      ? "Loading companies…"
+                      : "No company regions yet."}
+                  </td>
+                </tr>
+              ) : null}
+              {territories.map((t) => (
                 <tr
                   key={t.id}
                   className="h-9 transition-colors hover:bg-violet-50/40"

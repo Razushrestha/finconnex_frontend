@@ -119,6 +119,8 @@ export function createCompany(input: {
     owner: input.owner,
     annualRevenue: input.annualRevenue?.trim() || undefined,
     city: input.city?.trim() || undefined,
+    state: input.state?.trim() || undefined,
+    country: input.country?.trim() || undefined,
     accentColorClass: target.dotColorClass,
     avatarBgClass: AVATAR_COLORS[avatarIndex % AVATAR_COLORS.length],
   };

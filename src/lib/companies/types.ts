@@ -20,6 +20,8 @@ export interface CompanyCardData {
   ownerId?: string;
   annualRevenue?: string;
   city?: string;
+  state?: string;
+  country?: string;
   tags?: string[];
   accentColorClass: string;
   avatarBgClass: string;

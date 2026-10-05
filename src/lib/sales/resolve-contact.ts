@@ -44,7 +44,7 @@ export function resolveDealContact(deal: DealRecord): {
       return {
         name: found.contact.name,
         id: found.contact.id,
-        email: found.contact.email,
+        email: found.contact.email || deal.contactEmail || "",
         phone: found.contact.mobile || found.contact.phone || "",
       };
     }
@@ -55,11 +55,18 @@ export function resolveDealContact(deal: DealRecord): {
       return {
         name: byName.name,
         id: byName.id,
-        email: byName.email,
+        email: byName.email || deal.contactEmail || "",
         phone: byName.mobile || byName.phone || "",
       };
     }
-    return { name: deal.contact.trim(), email: "", phone: "" };
+  }
+  if (deal.contactEmail || deal.contact?.trim()) {
+    return {
+      name: deal.contact?.trim() || "",
+      id: deal.contactId,
+      email: deal.contactEmail || "",
+      phone: "",
+    };
   }
   return { name: "", email: "", phone: "" };
 }
