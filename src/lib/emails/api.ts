@@ -663,10 +663,16 @@ export async function sendCrmEmail(
       files.length > 0 ||
       Boolean(html && (/<img\b/i.test(html) || /data:image\//i.test(html)));
     if (needsBackup) {
-      const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
       // Always push the full local file set through SendGrid. CRM may have
       // dropped non-whitelisted types (e.g. .docx) before /send.
-      await deliverQueuedCrmEmail(full ?? mapped, { html, files });
+      // The CRM has already sent the email by now, so a failure here must
+      // not report the send as failed (that left sent mail sitting in Drafts).
+      try {
+        const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
+        await deliverQueuedCrmEmail(full ?? mapped, { html, files });
+      } catch (err) {
+        console.warn("CRM sent the email; the rich-content copy failed", err);
+      }
     }
   }
   return mapped;

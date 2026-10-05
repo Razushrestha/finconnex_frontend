@@ -8,7 +8,7 @@ import {
   LayoutTemplate,
   Search,
 } from "lucide-react";
-import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
+import type { Email, EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import {
   applyCrmEmailTemplate,
@@ -387,6 +387,9 @@ export function CreateEmailForm({
       })),
     });
     let keptId = local.id;
+    // Set once the CRM has the email, so a later failure updates that record
+    // instead of restoring the local copy as a second, draft-only email.
+    let crmCopy: Email | null = null;
 
     try {
       const remote = await createCrmEmail({
@@ -420,6 +423,7 @@ export function CreateEmailForm({
         outbound: status !== "Draft",
       }) ?? remote;
       keptId = current.id;
+      crmCopy = current;
       const blobs = form.attachments
         .map((item) => item.file)
         .filter((item): item is File => item instanceof File);
@@ -479,7 +483,7 @@ export function CreateEmailForm({
         keptId = current.id;
       }
     } catch (err) {
-      upsertEmail({ ...local, status: "Draft", outbound: true });
+      upsertEmail({ ...(crmCopy ?? local), status: "Draft", outbound: true });
       setSending(false);
       setSendError(
         err instanceof Error

@@ -160,6 +160,25 @@ export function mergeCrmEmails(remote: Email[]) {
   saveEmails([...remote.map(cloneEmail), ...local.map(cloneEmail)]);
 }
 
+/**
+ * A local-only draft left behind by a send the CRM actually completed: same
+ * subject and recipients as a CRM email that is no longer a draft. Its body
+ * often differs (signature, inline images), so the body check above misses it.
+ */
+function isLeftoverDraftOf(row: Email, remote: Email[]) {
+  if (row.status !== "Draft" && row.status !== "Failed") return false;
+  const subject = row.subject.trim().toLowerCase();
+  const to = row.to.map((addr) => addr.trim().toLowerCase()).sort().join(",");
+  if (!subject || !to) return false;
+  return remote.some(
+    (item) =>
+      item.status !== "Draft" &&
+      item.status !== "Failed" &&
+      item.subject.trim().toLowerCase() === subject &&
+      item.to.map((addr) => addr.trim().toLowerCase()).sort().join(",") === to,
+  );
+}
+
 export function replaceCrmEmails(remote: Email[]) {
   const previous = listEmails();
   const previousById = new Map(previous.map((row) => [row.id, row]));
@@ -173,7 +192,7 @@ export function replaceCrmEmails(remote: Email[]) {
         item.subject.trim().toLowerCase() === row.subject.trim().toLowerCase() &&
         item.body.trim() === row.body.trim(),
     );
-    return !duplicate;
+    return !duplicate && !isLeftoverDraftOf(row, remote);
   });
   const mergedRemote = remote.map((row) => {
     const local = previousById.get(row.id);
