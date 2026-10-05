@@ -5,6 +5,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   type NotificationMethod,
@@ -156,22 +157,24 @@ export function normalizeReminder(
     id: pickStr(raw.id, raw.uuid, raw.reminderId) || `crm-rem-${index}`,
     title: pickStr(raw.title, raw.subject, raw.name, "Reminder"),
     relatedTo:
+      relatedActivityLabel(raw) ||
       pickStr(
-        raw.relatedTo,
+        typeof raw.relatedTo === "string" ? raw.relatedTo : "",
         related && pickStr(related.name, related.title, related.label),
-      ) || undefined,
+      ) ||
+      undefined,
     dateTime: formatWhen(
       raw.dueAt ?? raw.remindAt ?? raw.scheduledAt ?? raw.dateTime ?? raw.when,
     ),
     type: mapReminderType(pickStr(raw.reminderType, raw.type, raw.kind, "CUSTOM")),
     status: mapReminderStatus(pickStr(raw.status, raw.state, "PENDING")),
     notificationMethod: mapNotificationMethod(channel),
-    owner: pickStr(
-      owner && pickStr(owner.name, owner.fullName, owner.email),
-      raw.ownerName,
-      raw.createdBy,
+    owner:
+      partyName(raw.targetUser) ||
+      partyName(raw.createdBy) ||
+      partyName(owner) ||
+      pickStr(raw.ownerName, typeof raw.createdBy === "string" ? raw.createdBy : "") ||
       "—",
-    ),
   };
 }
 

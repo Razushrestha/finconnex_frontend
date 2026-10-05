@@ -5,6 +5,11 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import {
+  formatDurationSeconds,
+  partyName,
+  relatedActivityLabel,
+} from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { Call, CallStatus, CallType } from "@/lib/calls/types";
 import { toE164 } from "@/lib/contacts/phone";
@@ -121,14 +126,16 @@ export function normalizeCrmCall(
     id,
     subject,
     relatedTo: pickStr(
+      relatedActivityLabel(raw),
       related && pickStr(related.name, related.title, related.label),
       raw.relatedName,
-      raw.relatedType && raw.relatedId
-        ? `${raw.relatedType}: ${raw.relatedId}`
-        : "",
       typeof raw.relatedTo === "string" ? raw.relatedTo : "",
     ) || undefined,
-    contact: pickStr(raw.contactName, raw.contact, raw.callFor, raw.toName) || undefined,
+    contact:
+      partyName(raw.contact) ||
+      partyName(raw.lead) ||
+      pickStr(raw.contactName, typeof raw.contact === "string" ? raw.contact : "", raw.callFor, raw.toName) ||
+      undefined,
     callFor: pickStr(raw.callFor, raw.contactName, raw.contact) || undefined,
     fromNumber: pickStr(raw.fromNumber, raw.phone, raw.from) || undefined,
     callType: mapCallType(pickStr(raw.type, raw.callType, raw.direction, "OUTBOUND")),
@@ -142,17 +149,15 @@ export function normalizeCrmCall(
         raw.completedAt ??
         raw.createdAt,
     ) || new Date().toISOString(),
-    duration: pickStr(raw.duration, raw.durationLabel) || undefined,
+    duration: formatDurationSeconds(raw.duration) || pickStr(raw.durationLabel) || undefined,
     notes: pickStr(raw.notes, raw.outcomeNotes, raw.description) || undefined,
     agenda: pickStr(raw.agenda) || undefined,
     purpose: pickStr(raw.purpose, raw.outcome) || undefined,
-    assignedTo: pickStr(
-      owner && pickStr(owner.name, owner.email),
-      raw.ownerName,
-      raw.assignedTo,
-      raw.assignee,
+    assignedTo:
+      partyName(raw.assignedTo) ||
+      partyName(owner) ||
+      pickStr(raw.ownerName, typeof raw.assignedTo === "string" ? raw.assignedTo : "", raw.assignee) ||
       "—",
-    ),
     outcome: pickStr(raw.outcome, raw.result) || undefined,
   };
 }

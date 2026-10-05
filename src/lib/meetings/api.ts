@@ -6,6 +6,7 @@ import {
   rememberedWorkspaceId,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertMeeting } from "@/lib/meetings/store";
@@ -236,6 +237,7 @@ export function normalizeMeeting(
     ) || undefined;
   const hostLabel = [
     bookingHost && pickStr(bookingHost.name, bookingHost.email),
+    partyName(raw.organizer),
     organizer && pickStr(organizer.name, organizer.email),
     pickStr(raw.organizerName, raw.organizer_name),
     createdBy && pickStr(createdBy.name, createdBy.email),
@@ -257,6 +259,7 @@ export function normalizeMeeting(
     id: pickStr(raw.id, raw.uuid, raw.meetingId) || `crm-meet-${index}`,
     title: pickStr(raw.title, raw.subject, raw.name, "Untitled meeting"),
     relatedTo:
+      relatedActivityLabel(raw) ||
       pickStr(
         related && pickStr(related.name, related.title, related.label),
         raw.relatedName,

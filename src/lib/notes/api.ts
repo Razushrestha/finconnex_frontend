@@ -5,6 +5,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertNote } from "@/lib/notes/store";
@@ -149,6 +150,7 @@ export function normalizeNote(raw: Record<string, unknown>, index: number): Note
     title: pickStr(raw.title, raw.subject, raw.name, ""),
     body: pickStr(raw.body, raw.text, raw.content, raw.html, ""),
     relatedTo:
+      relatedActivityLabel(raw) ||
       pickStr(
         related && pickStr(related.name, related.title, related.label),
         raw.relatedName,
@@ -161,8 +163,9 @@ export function normalizeNote(raw: Record<string, unknown>, index: number): Note
     relatedId: pickStr(raw.relatedId, related && related.id) || undefined,
     noteType: mapNoteType(pickStr(raw.noteType, raw.type, raw.kind, "GENERAL")),
     createdBy: pickStr(
+      partyName(author),
       author && pickStr(author.name, author.fullName, author.email),
-      raw.createdBy,
+      typeof raw.createdBy === "string" ? raw.createdBy : "",
       raw.authorName,
       raw.ownerName,
       "—",

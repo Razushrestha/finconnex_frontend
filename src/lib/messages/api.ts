@@ -5,6 +5,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertMessage } from "@/lib/messages/store";
@@ -172,9 +173,17 @@ export function normalizeMessage(
     type: mapMessageType(pickStr(raw.type, raw.channel, raw.kind, "EXTERNAL")),
     subject: pickStr(raw.subject, raw.title, raw.name, "Untitled message"),
     body: pickStr(raw.body, raw.text, raw.html, raw.content, ""),
-    from: pickStr(raw.from, raw.sender, raw.fromName, "—"),
-    to: to || "—",
+    from:
+      partyName(raw.from) ||
+      pickStr(typeof raw.from === "string" ? raw.from : "", raw.sender, raw.fromName) ||
+      "—",
+    to:
+      partyName(raw.toUser) ||
+      partyName(raw.toContact) ||
+      to ||
+      "—",
     relatedTo:
+      relatedActivityLabel(raw) ||
       pickStr(
         related && pickStr(related.name, related.title, related.label),
         raw.relatedName,
