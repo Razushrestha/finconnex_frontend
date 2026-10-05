@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import {
   Briefcase,
@@ -2584,6 +2585,17 @@ function PhoneNumberField({
   // Codes are shared (+1 is the US, Canada and more), so remember the country.
   const [iso, setIso] = useState(() => phoneCountryForCode(dialCode)?.iso ?? "");
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // The menu is portalled to <body> with fixed coordinates: the booking card
+  // clips its overflow and some layouts scroll the form, either of which
+  // hid the search box and list when the menu sat inside them.
+  const [menuAt, setMenuAt] = useState<{
+    left: number;
+    width: number;
+    top?: number;
+    bottom?: number;
+    maxHeight: number;
+  } | null>(null);
   const chosen = phoneCountryByIso(iso);
   const selected =
     (chosen?.code === dialCode ? chosen : phoneCountryForCode(dialCode)) ??
@@ -2593,6 +2605,33 @@ function PhoneNumberField({
   function close() {
     setOpen(false);
     setQuery("");
+    setMenuAt(null);
+  }
+
+  function placeMenu() {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gap = 4;
+    const below = window.innerHeight - rect.bottom - gap - 8;
+    const above = rect.top - gap - 8;
+    const width = Math.min(rect.width, 384);
+    const left = Math.min(rect.left, window.innerWidth - width - 8);
+    // Open downwards unless there is clearly more room above.
+    if (below >= 240 || below >= above) {
+      setMenuAt({ left, width, top: rect.bottom + gap, maxHeight: Math.max(160, below) });
+    } else {
+      setMenuAt({
+        left,
+        width,
+        bottom: window.innerHeight - rect.top + gap,
+        maxHeight: Math.max(160, above),
+      });
+    }
+  }
+
+  function openMenu() {
+    placeMenu();
+    setOpen(true);
   }
 
   function pick(row: PhoneCountry) {
@@ -2604,12 +2643,34 @@ function PhoneNumberField({
   useEffect(() => {
     if (!open) return;
     function onDoc(event: MouseEvent) {
-      if (wrapRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
       setOpen(false);
       setQuery("");
+      setMenuAt(null);
+    }
+    // Keep the menu on its field while the page or the form scrolls; a scroll
+    // inside the menu's own list is not a reason to move it.
+    function onMove(event: Event) {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      const rect = wrapRef.current?.getBoundingClientRect();
+      if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false);
+        setQuery("");
+        setMenuAt(null);
+        return;
+      }
+      placeMenu();
     }
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
   }, [open]);
 
   return (
@@ -2622,7 +2683,7 @@ function PhoneNumberField({
       >
         <button
           type="button"
-          onClick={() => (open ? close() : setOpen(true))}
+          onClick={() => (open ? close() : openMenu())}
           className="flex h-full shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium text-slate-700"
           aria-label={`Country code: ${selected.name} ${selected.code}`}
           aria-expanded={open}
@@ -2647,8 +2708,19 @@ function PhoneNumberField({
           className="h-full min-w-0 flex-1 border-0 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
         />
       </div>
-      {open ? (
-        <div className="absolute z-30 mt-1 w-full max-w-sm overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+      {open && menuAt && typeof document !== "undefined" ? createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            left: menuAt.left,
+            width: menuAt.width,
+            top: menuAt.top,
+            bottom: menuAt.bottom,
+            maxHeight: menuAt.maxHeight,
+          }}
+          className="z-[1000] flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+        >
           <div className="relative border-b border-slate-100 p-2">
             <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -2669,7 +2741,11 @@ function PhoneNumberField({
               className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 outline-none focus:border-slate-300"
             />
           </div>
-          <ul role="listbox" aria-label="Countries" className="max-h-64 overflow-y-auto py-1">
+          <ul
+            role="listbox"
+            aria-label="Countries"
+            className="max-h-64 min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
+          >
             {matches.map((row) => (
               <li key={row.iso} role="option" aria-selected={row.iso === selected.iso}>
                 <button
@@ -2696,7 +2772,8 @@ function PhoneNumberField({
               </li>
             ) : null}
           </ul>
-        </div>
+        </div>,
+        document.body,
       ) : null}
       {error ? (
         <p className="mt-0.5 text-[10px] font-medium text-rose-500">{error}</p>
