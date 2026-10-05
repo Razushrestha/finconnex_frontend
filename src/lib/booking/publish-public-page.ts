@@ -14,5 +14,12 @@ export async function publishPublicBookingPage(page: BookingPage) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(crmPublic ? { ...page, crmPublic } : page),
   });
-  if (!res.ok) throw new Error("Could not publish the booking page");
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    throw new Error(
+      typeof json?.error === "string" && json.error
+        ? json.error
+        : "Could not publish the booking page",
+    );
+  }
 }

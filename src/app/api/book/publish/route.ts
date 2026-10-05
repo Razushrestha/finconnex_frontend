@@ -33,6 +33,10 @@ export async function POST(request: Request) {
       !!previous && (previous.crmEventTypeId || previous.id) === (page.crmEventTypeId || page.id);
     crmPublic = sameEventType ? parseCrmPublicRef(previous.crmPublic) : null;
   }
-  await writePublicBookingPage({ ...page, crmPublic: crmPublic ?? undefined });
+  const refused = await writePublicBookingPage({ ...page, crmPublic: crmPublic ?? undefined });
+  if (refused) {
+    const taken = /already uses this booking link/i.test(refused);
+    return NextResponse.json({ error: refused }, { status: taken ? 409 : 502 });
+  }
   return NextResponse.json({ ok: true, slug: page.slug });
 }
