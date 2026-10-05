@@ -16,6 +16,7 @@ import {
   User,
   Users,
   X,
+  Search,
 } from "lucide-react";
 import { confirmPublicBooking } from "@/lib/booking/actions";
 import { sanitizeDescriptionHtml } from "@/lib/booking/description-html";
@@ -79,6 +80,13 @@ import {
   readLocalBookingPageBranding,
   type BookingPageBranding,
 } from "@/lib/booking/page-branding";
+import {
+  PHONE_COUNTRIES,
+  phoneCountryByIso,
+  phoneCountryForCode,
+  searchPhoneCountries,
+  type PhoneCountry,
+} from "@/lib/phone/countries";
 import { cn } from "@/lib/utils";
 
 type Step = "date" | "details" | "done";
@@ -2558,15 +2566,6 @@ function InviteGuestEmailsField({
   );
 }
 
-const PHONE_DIAL_CODES = [
-  { code: "+977", iso: "NP" },
-  { code: "+61", iso: "AU" },
-  { code: "+1", iso: "US" },
-  { code: "+44", iso: "GB" },
-  { code: "+91", iso: "IN" },
-  { code: "+64", iso: "NZ" },
-] as const;
-
 function PhoneNumberField({
   dialCode,
   phone,
@@ -2581,17 +2580,37 @@ function PhoneNumberField({
   onPhoneChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // Codes are shared (+1 is the US, Canada and more), so remember the country.
+  const [iso, setIso] = useState(() => phoneCountryForCode(dialCode)?.iso ?? "");
   const wrapRef = useRef<HTMLDivElement>(null);
+  const chosen = phoneCountryByIso(iso);
   const selected =
-    PHONE_DIAL_CODES.find((row) => row.code === dialCode) ?? PHONE_DIAL_CODES[0];
+    (chosen?.code === dialCode ? chosen : phoneCountryForCode(dialCode)) ??
+    PHONE_COUNTRIES[0];
+  const matches = useMemo(() => searchPhoneCountries(query), [query]);
+
+  function close() {
+    setOpen(false);
+    setQuery("");
+  }
+
+  function pick(row: PhoneCountry) {
+    setIso(row.iso);
+    onDialCodeChange(row.code);
+    close();
+  }
 
   useEffect(() => {
+    if (!open) return;
     function onDoc(event: MouseEvent) {
-      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+      if (wrapRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+      setQuery("");
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [open]);
 
   return (
     <div ref={wrapRef} className="relative">
@@ -2603,12 +2622,16 @@ function PhoneNumberField({
       >
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="flex h-full shrink-0 items-center gap-1 px-3 text-[13px] font-medium text-slate-700"
-          aria-label="Country code"
+          onClick={() => (open ? close() : setOpen(true))}
+          className="flex h-full shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium text-slate-700"
+          aria-label={`Country code: ${selected.name} ${selected.code}`}
           aria-expanded={open}
+          aria-haspopup="listbox"
         >
-          <span className="w-6 text-left tabular-nums">{selected.iso}</span>
+          <span aria-hidden className="text-[15px] leading-none">
+            {selected.flag}
+          </span>
+          <span className="tabular-nums">{selected.iso}</span>
           <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
         </button>
         <span className="h-5 w-px shrink-0 bg-slate-200" />
@@ -2619,32 +2642,61 @@ function PhoneNumberField({
           value={phone}
           onChange={(event) => onPhoneChange(event.target.value)}
           placeholder="Contact Number"
+          inputMode="tel"
+          autoComplete="tel-national"
           className="h-full min-w-0 flex-1 border-0 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
         />
       </div>
       {open ? (
-        <ul className="absolute z-30 mt-1 w-36 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-          {PHONE_DIAL_CODES.map((row) => (
-            <li key={row.code}>
-              <button
-                type="button"
-                onClick={() => {
-                  onDialCodeChange(row.code);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
-                  row.code === selected.code
-                    ? "bg-slate-50 font-medium text-slate-900"
-                    : "text-slate-700",
-                )}
-              >
-                <span className="w-6 tabular-nums text-slate-500">{row.iso}</span>
-                <span className="tabular-nums">{row.code}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="absolute z-30 mt-1 w-full max-w-sm overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+          <div className="relative border-b border-slate-100 p-2">
+            <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  close();
+                } else if (event.key === "Enter") {
+                  event.preventDefault();
+                  if (matches[0]) pick(matches[0]);
+                }
+              }}
+              placeholder="Search country or code"
+              aria-label="Search country or code"
+              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 outline-none focus:border-slate-300"
+            />
+          </div>
+          <ul role="listbox" aria-label="Countries" className="max-h-64 overflow-y-auto py-1">
+            {matches.map((row) => (
+              <li key={row.iso} role="option" aria-selected={row.iso === selected.iso}>
+                <button
+                  type="button"
+                  onClick={() => pick(row)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
+                    row.iso === selected.iso
+                      ? "bg-slate-50 font-medium text-slate-900"
+                      : "text-slate-700",
+                  )}
+                >
+                  <span aria-hidden className="text-[15px] leading-none">
+                    {row.flag}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                  <span className="shrink-0 tabular-nums text-slate-500">{row.code}</span>
+                </button>
+              </li>
+            ))}
+            {matches.length === 0 ? (
+              <li className="px-3 py-4 text-[12px] text-slate-400">
+                No country matches “{query}”
+              </li>
+            ) : null}
+          </ul>
+        </div>
       ) : null}
       {error ? (
         <p className="mt-0.5 text-[10px] font-medium text-rose-500">{error}</p>
