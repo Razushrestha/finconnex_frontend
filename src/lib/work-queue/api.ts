@@ -518,16 +518,24 @@ export async function listCrmWorkQueueForNav(
   const scoped = assigneeIdFromScope(opts.scope, opts.nameById);
   const assigneeId =
     scoped && selfId && scoped === selfId ? undefined : scoped;
-  const page = await listCrmWorkQueue({
-    limit: 50,
-    page: 1,
-    from: range.from,
-    to: range.to,
-    assigneeId,
-    nameById: opts.nameById,
-  });
-  const items = types === "all" ? page.items : filterQueueRowsByNav(page.items, nav);
-  return { items, total: items.length, all: page.items };
+  const collected: QueueRow[] = [];
+  let reported = 0;
+  for (let pageNo = 1; pageNo <= 10; pageNo += 1) {
+    const page = await listCrmWorkQueue({
+      limit: 50,
+      page: pageNo,
+      from: range.from,
+      to: range.to,
+      assigneeId,
+      nameById: opts.nameById,
+    });
+    reported = page.total;
+    collected.push(...page.items);
+    if (collected.length >= reported || page.items.length < 50) break;
+  }
+  const items =
+    types === "all" ? collected : filterQueueRowsByNav(collected, nav);
+  return { items, total: items.length, all: collected };
 }
 
 function queueItemId(row: QueueRow): string {
