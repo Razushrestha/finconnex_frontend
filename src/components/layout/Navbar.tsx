@@ -25,6 +25,9 @@ import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getModuleTitle } from "@/lib/module-title";
 import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
+import { useCrmPayments } from "@/lib/finance/payments/use-crm-payments";
+import { useCrmDeals } from "@/lib/deals/use-crm-deals";
+import { useCrmCalls } from "@/lib/calls/use-crm-calls";
 import {
   isPlatformAdminRole,
   platformRoleLabel,
@@ -119,6 +122,21 @@ export function Navbar({
   const isInbox = pathname.startsWith("/marketing/inbox");
   const isCalendar = pathname.startsWith("/activities/calendar");
   const isWorkQueue = pathname.startsWith("/work-queue");
+  const paymentsCrm = useCrmPayments();
+  const dealsCrm = useCrmDeals();
+  const callsCrm = useCrmCalls();
+  const showFinanceDot = pathname.startsWith("/finance");
+  const showSalesDot = pathname.startsWith("/sales");
+  const showActivitiesDot = pathname.startsWith("/activities");
+  const paymentsLive = paymentsCrm.source === "api";
+  const salesLive = dealsCrm.source === "api";
+  const activitiesLive = callsCrm.source === "api";
+  const showModuleDot = showFinanceDot || showSalesDot || showActivitiesDot;
+  const moduleLive = showFinanceDot
+    ? paymentsLive
+    : showSalesDot
+      ? salesLive
+      : activitiesLive;
 
   return (
     <header className="sticky top-0 z-30 flex w-full flex-col border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -133,7 +151,18 @@ export function Navbar({
       </button>
 
       <h1 className="min-w-0 truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-slate-100">
-        {moduleTitle}
+        <span className="inline-flex items-center gap-2">
+          <span className="truncate">{moduleTitle}</span>
+          {showModuleDot ? (
+            <span
+              aria-label={moduleLive ? "CRM live" : "CRM offline"}
+              className={cn(
+                "inline-flex h-2.5 w-2.5 shrink-0 rounded-full",
+                moduleLive ? "bg-emerald-500" : "bg-rose-500",
+              )}
+            />
+          ) : null}
+        </span>
       </h1>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />

@@ -31,6 +31,7 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { defaultActorName } from "@/lib/rules/actor";
 import { TagListInput } from "@/components/shared/tags/TagListInput";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function UploadLibraryFileForm({
   defaultFolder = "Clients",
@@ -176,7 +177,7 @@ export function UploadLibraryFileForm({
         type="button"
         disabled={uploading}
         onClick={() => void submit()}
-        className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+        className={`${FINANCE_PRIMARY_BUTTON_SM} h-9 flex-1 rounded-lg text-[12px] disabled:opacity-50`}
       >
         {uploading ? "Uploading…" : "Upload"}
       </button>

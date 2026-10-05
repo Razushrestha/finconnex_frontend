@@ -585,20 +585,6 @@ export default function DealsPage() {
     <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-            crm.source === "api"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-slate-100 text-slate-500",
-          )}
-        >
-          {crm.source === "api"
-            ? "Live CRM"
-            : crm.loading
-              ? "Connecting…"
-              : "Demo"}
-        </span>
         {crm.forecast && crm.source === "api" ? (
           <span className="text-[10px] text-slate-500">
             Forecast expected {crm.forecast.expected} · actual {crm.forecast.actual}
@@ -610,6 +596,8 @@ export default function DealsPage() {
       </div>
       <EntityHeader
         entityLabel="Deal"
+        crmLiveStatus={crm.source === "api" ? "live" : "offline"}
+        hideTitle
         createRoute="/sales/deals/create"
         onCreate={openCreateDeal}
         totalCount={totalCount}
@@ -620,6 +608,45 @@ export default function DealsPage() {
         scopeOptions={DEAL_SCOPE_OPTIONS}
         activeScope={activeScope}
         onScopeChange={setActiveScope}
+        afterScope={
+          <div className="relative" ref={pipelineMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsPipelineMenuOpen((open) => !open)}
+              aria-haspopup="true"
+              aria-expanded={isPipelineMenuOpen}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
+            >
+              <span>
+                {PIPELINE_OPTIONS.find((opt) => opt.value === activePipeline)
+                  ?.label ?? "Deal Pipeline"}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {isPipelineMenuOpen && (
+              <div className="absolute left-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {PIPELINE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      handlePipelineChange?.(opt.value);
+                      setIsPipelineMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded px-2.5 py-2 text-left text-[13px] font-medium ${
+                      opt.value === activePipeline
+                        ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        }
         sortOptions={SORT_OPTIONS}
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
@@ -679,43 +706,6 @@ export default function DealsPage() {
               {bulkFlash}
             </span>
           ) : null}
-          <div className="relative" ref={pipelineMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsPipelineMenuOpen((open) => !open)}
-              aria-haspopup="true"
-              aria-expanded={isPipelineMenuOpen}
-              className="flex items-center gap-1.5 rounded-sm bg-white hover:bg-white px-3 py-1 text-sm font-medium text-foreground/70"
-            >
-              <span>
-                {PIPELINE_OPTIONS.find((opt) => opt.value === activePipeline)
-                  ?.label ?? "Deal Pipeline"}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-            </button>
-
-            {isPipelineMenuOpen && (
-              <div className="absolute left-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-                {PIPELINE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      handlePipelineChange?.(opt.value);
-                      setIsPipelineMenuOpen(false);
-                    }}
-                    className={`flex w-full items-center rounded px-2.5 py-2 text-left text-[13px] font-medium ${
-                      opt.value === activePipeline
-                        ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
 

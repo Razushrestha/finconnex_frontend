@@ -572,17 +572,7 @@ export function UsersSettingsClient() {
 
   return (
     <div className="mx-auto flex max-w-[1920px] flex-col gap-5 p-4 sm:p-5 lg:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-slate-900">
-              Users
-            </h1>
-          </div>
-        </div>
+      <header className="flex flex-wrap items-start justify-end gap-4">
         <form
           className="relative w-full max-w-sm"
           onSubmit={(e) => {
@@ -651,19 +641,7 @@ export function UsersSettingsClient() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-[16px] font-semibold text-violet-700">Users</h2>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                live
-                  ? "bg-violet-100 text-violet-700"
-                  : "bg-violet-100 text-violet-700",
-              )}
-            >
-              {live ? "Live CRM" : crm.loading ? "Connecting…" : "Demo"}
-            </span>
-          </div>
+          <h2 className="text-[16px] font-semibold text-violet-700">Team Members</h2>
           {live ? (
             <p className="mt-1 text-[12px] font-medium text-slate-500">
               Joined {crm.summary.joined} · Awaiting first sign-in{" "}

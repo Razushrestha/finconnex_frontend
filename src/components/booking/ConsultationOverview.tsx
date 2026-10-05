@@ -96,6 +96,7 @@ import {
   type AssignableOwner,
 } from "@/lib/users/assignable";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const BRAND = "#5A32A3";
 
@@ -451,8 +452,10 @@ function EventTypeEditForm({
             type="button"
             onClick={() => void save()}
             disabled={saving}
-            className="inline-flex h-9 items-center rounded-lg px-4 text-[13px] font-semibold text-white disabled:opacity-60"
-            style={{ backgroundColor: BRAND }}
+            className={cn(
+              FINANCE_PRIMARY_BUTTON_SM,
+              "h-9 rounded-lg px-4 text-[13px] disabled:opacity-60",
+            )}
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -791,8 +794,10 @@ function AssignedUsersEditForm({
             type="button"
             onClick={() => void save()}
             disabled={saving}
-            className="inline-flex h-9 items-center rounded-lg px-4 text-[13px] font-semibold text-white disabled:opacity-60"
-            style={{ backgroundColor: BRAND }}
+            className={cn(
+              FINANCE_PRIMARY_BUTTON_SM,
+              "h-9 rounded-lg px-4 text-[13px] disabled:opacity-60",
+            )}
           >
             {saving ? "Saving…" : "Save"}
           </button>

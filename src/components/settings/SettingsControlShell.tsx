@@ -16,8 +16,6 @@ import {
   Search,
   type LucideIcon,
 } from "lucide-react";
-import { SettingsCrmBadge } from "@/components/settings/SettingsCrmBadge";
-import { SettingsBreadcrumb } from "@/components/settings/SettingsBreadcrumb";
 import {
   SETTINGS_CONTROL_PANEL,
   searchSettingsNav,
@@ -52,16 +50,7 @@ export function SettingsControlShell({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F4F1FA]">
       <header className="z-20 shrink-0 border-b border-[#5A32A3]/10 bg-white/90 backdrop-blur-md">
-        <div className="flex items-center gap-4 px-4 py-3 sm:px-6">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold tracking-[0.16em] text-[#5A32A3] uppercase">
-                Settings
-              </p>
-              <SettingsCrmBadge />
-            </div>
-            <SettingsBreadcrumb />
-          </div>
+        <div className="flex items-center justify-end gap-4 px-4 py-3 sm:px-6">
           <label className="relative hidden min-w-[220px] max-w-sm flex-1 md:block">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input

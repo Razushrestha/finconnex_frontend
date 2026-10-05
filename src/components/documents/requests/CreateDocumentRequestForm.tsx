@@ -12,6 +12,7 @@ import {
   Trash2,
   ChevronDown,
   FileText,
+  X,
 } from "lucide-react";
 import {
   nextDocumentRequestIds,
@@ -72,6 +73,7 @@ import {
   loadAssignableOwners,
   type AssignableOwner,
 } from "@/lib/users/assignable";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function SenderOnBehalfField({
   value,
@@ -454,7 +456,7 @@ function PrefillRow({
         <button
           type="button"
           onClick={onToggle}
-          className="inline-flex h-8 shrink-0 items-center rounded-md bg-[#5A32A3] px-3.5 text-[13px] font-semibold text-white hover:bg-[#4a2890]"
+          className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-8 shrink-0 rounded-md text-[13px]")}
         >
           {open ? "Hide details" : "Add details"}
         </button>
@@ -1216,36 +1218,27 @@ export function CreateDocumentRequestForm({
   }
 
   return (
-    <div className="min-h-full bg-slate-100/80 px-3 py-4 sm:px-5 sm:py-6">
-      <div className="mx-auto flex h-[calc(100dvh-6rem)] max-h-[1100px] w-full max-w-[1920px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
-        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 2xl:px-8">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/25 px-3 py-4 sm:px-5 sm:py-6 lg:pl-[12rem]">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#5A32A3] text-white">
             <FileText className="h-4 w-4" />
           </span>
           <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900">
             Create document request
           </h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={goBack}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              {step === 1 ? "Cancel" : "Back"}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={goNext}
-              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60"
-            >
-              {step === 3 ? (saving ? "Creating…" : "Create") : "Next"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/documents/requests")}
+            aria-label="Close"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {errors.dueDate || errors.reminderDate || errors.docs || errors.applicants || errors.sendOnBehalfOf ? (
-          <p className="shrink-0 px-4 pt-2 text-[12px] font-medium text-rose-600 sm:px-6 2xl:px-8">
+          <p className="shrink-0 px-4 pt-2 text-[12px] font-medium text-rose-600 sm:px-6">
             {errors.dueDate ||
               errors.reminderDate ||
               errors.docs ||
@@ -1254,8 +1247,8 @@ export function CreateDocumentRequestForm({
           </p>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto flex min-h-full w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6 2xl:px-8">
+        <div className="min-h-0 max-h-[calc(100dvh-11.5rem)] flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto flex min-h-full w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6">
             <div className="pt-3">
               <Stepper step={step} />
             </div>
@@ -1275,7 +1268,7 @@ export function CreateDocumentRequestForm({
                 )}
               >
                 {step === 1 ? (
-                  <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                  <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-xl border border-slate-100 bg-white p-5 sm:p-6">
                     <SenderOnBehalfField
                       value={sendOnBehalfOf}
                       options={senders}
@@ -1317,7 +1310,7 @@ export function CreateDocumentRequestForm({
                 ) : null}
 
                 {step === 2 ? (
-                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-xl border border-slate-100 bg-white p-5 sm:p-6">
                     <RequestDocumentsPicker
                       applicant1={applicant1}
                       applicant2={applicant2}
@@ -1402,6 +1395,27 @@ export function CreateDocumentRequestForm({
               ) : null}
             </div>
           </div>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={goBack}
+            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          >
+            {step === 1 ? "Cancel" : "Back"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={goNext}
+            className={cn(
+              FINANCE_PRIMARY_BUTTON_SM,
+              "rounded-md px-4 py-2 text-sm disabled:opacity-60",
+            )}
+          >
+            {step === 3 ? (saving ? "Creating…" : "Create request") : "Next"}
+          </button>
         </div>
       </div>
     </div>

@@ -56,6 +56,7 @@ import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
 import { defaultActorName } from "@/lib/rules/actor";
 import { notify } from "@/lib/notify/toast";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
   Private: "bg-slate-100 text-slate-600",
@@ -394,25 +395,6 @@ function DocumentLibraryPageInner() {
     <div className={BOARD_PAGE}>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                crm.source === "api"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-500",
-              )}
-            >
-              {crm.source === "api"
-                ? "Live CRM"
-                : crm.loading
-                  ? "Connecting…"
-                  : "Demo"}
-            </span>
-            {crm.error && crm.source === "demo" ? (
-              <span className="text-[10px] text-slate-500">{crm.error}</span>
-            ) : null}
-          </div>
           <div className="flex items-center gap-2">
           <Link
             href={
@@ -420,7 +402,7 @@ function DocumentLibraryPageInner() {
                 ? `/documents/library/upload?folder=${encodeURIComponent(folder)}`
                 : "/documents/library/upload"
             }
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+            className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-8 text-[11px]")}
           >
             <Plus className="h-3.5 w-3.5" />
             Upload
@@ -798,7 +780,10 @@ function DocumentLibraryPageInner() {
                 </button>
                 <button
                   type="submit"
-                  className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white shadow-sm hover:bg-violet-700"
+                  className={cn(
+                    FINANCE_PRIMARY_BUTTON_SM,
+                    "h-9 flex-1 rounded-lg text-[12px]",
+                  )}
                 >
                   Create Folder
                 </button>

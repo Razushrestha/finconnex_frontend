@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getBrokerHubTemplate } from "@/lib/broker-hub/templates";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const BUILDER_PATH = "/smart-link/builder";
 const LIBRARY_PATH = "/smart-link/templates";
@@ -265,7 +266,7 @@ export default function TemplateConfigurePage() {
           <button
             type="button"
             onClick={handleUseTemplate}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            className={`${FINANCE_PRIMARY_BUTTON_SM} text-xs`}
           >
             <Wand2 className="h-3.5 w-3.5" />
             Use This Template

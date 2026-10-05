@@ -158,24 +158,7 @@ export default function ProductsPage() {
   return (
     <div className="min-h-full w-full bg-[#F4F7FB] p-4 sm:p-6 lg:p-8 text-slate-900">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[26px] font-bold tracking-tight text-slate-900">Items / Services</h1>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                crm.source === "api"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-200 text-slate-600",
-              )}
-            >
-              {crm.source === "api" ? "Live CRM" : crm.loading ? "Connecting…" : "Demo"}
-            </span>
-          </div>
-          <p className="mt-1 text-[13px] text-slate-400">
-            Manage your catalogue of items, services, taxes and more.
-          </p>
-        </div>
+        <div />
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />

@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { defaultActorName } from "@/lib/rules/actor";
 import { notify } from "@/lib/notify/toast";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 /** "Lead: Jane Doe" -> "Jane Doe" */
 export function clientNameFromRelatedTo(relatedTo?: string): string {
@@ -269,7 +270,7 @@ export default function AttachmentsPage() {
           <button
             type="button"
             onClick={() => openUpload(activeFolder)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm hover:bg-violet-700"
+            className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9")}
           >
             <Plus className="h-3.5 w-3.5" />
             {activeFolder ? `Upload to ${activeFolder}` : "Upload"}
@@ -546,7 +547,10 @@ export default function AttachmentsPage() {
               <button
                 type="submit"
                 disabled={uploading}
-                className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white disabled:opacity-50"
+                className={cn(
+                  FINANCE_PRIMARY_BUTTON_SM,
+                  "h-9 rounded-lg disabled:opacity-50",
+                )}
               >
                 {uploading ? "Uploading…" : "Upload"}
               </button>

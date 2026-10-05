@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -67,8 +67,8 @@ export default function CreditNotesPage() {
   });
 
   const headerProps = {
-    title: "Credit notes",
-    description: "Issue, send, and apply client credits against invoices.",
+    title: "",
+    description: "",
     searchPlaceholder: "Search credit notes...",
     searchValue: "",
     onSearchChange: () => {},
@@ -162,25 +162,6 @@ export default function CreditNotesPage() {
 
   return (
     <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-            crm.source === "api"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-slate-100 text-slate-500",
-          )}
-        >
-          {crm.source === "api"
-            ? "Live CRM"
-            : crm.loading
-              ? "Connecting…"
-              : "Demo"}
-        </span>
-        {crm.error && crm.source === "demo" ? (
-          <span className="text-[10px] text-slate-500">{crm.error}</span>
-        ) : null}
-      </div>
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
       <EntityFilters

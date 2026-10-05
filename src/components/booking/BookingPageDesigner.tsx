@@ -41,6 +41,7 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const PANELS = [
   { id: "theme", title: "Theme" },
@@ -1716,7 +1717,10 @@ function SaveButton({ saving, onClick }: { saving: boolean; onClick: () => void 
       type="button"
       onClick={onClick}
       disabled={saving}
-      className="mt-4 h-10 w-full rounded-lg bg-[#5A32A3] text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
+      className={cn(
+        FINANCE_PRIMARY_BUTTON_SM,
+        "mt-4 h-10 w-full rounded-lg text-[13px] disabled:opacity-50",
+      )}
     >
       {saving ? "Saving…" : "Save"}
     </button>

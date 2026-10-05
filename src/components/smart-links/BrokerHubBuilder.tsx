@@ -18,6 +18,7 @@ import {
 import { hubPublicPath, hubPublicUrl } from "@/lib/smart-links/api";
 import { BrokerHubEditor } from "./BrokerHubEditor";
 import { BrokerHubPreview } from "./BrokerHubPreview";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface BrokerHubBuilderProps {
   initialConfig: BrokerHubConfig;
@@ -103,10 +104,10 @@ export function BrokerHubBuilder({
               onClick={handlePublish}
               disabled={saving}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60",
+                `${FINANCE_PRIMARY_BUTTON_SM} rounded-md px-3 py-1.5 text-xs disabled:opacity-60`,
                 published
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20"
+                  : "bg-[#6D5AE6] text-white hover:bg-[#5B4BD4]",
               )}
             >
               {saving ? (

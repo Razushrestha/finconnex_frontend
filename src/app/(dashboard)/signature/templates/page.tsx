@@ -22,12 +22,12 @@ import {
 } from "@/lib/documents/signature/types";
 import { onRecordsChange } from "@/lib/records-sync";
 import { useCrmSignatureTemplates } from "@/lib/documents/signature/use-crm-signature-templates";
-import { CrmSourceBadge } from "@/components/documents/signature/CrmSourceBadge";
 import {
   deleteCrmSignatureTemplate,
   isCrmSignatureTemplateId,
   tryCrmSignatureTemplate,
 } from "@/lib/documents/signature/templates-api";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface TemplateItem {
   id: string;
@@ -175,14 +175,6 @@ export default function SignatureTemplatesPage() {
     <div className="relative mx-auto flex w-full flex-col p-4 space-y-4">
       {/* Header & Controls Section */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap items-center gap-2">
-          <CrmSourceBadge
-            source={crm.source}
-            loading={crm.loading}
-            error={crm.error}
-          />
-        </div>
-
         <div className="flex items-center gap-3">
           <SearchInput
             value={search}
@@ -194,7 +186,7 @@ export default function SignatureTemplatesPage() {
           />
           <button
             onClick={() => router.push("/signature/templates/create")}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-primary/90"
+            className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0 gap-2 px-4 text-sm`}
           >
             <Plus className="h-4 w-4" />
             New Template

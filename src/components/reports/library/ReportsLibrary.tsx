@@ -67,11 +67,17 @@ export function ReportsLibrary({
     <div className="min-h-full bg-[#F4F6F9]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {crmSource === "api" ? (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              Live CRM
-            </span>
-          ) : null}
+          <div className="mr-auto flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+              Reports
+            </h1>
+            <span
+              aria-label={crmSource === "api" ? "CRM live" : "CRM offline"}
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                crmSource === "api" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
+          </div>
           <button
             type="button"
             onClick={() => setCreating(true)}

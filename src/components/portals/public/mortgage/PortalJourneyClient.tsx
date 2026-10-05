@@ -18,7 +18,13 @@ export function PortalJourneyClient({ slug }: { slug: string }) {
   return (
     <div className="space-y-5 pb-10">
       <div>
-        <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Loan Journey</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Loan Journey</h1>
+          <span
+            aria-label="CRM live"
+            className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500"
+          />
+        </div>
         <p className="mt-1 text-[13px] text-slate-500">
           Follow each stage from fact find through to settlement.
         </p>

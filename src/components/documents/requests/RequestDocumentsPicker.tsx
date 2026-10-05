@@ -11,6 +11,7 @@ import {
 } from "@/lib/documents/requests/catalog";
 import { cn } from "@/lib/utils";
 import { EditDocumentModal } from "@/components/documents/requests/EditDocumentModal";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 type Slot = 1 | 2;
 
@@ -437,7 +438,7 @@ export function RequestDocumentsPicker({
                         <button
                           type="button"
                           onClick={() => addDocument(cat.id)}
-                          className="h-9 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white"
+                          className={`${FINANCE_PRIMARY_BUTTON_SM} h-9 rounded-lg text-[12px]`}
                         >
                           Add
                         </button>

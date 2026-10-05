@@ -263,6 +263,9 @@ export default function TasksPage() {
       <div className="shrink-0">
         <ActivityToolbar
           entityLabel="Task"
+          titleLabel="Tasks"
+          crmLiveStatus={tasksSource === "api" ? "live" : "offline"}
+          hideTitle
           createRoute="/activities/tasks/create"
           tabs={["All Tasks", "My Overdue Tasks"]}
           activeTab={scopeTab}

@@ -13,6 +13,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -601,7 +602,10 @@ export function SignatureModal({
             type="button"
             onClick={handleSave}
             disabled={!isValid}
-            className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-5 py-2 text-xs font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-40"
+            className={cn(
+              FINANCE_PRIMARY_BUTTON_SM,
+              "rounded-xl px-5 py-2 text-xs disabled:opacity-40",
+            )}
           >
             <Check className="h-3.5 w-3.5" />
             Apply Signature

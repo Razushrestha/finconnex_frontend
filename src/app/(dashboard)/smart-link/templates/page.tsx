@@ -23,6 +23,7 @@ import {
   trySmartLink,
   type CrmSmartHub,
 } from "@/lib/smart-links/api";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const CATEGORIES = [
   "All Templates",
@@ -108,7 +109,7 @@ export default function TemplateLibrary() {
             </button>
             <Link
               href="/smart-link/builder?template=blank"
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-800"
+              className={`${FINANCE_PRIMARY_BUTTON_SM} text-xs`}
             >
               <Plus className="h-4 w-4" />
               Create blank

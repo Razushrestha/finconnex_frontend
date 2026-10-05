@@ -34,6 +34,7 @@ import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewAppointmentModal } from "@/components/booking/NewAppointmentModal";
 import { AppointmentDateField } from "@/components/booking/DateTimeSection";
+import { FINANCE_PRIMARY_BUTTON, FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 import {
   appointmentDateKey,
   appointmentInitials,
@@ -252,20 +253,55 @@ export function BookingsWorkspace({
   const searchParams = useSearchParams();
   const crm = useCrmBooking();
   const [bookOpen, setBookOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     if (searchParams.get("book") === "1") setBookOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    const updateOnline = () => setIsOnline(window.navigator.onLine);
+    updateOnline();
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
 
   function closeBook() {
     setBookOpen(false);
     if (searchParams.get("book") === "1") router.replace("/booking");
   }
 
+  const sectionTitle =
+    section === "consultations"
+      ? "Consultations"
+      : section === "schedules"
+        ? "Schedules"
+        : section === "consultants"
+          ? "Consultants"
+          : "Bookings";
+  const crmConnected = !crm.loading && !crm.error;
+  const liveStatus: "live" | "offline" =
+    isOnline && crmConnected ? "live" : "offline";
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8F9FB]">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden px-3 pt-4 pb-3 sm:px-5 sm:pt-5 lg:px-7">
+          <div className="mb-3 flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+              {sectionTitle}
+            </h1>
+            <span
+              aria-label={liveStatus === "live" ? "CRM live" : "CRM offline"}
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                liveStatus === "live" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
+          </div>
           {section === "home" ? (
             <HomeView
               appointments={crm.appointments}
@@ -313,7 +349,7 @@ function NewBookingButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:opacity-90"
+      className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9")}
     >
       <Plus className="h-3.5 w-3.5" />
       New Meeting
@@ -1413,7 +1449,7 @@ function AppointmentDrawer({
                 type="button"
                 disabled={saving}
                 onClick={() => void saveEdit()}
-                className="inline-flex h-9 items-center rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white disabled:opacity-60"
+                className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -1422,7 +1458,7 @@ function AppointmentDrawer({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white"
+              className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
             >
               <Pencil className="h-3.5 w-3.5" />
               Edit

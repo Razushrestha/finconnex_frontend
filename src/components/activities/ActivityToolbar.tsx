@@ -52,6 +52,9 @@ export interface SortOption {
 
 export interface ActivityToolbarProps {
   entityLabel: string;
+  titleLabel?: string;
+  crmLiveStatus?: "live" | "offline";
+  hideTitle?: boolean;
   createRoute: string;
   activeTab?: string;
   tabs?: string[];
@@ -126,6 +129,9 @@ const DEFAULT_LAYOUT_ID = "standard";
 
 export function ActivityToolbar({
   entityLabel,
+  titleLabel,
+  crmLiveStatus,
+  hideTitle = false,
   createRoute,
   activeTab: externalActiveTab,
   tabs = [],
@@ -235,6 +241,21 @@ export function ActivityToolbar({
 
   return (
     <div className="mb-1.5">
+      {hideTitle ? null : (
+        <div className="mb-1 flex items-center gap-2">
+          <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            {titleLabel ?? `${entityLabel}s`}
+          </h1>
+          {crmLiveStatus ? (
+            <span
+              aria-label={crmLiveStatus === "live" ? "CRM live" : "CRM offline"}
+              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                crmLiveStatus === "live" ? "bg-emerald-500" : "bg-rose-500"
+              }`}
+            />
+          ) : null}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-b border-slate-200  py-1.5 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto scrollbar-none">
           {tabs.map((tab) => {
@@ -468,13 +489,13 @@ export function ActivityToolbar({
           )}
 
           <div className="relative">
-            <div className="flex h-7 overflow-hidden rounded-md bg-[#5A32A3] text-[12px]">
+            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
               <button
                 type="button"
                 onClick={goToCreate}
                 aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
                 aria-haspopup={hasCreateMenu ? "menu" : undefined}
-                className="px-2.5 font-semibold text-white hover:bg-[#4A2888] whitespace-nowrap sm:px-3"
+                className="inline-flex items-center whitespace-nowrap px-4 text-sm font-semibold hover:bg-[#5B4BD4]"
               >
                 Create <span className="hidden md:inline">{entityLabel}</span>
               </button>
@@ -484,7 +505,7 @@ export function ActivityToolbar({
                 aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
                 aria-haspopup={hasCreateMenu ? "menu" : undefined}
                 onClick={goToCreate}
-                className="flex items-center border-l border-white/25 px-1.5 text-white hover:bg-[#4A2888]"
+                className="flex w-9 items-center justify-center border-l border-white/25 hover:bg-[#5B4BD4]"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>

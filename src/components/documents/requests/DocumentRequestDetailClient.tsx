@@ -67,6 +67,7 @@ import { RejectDocumentModal } from "@/components/documents/requests/RejectDocum
 import { ViewDocumentModal } from "@/components/documents/requests/ViewDocumentModal";
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
 import { notify } from "@/lib/notify/toast";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const DETAIL_PIPELINE: {
   status: DocumentRequestStatus;
@@ -536,7 +537,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 <button
                   type="button"
                   onClick={sendReminder}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+                  className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-8 rounded-lg text-[11px]")}
                 >
                   <Bell className="h-3.5 w-3.5" />
                   Resend invitation
@@ -889,7 +890,10 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                         type="button"
                         onClick={sendReply}
                         disabled={!reply.trim()}
-                        className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-40"
+                        className={cn(
+                          FINANCE_PRIMARY_BUTTON_SM,
+                          "h-8 gap-1 rounded-lg px-2.5 text-[11px] disabled:opacity-40",
+                        )}
                       >
                         <MessageSquare className="h-3.5 w-3.5" />
                         Send

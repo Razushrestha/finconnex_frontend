@@ -37,6 +37,7 @@ import {
 import { DocumentRequestsList } from "@/components/documents/requests/DocumentRequestsList";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const PREVIEW_ROWS = 5;
 
@@ -120,15 +121,9 @@ function KpiCard({
 
 export function DocumentRequestsDashboard({
   rows,
-  source,
-  loading,
-  error,
   onRefresh,
 }: {
   rows: DocumentRequest[];
-  source?: "api" | "demo";
-  loading?: boolean;
-  error?: string | null;
   onRefresh?: () => void;
 }) {
   const [attention, setAttention] = useState<AttentionFilter>("all");
@@ -160,25 +155,6 @@ export function DocumentRequestsDashboard({
   return (
     <div className="min-h-full bg-[#f4f2f7]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              source === "api"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-100 text-slate-500",
-            )}
-          >
-            {source === "api"
-              ? "Live CRM"
-              : loading
-                ? "Connecting…"
-                : "Demo"}
-          </span>
-          {error && source === "demo" ? (
-            <span className="text-[10px] text-slate-500">{error}</span>
-          ) : null}
-        </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard
             label="Total Requests"
@@ -436,7 +412,7 @@ export function DocumentRequestsDashboard({
                 </Link>
                 <Link
                   href="/documents/requests/create?layoutid=standard&redirect=false"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4c2a8a]"
+                  className={`${FINANCE_PRIMARY_BUTTON_SM} h-8`}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Request Document
