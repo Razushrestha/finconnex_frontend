@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  sendViaSendGrid,
-  sendgridConfigured,
-} from "@/lib/emails/sendgrid-server";
+import { deliverMail, sendgridConfigured } from "@/lib/emails/sendgrid-server";
 import { sameSiteRequest } from "@/lib/booking/same-site";
 
 /**
  * Guest booking confirmation mail. No dashboard session — public /book only.
- * Requires SendGrid env on the host (Vercel: SENDGRID_API_KEY + SENDGRID_FROM_EMAIL).
+ * Sends with this app's SendGrid key when set (SENDGRID_API_KEY +
+ * SENDGRID_FROM_EMAIL), otherwise through the CRM using the booking's token.
  */
 export async function POST(request: Request) {
   if (!sameSiteRequest(request)) {
@@ -45,20 +43,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Message is too large" }, { status: 413 });
   }
 
-  if (!sendgridConfigured()) {
+  // The booking's manage token lets the CRM send this through its own mail
+  // account when this app has no SendGrid key.
+  const bookingToken =
+    typeof body.bookingToken === "string" ? body.bookingToken.trim() : "";
+  if (!sendgridConfigured() && !bookingToken) {
     return NextResponse.json({ ok: true, delivered: false });
   }
 
   try {
-    await sendViaSendGrid({
+    const delivered = await deliverMail({
       to: [to],
       subject,
       text: text || subject,
       html: html.trim() || undefined,
       cc,
       replyTo: replyTo || undefined,
-    });
-    return NextResponse.json({ ok: true, delivered: "sendgrid" });
+    }, { bookingToken });
+    return NextResponse.json({ ok: true, delivered });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not send email";

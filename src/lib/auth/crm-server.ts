@@ -68,7 +68,7 @@ type Envelope<T> = {
   timestamp?: string;
 };
 
-function crmBaseUrl(): string | null {
+export function crmBaseUrl(): string | null {
   const raw =
     process.env.CRM_API_URL?.trim() ||
     process.env.NEXT_PUBLIC_CRM_API_URL?.trim() ||

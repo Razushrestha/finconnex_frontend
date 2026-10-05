@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { sendViaSendGrid } from "@/lib/emails/sendgrid-server";
+import { resolveLiveCrmAuth } from "@/lib/auth/crm-server";
+import { deliverMail } from "@/lib/emails/sendgrid-server";
 
 function asList(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -74,8 +75,16 @@ export async function POST(request: Request) {
         }))
     : undefined;
 
+  // Without a SendGrid key of its own, this app asks the CRM to send — as the
+  // signed-in user, or for a guest, as the holder of the booking's token.
+  const accessToken = session
+    ? ((await resolveLiveCrmAuth().catch(() => null))?.accessToken ?? null)
+    : null;
+  const bookingToken =
+    bookMail && typeof body.bookingToken === "string" ? body.bookingToken : null;
+
   try {
-    await sendViaSendGrid({
+    const delivered = await deliverMail({
       to,
       subject,
       text,
@@ -84,8 +93,8 @@ export async function POST(request: Request) {
       bcc: asList(body.bcc),
       replyTo: typeof body.replyTo === "string" ? body.replyTo.trim() : undefined,
       attachments,
-    });
-    return NextResponse.json({ ok: true, delivered: "sendgrid" });
+    }, { accessToken, bookingToken });
+    return NextResponse.json({ ok: true, delivered });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not send email";

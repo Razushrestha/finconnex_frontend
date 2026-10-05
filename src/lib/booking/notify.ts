@@ -108,7 +108,14 @@ async function sendEmailSafe(
   email: string,
   subject: string,
   body: string,
-  opts?: { html?: string; text?: string; cc?: string[]; replyTo?: string },
+  opts?: {
+    html?: string;
+    text?: string;
+    cc?: string[];
+    replyTo?: string;
+    /** The CRM booking's manage token, so the CRM can send it for the guest. */
+    bookingToken?: string;
+  },
 ): Promise<void> {
   if (!looksLikeEmail(email)) return;
   const onPublicBook =
@@ -130,13 +137,14 @@ async function sendEmailSafe(
           text: opts?.text?.trim() || body.trim() || subject,
           ...(opts?.cc?.length ? { cc: opts.cc } : {}),
           ...(opts?.replyTo ? { replyTo: opts.replyTo } : {}),
+          ...(opts?.bookingToken ? { bookingToken: opts.bookingToken } : {}),
         }),
       }),
     );
     const json = (await res.json().catch(() => ({}))) as {
       delivered?: unknown;
     };
-    if (!res.ok || json.delivered !== "sendgrid") {
+    if (!res.ok || (json.delivered !== "sendgrid" && json.delivered !== "crm")) {
       throw new Error("Could not send the confirmation email.");
     }
     return;
@@ -376,13 +384,17 @@ export async function dispatchBookingNotifications(input: {
   const emailTasks: Array<Promise<unknown>> = [];
 
   if (channels.includes("Email")) {
-    // Reply To / Cc from the page's Email Configurations, per audience.
-    const routing = (audience: "customer" | "user", to: string) =>
-      resolveEmailRouting(input.page.emailNotifyConfig, audience, {
+    // Reply To / Cc from the page's Email Configurations, per audience, plus
+    // the booking's token so the CRM can send it when this app cannot.
+    const bookingToken = input.booking.crmCancelToken;
+    const routing = (audience: "customer" | "user", to: string) => ({
+      ...resolveEmailRouting(input.page.emailNotifyConfig, audience, {
         to,
         staffEmail: tokens.staffEmail || tokens.ownerEmail,
         customerEmail: tokens.email,
-      });
+      }),
+      ...(bookingToken ? { bookingToken } : {}),
+    });
     if (contact) {
       const route = routing("customer", tokens.email);
       if (input.event === "confirmed") {

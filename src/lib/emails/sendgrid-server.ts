@@ -1,6 +1,8 @@
 import "server-only";
 
-type DeliverInput = {
+import { crmBaseUrl } from "@/lib/auth/crm-server";
+
+export type DeliverInput = {
   to: string[];
   subject: string;
   text: string;
@@ -156,4 +158,82 @@ export async function sendViaSendGrid(input: DeliverInput): Promise<void> {
     );
   }
   throw new Error(detail);
+}
+
+/**
+ * How the CRM may be asked to send when this app has no SendGrid key: as the
+ * signed-in user, or as the guest holding a booking's manage token.
+ */
+export type CrmMailAuth = { accessToken?: string | null; bookingToken?: string | null };
+
+/**
+ * Sends through this app's own SendGrid key when one is set, otherwise
+ * through the CRM's configured mail account — the one that already sends
+ * sign-up mail — so every module's email works without a second key here.
+ */
+export async function deliverMail(
+  input: DeliverInput,
+  auth: CrmMailAuth = {},
+): Promise<"sendgrid" | "crm"> {
+  if (sendgridConfigured()) {
+    await sendViaSendGrid(input);
+    return "sendgrid";
+  }
+  const base = crmBaseUrl();
+  const bookingToken = auth.bookingToken?.trim();
+  const accessToken = auth.accessToken?.trim();
+  if (!base || (!bookingToken && !accessToken)) {
+    throw new Error(
+      "Email is not configured on this app. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL, or sign in so the CRM can send it.",
+    );
+  }
+  const emails = (list?: string[]) => addresses(list).map((row) => row.email);
+  const to = emails(input.to);
+  if (!to[0]) throw new Error("Add a recipient email address");
+  const subject = input.subject.trim();
+  if (!subject) throw new Error("Subject is required");
+
+  const body = {
+    to,
+    cc: emails(input.cc),
+    bcc: emails(input.bcc),
+    ...(addresses([input.replyTo ?? ""])[0]
+      ? { replyTo: addresses([input.replyTo ?? ""])[0].email }
+      : {}),
+    subject,
+    text: input.text.trim() || subject,
+    ...(input.html?.trim() ? { html: input.html.trim() } : {}),
+    attachments: (input.attachments ?? [])
+      .filter((row) => row.content && row.filename)
+      .map((row) => ({
+        filename: row.filename.slice(0, 200),
+        type: row.type?.trim() || "application/octet-stream",
+        content: sendgridBase64(row.content),
+        ...(row.disposition === "inline" && row.contentId
+          ? { disposition: "inline", contentId: row.contentId }
+          : { disposition: "attachment" }),
+      }))
+      .filter((row) => row.content.length > 0),
+  };
+  const url = bookingToken
+    ? `${base}/v1/public/booking/manage/${encodeURIComponent(bookingToken)}/mail`
+    : `${base}/v1/mail/relay`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(bookingToken ? {} : { Authorization: `Bearer ${accessToken}` }),
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { message?: unknown };
+    const message =
+      typeof json.message === "string" && json.message.trim()
+        ? json.message
+        : `CRM mail failed (${res.status})`;
+    throw new Error(message);
+  }
+  return "crm";
 }

@@ -8,6 +8,17 @@ const sendViaSendGrid = vi.hoisted(() =>
 const getSession = vi.hoisted(() => vi.fn(async () => ({ user: "admin" })));
 
 vi.mock("@/lib/auth/session", () => ({ getSession }));
+vi.mock("@/lib/auth/crm-server", () => ({
+  crmBaseUrl: () => "https://crm.test",
+  resolveLiveCrmAuth: async () => ({ accessToken: "jwt-user", refreshToken: null }),
+}));
+// Routes send through deliverMail; with a SendGrid key it is sendViaSendGrid.
+const deliverMail = vi.hoisted(() =>
+  vi.fn(async (input: Record<string, unknown>) => {
+    await sendViaSendGrid(input);
+    return "sendgrid" as const;
+  }),
+);
 
 type SendGridPayload = {
   from: { email: string };
@@ -67,6 +78,7 @@ describe("public booking mail endpoint", () => {
     vi.resetModules();
     vi.doMock("@/lib/emails/sendgrid-server", () => ({
       sendViaSendGrid,
+      deliverMail,
       sendgridConfigured: () => true,
     }));
   });
@@ -125,7 +137,7 @@ describe("signed-in mail delivery endpoint", () => {
   beforeEach(() => {
     sendViaSendGrid.mockClear();
     vi.resetModules();
-    vi.doMock("@/lib/emails/sendgrid-server", () => ({ sendViaSendGrid }));
+    vi.doMock("@/lib/emails/sendgrid-server", () => ({ sendViaSendGrid, deliverMail }));
   });
   afterEach(() => {
     vi.doUnmock("@/lib/emails/sendgrid-server");
@@ -153,5 +165,85 @@ describe("signed-in mail delivery endpoint", () => {
         replyTo: "sam@finconnex.com",
       }),
     );
+  });
+});
+
+describe("deliverMail without a SendGrid key", () => {
+  const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
+    async () => new Response(JSON.stringify({ data: { delivered: "crm" } }), { status: 200 }),
+  );
+
+  beforeEach(() => {
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("SENDGRID_API_KEY", "");
+    vi.stubEnv("SENDGRID_FROM_EMAIL", "");
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  async function real() {
+    return (
+      await vi.importActual<typeof import("@/lib/emails/sendgrid-server")>(
+        "@/lib/emails/sendgrid-server",
+      )
+    ).deliverMail;
+  }
+
+  it("asks the CRM to send a guest's booking mail with the booking token", async () => {
+    const deliver = await real();
+    await expect(
+      deliver(
+        { to: ["ada@example.com"], subject: "Confirmed", text: "Hi", replyTo: "sam@x.co" },
+        { bookingToken: "cancel-tok" },
+      ),
+    ).resolves.toBe("crm");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://crm.test/v1/public/booking/manage/cancel-tok/mail");
+    expect(new Headers(init.headers).has("authorization")).toBe(false);
+    expect(JSON.parse(String(init.body))).toEqual(
+      expect.objectContaining({ to: ["ada@example.com"], replyTo: "sam@x.co", subject: "Confirmed" }),
+    );
+  });
+
+  it("asks the CRM to send as the signed-in user otherwise", async () => {
+    const deliver = await real();
+    await deliver(
+      {
+        to: ["ada@example.com"],
+        subject: "Invite",
+        text: "Hi",
+        attachments: [{ filename: "a.pdf", content: "data:application/pdf;base64,QUJD" }],
+      },
+      { accessToken: "jwt-user" },
+    );
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://crm.test/v1/mail/relay");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer jwt-user");
+    expect(JSON.parse(String(init.body)).attachments[0]).toEqual(
+      expect.objectContaining({ filename: "a.pdf", content: "QUJD", disposition: "attachment" }),
+    );
+  });
+
+  it("reports the CRM's refusal instead of claiming it was sent", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "Mail about a booking can only go to its guest" }), {
+        status: 403,
+      }),
+    );
+    const deliver = await real();
+    await expect(
+      deliver({ to: ["x@y.co"], subject: "S", text: "T" }, { bookingToken: "t" }),
+    ).rejects.toThrow(/only go to its guest/);
+  });
+
+  it("explains that mail is not configured when there is no way to send", async () => {
+    const deliver = await real();
+    await expect(deliver({ to: ["x@y.co"], subject: "S", text: "T" })).rejects.toThrow(
+      /not configured/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
