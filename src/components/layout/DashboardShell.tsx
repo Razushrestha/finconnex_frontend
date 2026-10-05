@@ -11,6 +11,7 @@ import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { rulesRoleForWorkspaceRole } from "@/lib/auth/workspace-role";
 import { BOTTOM_BAR_H } from "@/lib/layout";
 import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
+import { CrmPrefetcher } from "@/components/persistence/CrmPrefetcher";
 import {
   resolveWorkspaceBrand,
   workspaceBrandCssVars,
@@ -34,6 +35,7 @@ type ShellUser = {
 export function DashboardShell({ children, session }: DashboardShellProps) {
   return (
     <SettingsCrmProvider>
+      <CrmPrefetcher />
       <DashboardShellInner session={session}>{children}</DashboardShellInner>
     </SettingsCrmProvider>
   );

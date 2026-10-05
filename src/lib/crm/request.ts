@@ -4,6 +4,11 @@ import {
   readStoredCrmTokens,
   refreshCrmTokenFromBrowser,
 } from "@/lib/auth/browser-session-cache";
+import {
+  cachedCrmGet,
+  invalidateCrmGetCache,
+  isCacheableGet,
+} from "@/lib/crm/get-cache";
 
 type Envelope<T> = {
   statusCode?: number;
@@ -543,6 +548,40 @@ export async function crmWorkspaceFetch<T>(
 export async function crmBffFetch<T>(
   path: string,
   init?: RequestInit,
+  opts?: { recordForPrefetch?: boolean },
+): Promise<T> {
+  return withCrmGetCache("bff", path, init, () => crmBffFetchUncached<T>(path, init), opts);
+}
+
+/**
+ * GETs go through the short-lived browser cache; anything else clears it,
+ * before and after the write, so no read can keep data from before it.
+ */
+async function withCrmGetCache<T>(
+  transport: string,
+  path: string,
+  init: RequestInit | undefined,
+  load: () => Promise<T>,
+  opts?: { recordForPrefetch?: boolean },
+): Promise<T> {
+  if (isCacheableGet(init)) {
+    return cachedCrmGet(transport, path, load, {
+      record: opts?.recordForPrefetch !== false,
+    });
+  }
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET") return load();
+  invalidateCrmGetCache();
+  try {
+    return await load();
+  } finally {
+    invalidateCrmGetCache();
+  }
+}
+
+async function crmBffFetchUncached<T>(
+  path: string,
+  init?: RequestInit,
 ): Promise<T> {
   if (!path.startsWith("/v1/")) {
     throw new Error(`CRM path must start with /v1/: ${path}`);
@@ -645,6 +684,21 @@ export async function forceSignOutForDeadSession(): Promise<void> {
 }
 
 export async function crmFetch<T>(
+  session: Pick<CrmSession, "baseUrl" | "accessToken">,
+  path: string,
+  init?: RequestInit,
+  opts?: { recordForPrefetch?: boolean },
+): Promise<T> {
+  return withCrmGetCache(
+    `direct ${session.baseUrl}`,
+    path,
+    init,
+    () => crmFetchUncached<T>(session, path, init),
+    opts,
+  );
+}
+
+async function crmFetchUncached<T>(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
   init?: RequestInit,

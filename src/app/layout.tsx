@@ -22,12 +22,25 @@ export const metadata: Metadata = {
     "Manage sales, finance, and customer relationships across your organization.",
 };
 
+function crmApiOrigin(): string | null {
+  const raw =
+    process.env.NEXT_PUBLIC_CRM_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+    "https://finconnex.payperless.app";
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const theme = parseTheme((await cookies()).get(THEME_COOKIE_NAME)?.value);
+  const crmOrigin = crmApiOrigin();
 
   return (
     <html
@@ -37,6 +50,13 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {crmOrigin ? (
+          <>
+            {/* Open the connection to the CRM before the first API call. */}
+            <link rel="preconnect" href={crmOrigin} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={crmOrigin} />
+          </>
+        ) : null}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var A="bis_skin_checked";function s(n){if(!n)return;if(n.nodeType===1&&n.removeAttribute)n.removeAttribute(A);if(!n.querySelectorAll)return;var l=n.querySelectorAll("["+A+"]");for(var i=0;i<l.length;i++)l[i].removeAttribute(A);}s(document.documentElement);})();`,

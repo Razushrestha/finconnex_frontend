@@ -16,6 +16,7 @@
  */
 
 import { fetchAuthBridge } from "@/lib/persistence/auth-bridge";
+import { invalidateCrmGetCache } from "@/lib/crm/get-cache";
 import {
   fetchCrmTokenJson,
   refreshCrmTokenFromBrowser,
@@ -70,6 +71,8 @@ export function persistCrmTokens(input: {
 
 export function clearCrmTokens() {
   if (typeof window === "undefined") return;
+  // Cached reads belong to the account that is signing out.
+  invalidateCrmGetCache();
   for (const key of [ACCESS_KEY, REFRESH_KEY, WORKSPACE_KEY]) {
     try {
       window.sessionStorage.removeItem(key);
