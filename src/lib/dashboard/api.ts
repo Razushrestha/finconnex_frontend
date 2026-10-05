@@ -483,3 +483,12 @@ export async function batchCrmDashboardWidgets(
     },
   );
 }
+
+export async function getCrmDashboardWorkQueue(
+  filters?: DashboardFilters,
+  ownerId?: string,
+): Promise<unknown> {
+  return dashboardCrm(
+    `${dashboardMetricsPath("/work-queue")}${toQuery(dashboardFilterQuery(filters, ownerId))}`,
+  );
+}

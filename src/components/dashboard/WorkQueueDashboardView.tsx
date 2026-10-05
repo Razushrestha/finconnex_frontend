@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -14,8 +14,10 @@ import {
 import {
   type DashboardFilters,
 } from "@/lib/dashboard/layout";
+import { getCrmDashboardWorkQueue } from "@/lib/dashboard/api";
 import {
   computeWorkQueueDashboard,
+  workQueueFromCrm,
   type QueueLine,
 } from "@/lib/dashboard/work-queue-board";
 import {
@@ -130,10 +132,21 @@ export function WorkQueueDashboardView({
 }: {
   filters: DashboardFilters;
 } & DashboardReorderProps) {
-  const data = useMemo(
-    () => computeWorkQueueDashboard(filters),
-    [filters],
-  );
+  const [data, setData] = useState(() => computeWorkQueueDashboard(filters));
+
+  useEffect(() => {
+    let cancel = false;
+    setData(computeWorkQueueDashboard(filters));
+    void getCrmDashboardWorkQueue(filters)
+      .then((raw) => {
+        const live = workQueueFromCrm(raw);
+        if (!cancel && live) setData(live);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [filters]);
 
   const items = {
     kpis: {

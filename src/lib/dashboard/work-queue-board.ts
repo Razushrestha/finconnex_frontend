@@ -321,3 +321,84 @@ export function computeWorkQueueDashboard(
     urgent: pick(urgent),
   };
 }
+
+function asQueueRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function queueNum(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function queueLines(value: unknown): QueueLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const rec = asQueueRecord(item);
+    if (!rec) return [];
+    const title = String(rec.title ?? "").trim();
+    if (!title) return [];
+    const tone = String(rec.tone ?? "");
+    return [
+      {
+        id: String(rec.id ?? title),
+        title,
+        related: String(rec.related ?? "—"),
+        owner: String(rec.owner ?? ""),
+        when: String(rec.when ?? ""),
+        extra: String(rec.extra ?? ""),
+        tone:
+          tone === "rose" || tone === "amber" || tone === "emerald"
+            ? tone
+            : undefined,
+      },
+    ];
+  });
+}
+
+/** Map GET /v1/dashboard/work-queue onto the work queue view. */
+export function workQueueFromCrm(raw: unknown): WorkQueueDashboard | null {
+  const rec = asQueueRecord(raw);
+  if (!rec || !("tasksToday" in rec) && !("overdueTasks" in rec)) return null;
+  const approvals = Array.isArray(rec.approvals)
+    ? rec.approvals.flatMap((item) => {
+        const row = asQueueRecord(item);
+        if (!row) return [];
+        const label = String(row.label ?? "").trim();
+        if (!label) return [];
+        return [{ label, value: queueNum(row.value) }];
+      })
+    : [];
+  const lenders = Array.isArray(rec.lenders)
+    ? rec.lenders.flatMap((item) => {
+        const row = asQueueRecord(item);
+        if (!row) return [];
+        const name = String(row.name ?? "").trim();
+        if (!name) return [];
+        return [{ name, value: queueNum(row.value) }];
+      })
+    : [];
+  return {
+    overdueTasks: queueNum(rec.overdueTasks),
+    tasksDueToday: queueNum(rec.tasksDueToday),
+    followUpsDue: queueNum(rec.followUpsDue),
+    documentsPending: queueNum(rec.documentsPending),
+    appointmentsToday: queueNum(rec.appointmentsToday),
+    slaBreaches: queueNum(rec.slaBreaches),
+    overdueDelta: 0,
+    todayDelta: 0,
+    followDelta: 0,
+    docsDelta: 0,
+    apptDelta: 0,
+    slaDelta: 0,
+    tasksToday: queueLines(rec.tasksToday),
+    followUps: queueLines(rec.followUps),
+    documents: queueLines(rec.documents),
+    appointments: queueLines(rec.appointments),
+    missed: queueLines(rec.missed),
+    stale: queueLines(rec.stale),
+    approvals,
+    lenders,
+    urgent: queueLines(rec.urgent),
+  };
+}
