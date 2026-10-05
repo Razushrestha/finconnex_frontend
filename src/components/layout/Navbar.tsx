@@ -24,6 +24,7 @@ import { listInboxConversations } from "@/lib/marketing/inbox/types";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getModuleTitle } from "@/lib/module-title";
+import { useNavbarModuleLive } from "@/lib/layout/use-navbar-module-live";
 import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
 import { useCrmPayments } from "@/lib/finance/payments/use-crm-payments";
 import { useCrmDeals } from "@/lib/deals/use-crm-deals";
@@ -128,15 +129,24 @@ export function Navbar({
   const showFinanceDot = pathname.startsWith("/finance");
   const showSalesDot = pathname.startsWith("/sales");
   const showActivitiesDot = pathname.startsWith("/activities");
+  const showAnalyticsDot = pathname.startsWith("/analytics");
   const paymentsLive = paymentsCrm.source === "api";
   const salesLive = dealsCrm.source === "api";
   const activitiesLive = callsCrm.source === "api";
-  const showModuleDot = showFinanceDot || showSalesDot || showActivitiesDot;
+  const moduleCrm = useNavbarModuleLive(pathname);
+  const showModuleDot =
+    showFinanceDot ||
+    showSalesDot ||
+    showActivitiesDot ||
+    showAnalyticsDot ||
+    moduleCrm.show;
   const moduleLive = showFinanceDot
     ? paymentsLive
-    : showSalesDot
+    : showSalesDot || showAnalyticsDot
       ? salesLive
-      : activitiesLive;
+      : showActivitiesDot
+        ? activitiesLive
+        : moduleCrm.live;
 
   return (
     <header className="sticky top-0 z-30 flex w-full flex-col border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">

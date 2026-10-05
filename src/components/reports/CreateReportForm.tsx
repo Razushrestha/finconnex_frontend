@@ -55,6 +55,8 @@ import { defaultActorName } from "@/lib/rules/actor";
 interface Props {
   layoutId: string;
   redirect: boolean;
+  initialType?: ReportType;
+  initialSource?: string;
 }
 
 function CompactField({
@@ -88,12 +90,18 @@ function CompactField({
   );
 }
 
-export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateReportForm({
+  layoutId: _l,
+  redirect: _r,
+  initialType,
+  initialSource,
+}: Props) {
   const router = useRouter();
+  const startingType = initialType ?? "Lead";
   const [name, setName] = useState("");
-  const [type, setType] = useState<ReportType>("Lead");
+  const [type, setType] = useState<ReportType>(startingType);
   const [dataSource, setDataSource] = useState<string>(
-    REPORT_TYPE_DEFAULT_SOURCE.Lead,
+    initialSource || REPORT_TYPE_DEFAULT_SOURCE[startingType],
   );
   const [dateRange, setDateRange] = useState<string>(REPORT_DATE_RANGES[1]);
   const [customFrom, setCustomFrom] = useState("");
@@ -227,9 +235,6 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              New report
-            </h1>
             {saveError ? (
               <p className="text-[11px] font-medium text-rose-600">{saveError}</p>
             ) : null}

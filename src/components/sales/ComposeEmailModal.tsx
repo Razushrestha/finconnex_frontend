@@ -432,9 +432,9 @@ export function ComposeEmailModal({
         toList: finalTo,
         ccList: finalCc,
         bccList: finalBcc,
-        subject,
-        body,
-        attachments,
+      subject,
+      body,
+      attachments,
         sendAt,
         importance,
       });
@@ -514,7 +514,7 @@ export function ComposeEmailModal({
             {size === "expanded" ? (
               <Minimize2 className="h-3.5 w-3.5" />
             ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
+            <Maximize2 className="h-3.5 w-3.5" />
             )}
           </button>
           <button
@@ -553,7 +553,7 @@ export function ComposeEmailModal({
                   >
                     Cc
                   </button>
-                  <button
+              <button
                     type="button"
                     onClick={() => setShowBcc((v) => !v)}
                     className={cn(
@@ -562,8 +562,8 @@ export function ComposeEmailModal({
                     )}
                   >
                     Bcc
-                  </button>
-                </div>
+              </button>
+          </div>
               }
             />
             {showCc ? (
@@ -596,7 +596,7 @@ export function ComposeEmailModal({
                 placeholder="Add Bcc"
               />
             ) : null}
-          </div>
+            </div>
 
           <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 py-2">
             <input
@@ -627,13 +627,13 @@ export function ComposeEmailModal({
                 className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-[#5A32A3] hover:bg-violet-50"
               >
                 <Sparkles className="h-3 w-3" />
-                Templates
-                <ChevronDown className="h-3 w-3" />
-              </button>
+              Templates
+              <ChevronDown className="h-3 w-3" />
+            </button>
               {templatesOpen ? (
                 <div className="absolute top-8 right-0 z-20 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                   {TEMPLATES.map((item) => (
-                    <button
+                <button
                       key={item.id}
                       type="button"
                       onClick={() => applyTemplate(item)}
@@ -645,7 +645,7 @@ export function ComposeEmailModal({
                       <span className="truncate text-[11px] text-slate-400">
                         {applyTokens(item.subject, recipient)}
                       </span>
-                    </button>
+                </button>
                   ))}
                 </div>
               ) : null}
@@ -655,7 +655,7 @@ export function ComposeEmailModal({
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="px-3 pt-2">
               <TaskDescriptionEditor
-                value={body}
+              value={body}
                 onChange={(next) => {
                   setBody(next);
                   setSavedAt(new Date());
@@ -671,8 +671,8 @@ export function ComposeEmailModal({
                 }}
                 recipientName={recipient.name}
                 subject={subject}
-              />
-            </div>
+            />
+          </div>
 
             <div className="px-4 pt-3 pb-3">
               {attachments.length > 0 ? (
@@ -699,21 +699,21 @@ export function ComposeEmailModal({
                   ))}
                 </div>
               ) : null}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(true);
-                }}
-                onDragLeave={() => setIsDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                  addFiles(e.dataTransfer.files);
-                }}
-                onClick={() => fileInputRef.current?.click()}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                addFiles(e.dataTransfer.files);
+              }}
+              onClick={() => fileInputRef.current?.click()}
                 className={cn(
                   "cursor-pointer rounded-lg border border-dashed py-2.5 text-center text-[11px] font-medium",
-                  isDragOver
+                isDragOver
                     ? "border-[#5A32A3] bg-violet-50 text-[#5A32A3]"
                     : "border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600",
                 )}
@@ -835,7 +835,7 @@ export function ComposeEmailModal({
                   {sending ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <SendIcon className="h-3.5 w-3.5" />
+                  <SendIcon className="h-3.5 w-3.5" />
                   )}
                   {sending ? "Sending…" : "Send"}
                 </button>

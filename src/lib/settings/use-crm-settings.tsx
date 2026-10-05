@@ -96,21 +96,14 @@ function writeSettingsCache(cache: SettingsCache) {
 }
 
 function useCrmSettingsState(enabled: boolean): CrmSettingsState {
-  const cached = typeof window !== "undefined" ? readSettingsCache() : null;
-  const [source, setSource] = useState<SettingsDataSource>(
-    cached?.settings ? "api" : "demo",
-  );
-  const [loading, setLoading] = useState(!cached?.settings);
+  // Keep the first render identical on the server and client. Saved brand
+  // colours live in sessionStorage and are applied after hydration.
+  const [source, setSource] = useState<SettingsDataSource>("demo");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<CrmWorkspaceSettings | null>(
-    cached?.settings ?? null,
-  );
-  const [security, setSecurity] = useState<CrmSecuritySettings | null>(
-    cached?.security ?? null,
-  );
-  const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(
-    cached?.capabilities ?? null,
-  );
+  const [settings, setSettings] = useState<CrmWorkspaceSettings | null>(null);
+  const [security, setSecurity] = useState<CrmSecuritySettings | null>(null);
+  const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(null);
   const [previewBrand, setPreviewBrand] = useState<
     Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null
   >(null);
@@ -122,7 +115,15 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
     if (!enabled) return;
     let cancelled = false;
     const cachedNow = readSettingsCache();
-    if (!cachedNow?.settings) setLoading(true);
+    if (tick === 0 && cachedNow?.settings) {
+      setSettings(cachedNow.settings);
+      setSecurity(cachedNow.security);
+      setCapabilities(cachedNow.capabilities);
+      setSource("api");
+      setLoading(false);
+    } else if (!cachedNow?.settings) {
+      setLoading(true);
+    }
     setError(null);
 
     const run = async () => {

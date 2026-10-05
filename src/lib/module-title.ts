@@ -35,6 +35,7 @@ const MODULE_TITLES: { href: string; label: string }[] = [
   { href: "/marketing/whatsapp", label: "WhatsApp Campaigns" },
   { href: "/marketing/forms", label: "Forms" },
   { href: "/marketing/linktree", label: "Broker pages" },
+  { href: "/smart-link/templates", label: "Templates" },
   { href: "/finance/estimates", label: "Estimates" },
   { href: "/finance/quotations", label: "Quotations" },
   { href: "/finance/credit-notes", label: "Credit notes" },

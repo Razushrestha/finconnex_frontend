@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -14,15 +14,21 @@ import {
 } from "lucide-react";
 import {
   DEFAULT_RATES,
-  RELATED_RECORD_OPTIONS,
-  TIME_USERS,
+  RELATED_KINDS,
   appendTimeAudit,
   formatTimeAt,
   formatTimeDate,
   nextTimeEntryIds,
   relatedLabel,
   upsertTimeEntry,
+  type RelatedKind,
 } from "@/lib/time-tracking/types";
+import {
+  createCrmTimeEntry,
+  listTimeRelatedOptions,
+  type TimeRelatedOption,
+} from "@/lib/time-tracking/api";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 import {
   CreateEntityFormShell,
   Field,
@@ -40,7 +46,11 @@ interface Props {
 
 export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
+  const [options, setOptions] = useState<TimeRelatedOption[]>([]);
+  const [users, setUsers] = useState<string[]>([defaultActorName()]);
   const [relatedIdx, setRelatedIdx] = useState(0);
+  const [kind, setKind] = useState<RelatedKind>("Deal");
+  const [relatedName, setRelatedName] = useState("");
   const [user, setUser] = useState<string>(defaultActorName());
   const [date, setDate] = useState(formatTimeDate());
   const [hours, setHours] = useState("1");
@@ -50,7 +60,24 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const related = RELATED_RECORD_OPTIONS[relatedIdx];
+  const related = options[relatedIdx];
+
+  useEffect(() => {
+    let cancelled = false;
+    void listTimeRelatedOptions().then((rows) => {
+      if (!cancelled && rows.length) setOptions(rows);
+    });
+    void loadAssignableOwners().then((owners) => {
+      if (cancelled) return;
+      const names = [
+        ...new Set(owners.map((owner) => owner.name.trim()).filter(Boolean)),
+      ].sort((a, b) => a.localeCompare(b));
+      if (names.length) setUsers(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const durationHours = useMemo(() => {
     const h = Number(hours) || 0;
@@ -65,20 +92,51 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
     if (durationHours <= 0) next.duration = "Duration must be greater than 0";
     if (billable && !(Number(rate) > 0)) next.rate = "Rate is required";
     if (!description.trim()) next.description = "Description is required";
-    if (!related) next.related = "Related record is required";
+    if (options.length ? !related : !relatedName.trim()) {
+      next.related = "Related record is required";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
-    if (!validate() || !related) return;
+  function chosenRelated(): TimeRelatedOption | null {
+    if (related) return related;
+    const name = relatedName.trim();
+    if (!name) return null;
+    return { kind, name };
+  }
+
+  async function onSave(createAnother: boolean) {
+    const picked = chosenRelated();
+    if (!validate() || !picked) return;
+    try {
+      const created = await createCrmTimeEntry({
+        related: picked,
+        date,
+        durationHours,
+        billable,
+        rate: Number(rate) || 0,
+        description: description.trim(),
+      });
+      if (createAnother) {
+        setDescription("");
+        setHours("1");
+        setMinutes("0");
+        setErrors({});
+        return;
+      }
+      router.push(`/time-tracking/${created.id}`);
+      return;
+    } catch {
+      /* keep the local entry when the CRM is offline */
+    }
     const ids = nextTimeEntryIds();
     const now = formatTimeAt();
     const entry = appendTimeAudit(
       {
         id: ids.id,
         entryId: ids.entryId,
-        relatedTo: { ...related },
+        relatedTo: { kind: picked.kind, name: picked.name, clientId: picked.clientId },
         user,
         date,
         durationHours,
@@ -119,20 +177,46 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
       saveLabel="Log time"
       onSave={onSave}
     >
-      <Field label="Related to" required className="sm:col-span-2">
-        <InputShell icon={Link2}>
-          <select
-            className={elevatedSelectClass(true)}
-            value={relatedIdx}
-            onChange={(e) => setRelatedIdx(Number(e.target.value))}
-          >
-            {RELATED_RECORD_OPTIONS.map((r, i) => (
-              <option key={`${r.kind}-${r.name}`} value={i}>
-                {relatedLabel(r)}
-              </option>
-            ))}
-          </select>
-        </InputShell>
+      <Field label="Related to" required error={errors.related} className="sm:col-span-2">
+        {options.length ? (
+          <InputShell icon={Link2} error={!!errors.related}>
+            <select
+              className={elevatedSelectClass(true)}
+              value={relatedIdx}
+              onChange={(e) => setRelatedIdx(Number(e.target.value))}
+            >
+              {options.map((r, i) => (
+                <option key={`${r.kind}-${r.id ?? r.name}`} value={i}>
+                  {relatedLabel(r)}
+                </option>
+              ))}
+            </select>
+          </InputShell>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <InputShell icon={Link2} error={!!errors.related}>
+              <select
+                className={elevatedSelectClass(true)}
+                value={kind}
+                onChange={(e) => setKind(e.target.value as RelatedKind)}
+              >
+                {RELATED_KINDS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </InputShell>
+            <InputShell icon={Link2} error={!!errors.related}>
+              <input
+                className={elevatedInputClass(true)}
+                value={relatedName}
+                onChange={(e) => setRelatedName(e.target.value)}
+                placeholder="Matter, deal, ticket, or project name"
+              />
+            </InputShell>
+          </div>
+        )}
       </Field>
 
       <Field label="User" required error={errors.user}>
@@ -146,7 +230,7 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
               setRate(String(DEFAULT_RATES[u] ?? rate));
             }}
           >
-            {TIME_USERS.map((u) => (
+            {users.map((u) => (
               <option key={u} value={u}>
                 {u}
               </option>

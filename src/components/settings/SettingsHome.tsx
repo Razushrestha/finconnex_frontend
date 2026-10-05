@@ -36,15 +36,6 @@ const ICONS: Record<SettingsNavIcon, LucideIcon> = {
 export function SettingsHome() {
   return (
     <div>
-      <div className="mb-3 flex min-w-0 items-center gap-2">
-        <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-          Settings
-        </h1>
-        <span
-          aria-label="CRM live"
-          className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500"
-        />
-      </div>
       <div className="relative overflow-hidden rounded-3xl bg-[#5A32A3] px-6 py-8 text-white shadow-lg shadow-[#5A32A3]/20 sm:px-8">
         <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-20 left-20 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-2xl" />

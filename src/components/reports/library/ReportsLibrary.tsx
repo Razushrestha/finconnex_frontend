@@ -13,6 +13,7 @@ import {
   Handshake,
   Kanban,
   Megaphone,
+  Plus,
   Star,
   Trophy,
   Users,
@@ -32,6 +33,9 @@ import {
 } from "@/lib/reports/library/prefs";
 import type { ReportFolder } from "@/lib/reports/library/types";
 import { FolderEditor } from "@/components/reports/library/FolderEditor";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import { useCrmReports } from "@/lib/reports/use-crm-reports";
+import { cn } from "@/lib/utils";
 
 const ICONS = {
   users: Users,
@@ -46,12 +50,9 @@ const ICONS = {
   crown: Crown,
 };
 
-export function ReportsLibrary({
-  crmSource,
-}: {
-  crmSource?: "api" | "demo";
-  crmLoading?: boolean;
-}) {
+export function ReportsLibrary() {
+  const router = useRouter();
+  const crm = useCrmReports();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [folders, setFolders] = useState<ReportFolder[]>([]);
@@ -66,25 +67,30 @@ export function ReportsLibrary({
   return (
     <div className="min-h-full bg-[#F4F6F9]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="mr-auto flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-              Reports
-            </h1>
-            <span
-              aria-label={crmSource === "api" ? "CRM live" : "CRM offline"}
-              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                crmSource === "api" ? "bg-emerald-500" : "bg-rose-500"
-              }`}
-            />
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.loading ? "Loading reports" : crm.source === "api" ? "Live CRM" : "Workspace data"}
+          </span>
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#5A32A3] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#4a2788]"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
           >
             <FolderPlus className="h-3.5 w-3.5" />
             New folder
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/reports/create?layoutid=standard&redirect=false")}
+            className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New report
           </button>
         </div>
 

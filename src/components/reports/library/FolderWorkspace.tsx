@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Folder, Pencil, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 import { reportById } from "@/lib/reports/library/catalog";
 import {
   deleteReportFolder,
@@ -33,27 +34,12 @@ export function FolderWorkspace({ folderId }: { folderId: string }) {
   return (
     <div className="min-h-full bg-[#F4F6F9]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-        <Link href="/reports" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to Reports
-        </Link>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
-              {isDefaultFolder(folder.id) ? (
-                <Star className="h-4 w-4 fill-[#5A32A3]" />
-              ) : (
-                <Folder className="h-4 w-4" />
-              )}
-            </span>
-            <div>
-              <h1 className="text-[20px] font-semibold text-slate-900">{folder.name}</h1>
-              <p className="text-[12px] text-slate-500">
-                {reports.length} selected report{reports.length === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/reports" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Reports
+          </Link>
+          <div className="ml-auto flex items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -75,6 +61,13 @@ export function FolderWorkspace({ folderId }: { folderId: string }) {
                 Delete
               </button>
             )}
+            <Link
+              href="/reports/create?layoutid=standard&redirect=false"
+              className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New report
+            </Link>
           </div>
         </div>
 

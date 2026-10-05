@@ -13,6 +13,7 @@ import {
   ListFilter,
   MoreHorizontal,
   Percent,
+  Plus,
   RotateCcw,
   Search,
   Star,
@@ -21,6 +22,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { AddToFolderMenu } from "@/components/reports/library/AddToFolderMenu";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   DropdownMenu,
@@ -59,12 +61,17 @@ import {
 import {
   isFavoriteReport,
   loadLibraryRange,
-  scheduleLibraryReport,
   toggleFavoriteReport,
   touchRecentReport,
 } from "@/lib/reports/library/prefs";
+import {
+  CATEGORY_DATA_SOURCE,
+  CATEGORY_REPORT_TYPE,
+  publishLibrarySchedule,
+} from "@/lib/reports/library/live";
 import { runLibraryReport } from "@/lib/reports/library/run";
 import { reportAccess } from "@/lib/reports/library/scope";
+import { useReportLibraryLive } from "@/lib/reports/library/use-live-sources";
 import {
   defaultLibraryFilters,
   type LibraryFilters,
@@ -129,6 +136,7 @@ export function ReportWorkspace({
   const def = reportById(reportId);
   const category = categoryById(categoryId);
   const access = reportAccess();
+  const live = useReportLibraryLive(def?.category ?? categoryId);
   const [filters, setFilters] = useState<LibraryFilters>(() => ({
     ...defaultLibraryFilters(),
     dateRange: loadLibraryRange(),
@@ -171,7 +179,7 @@ export function ReportWorkspace({
         error: err instanceof Error ? err.message : "The report could not be built.",
       };
     }
-  }, [def, filters]);
+  }, [def, filters, live.revision]);
 
   if (!def || !category || def.category !== category.id) {
     return (
@@ -232,32 +240,15 @@ export function ReportWorkspace({
   return (
     <div className="min-h-full bg-[#F4F6F9]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-        <Link
-          href="/reports"
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to Reports
-        </Link>
-
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-2xl">
-            <h1 className="inline-flex items-center gap-2 text-[22px] font-semibold text-slate-900">
-              {def.name}
-              <button
-                type="button"
-                title={favorite ? "Remove from My Favourites" : "Add to My Favourites"}
-                onClick={() => {
-                  toggleFavoriteReport(def.id);
-                  setFavorite(isFavoriteReport(def.id));
-                }}
-              >
-                <Star className={cn("h-4 w-4", favorite ? "fill-amber-400 text-amber-400" : "text-slate-300")} />
-              </button>
-            </h1>
-            <p className="mt-1 text-[13px] text-slate-500">{def.purpose}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/reports"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Reports
+          </Link>
+          <div className="ml-auto flex items-center justify-end gap-1.5">
             {flash ? <span className="text-[11px] font-medium text-emerald-700">{flash}</span> : null}
             <button
               type="button"
@@ -273,8 +264,15 @@ export function ReportWorkspace({
             <button
               type="button"
               onClick={() => {
-                scheduleLibraryReport(def.id, "Weekly");
-                setFlash("Scheduled weekly");
+                void publishLibrarySchedule({
+                  id: def.id,
+                  name: def.name,
+                  category: def.category,
+                  groupBy: def.groupBy?.[0]?.id,
+                  cadence: "Weekly",
+                }).then((where) => {
+                  setFlash(where === "api" ? "Scheduled weekly in CRM" : "Scheduled weekly on this device");
+                });
               }}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
             >
@@ -300,8 +298,15 @@ export function ReportWorkspace({
                 <DropdownMenuItem
                   className="text-[12px]"
                   onClick={() => {
-                    scheduleLibraryReport(def.id, "Monthly");
-                    setFlash("Scheduled monthly");
+                    void publishLibrarySchedule({
+                      id: def.id,
+                      name: def.name,
+                      category: def.category,
+                      groupBy: def.groupBy?.[0]?.id,
+                      cadence: "Monthly",
+                    }).then((where) => {
+                      setFlash(where === "api" ? "Scheduled monthly in CRM" : "Scheduled monthly on this device");
+                    });
                   }}
                 >
                   Schedule monthly
@@ -328,6 +333,13 @@ export function ReportWorkspace({
                 ) : null}
               </div>
             ) : null}
+            <Link
+              href={`/reports/create?layoutid=standard&redirect=false&type=${CATEGORY_REPORT_TYPE[def.category]}&source=${CATEGORY_DATA_SOURCE[def.category]}`}
+              className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New report
+            </Link>
           </div>
         </div>
 

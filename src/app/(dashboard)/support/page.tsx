@@ -115,18 +115,7 @@ export default function SupportTicketsPage() {
     <div className="relative min-h-full overflow-hidden bg-slate-50">
 
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-              Support
-            </h1>
-            <span
-              aria-label={crm.source === "api" ? "CRM live" : "CRM offline"}
-              className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-                crm.source === "api" ? "bg-emerald-500" : "bg-rose-500"
-              }`}
-            />
-          </div>
+        <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-1.5">
             <button
               type="button"

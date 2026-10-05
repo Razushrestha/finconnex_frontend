@@ -139,11 +139,17 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
     flash("Timer stopped");
   }
 
-  function onToggleBillable() {
+  async function onToggleBillable() {
     if (!row || row.status === "Invoiced") return;
-    setBillable(row.id, !row.billable, row.user);
+    const next = !row.billable;
+    try {
+      const { updateCrmTimeEntry } = await import("@/lib/time-tracking/api");
+      await updateCrmTimeEntry(row.id, { billable: next });
+    } catch {
+      setBillable(row.id, next, row.user);
+    }
     reload();
-    flash(!row.billable ? "Marked billable" : "Marked non-billable");
+    flash(next ? "Marked billable" : "Marked non-billable");
   }
 
   function onSubmit() {

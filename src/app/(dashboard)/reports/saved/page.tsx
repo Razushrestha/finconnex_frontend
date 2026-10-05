@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Search, Download } from "lucide-react";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 import {
   REPORT_SCHEDULES,
   REPORT_STATUS_STYLE,
@@ -102,7 +103,7 @@ export default function SavedReportsPage() {
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="ml-auto flex items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={exportCsv}
@@ -114,7 +115,7 @@ export default function SavedReportsPage() {
             <button
               type="button"
               onClick={() => router.push("/reports/create?layoutid=standard&redirect=false")}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+              className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0`}
             >
               <Plus className="h-3.5 w-3.5" />
               New report

@@ -394,7 +394,7 @@ function DocumentLibraryPageInner() {
   return (
     <div className={BOARD_PAGE}>
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2">
           <Link
             href={

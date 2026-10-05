@@ -29,16 +29,7 @@ export default function FinancialCalculatorPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 p-6 font-sans">
       {/* Top Header & Breadcrumb */}
       <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-              Calculator
-            </h1>
-            <span
-              aria-label="CRM live"
-              className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500"
-            />
-          </div>
+        <div className="flex items-center justify-end gap-3">
           <button
             onClick={() => router.push("/calculator/history")}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg transition shadow-xs cursor-pointer"

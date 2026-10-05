@@ -312,13 +312,13 @@ export default function ESignatureOverviewPage() {
       {/* Main Content Table Section */}
       <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950">
         <div className="shrink-0">
-          <RecentTabsHeader
-            onTabChange={(tab) => {
-              setActiveTab(tab);
+        <RecentTabsHeader
+          onTabChange={(tab) => {
+            setActiveTab(tab);
               documentsTable.setPage(1);
               templatesTable.setPage(1);
-            }}
-          />
+          }}
+        />
         </div>
 
         {/* Table View */}
@@ -404,8 +404,8 @@ export default function ESignatureOverviewPage() {
                           <div className="min-w-0 flex-1">
                             <Tooltip content={doc.documentName} fullWidth>
                               <div className="truncate font-semibold text-slate-900 dark:text-white">
-                                {doc.documentName}
-                              </div>
+                              {doc.documentName}
+                            </div>
                             </Tooltip>
                             <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded dark:bg-zinc-800 dark:text-zinc-400">
                               {computeOverallStatus(doc)}
@@ -433,13 +433,13 @@ export default function ESignatureOverviewPage() {
                                   {initialsFor(
                                     signer.name || signer.email || "?",
                                   )}
-                                </span>
+                            </span>
                               ))}
                           </div>
                           <Tooltip content={recipientLabel(doc)} fullWidth>
                             <span className="block truncate text-slate-500">
                               {recipientLabel(doc)}
-                            </span>
+                          </span>
                           </Tooltip>
                         </div>
                       </td>
@@ -451,7 +451,7 @@ export default function ESignatureOverviewPage() {
                           <Tooltip content={ownerLabel(doc)} fullWidth>
                             <span className="block truncate font-medium text-slate-900 dark:text-white">
                               {ownerLabel(doc)}
-                            </span>
+                          </span>
                           </Tooltip>
                         </div>
                       </td>
@@ -580,7 +580,7 @@ export default function ESignatureOverviewPage() {
                             <Tooltip content={tpl.documentName} fullWidth>
                               <div className="truncate font-semibold text-slate-900 dark:text-white">
                                 {tpl.documentName}
-                              </div>
+                            </div>
                             </Tooltip>
                             <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded dark:bg-zinc-800 dark:text-zinc-400">
                               {tpl.status}
@@ -608,7 +608,7 @@ export default function ESignatureOverviewPage() {
                           <Tooltip content={tpl.createdBy} fullWidth>
                             <span className="block truncate font-medium text-slate-900 dark:text-white">
                               {tpl.createdBy}
-                            </span>
+                          </span>
                           </Tooltip>
                         </div>
                       </td>
@@ -643,17 +643,17 @@ export default function ESignatureOverviewPage() {
         </div>
 
         <div className="shrink-0">
-          <PaginationBar
+        <PaginationBar
             page={activeTab === "documents" ? activeDocs.page : activeTpls.page}
             pageSize={5}
-            total={totalItems}
+          total={totalItems}
             onPageChange={(p) =>
               activeTab === "documents"
                 ? activeDocs.setPage(p)
                 : activeTpls.setPage(p)
             }
-            entriesLabel={activeTab === "documents" ? "documents" : "templates"}
-          />
+          entriesLabel={activeTab === "documents" ? "documents" : "templates"}
+        />
         </div>
       </div>
     </div>

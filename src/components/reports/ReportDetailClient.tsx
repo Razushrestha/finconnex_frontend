@@ -18,6 +18,7 @@ import {
   Activity,
   LayoutGrid,
   Clock,
+  Plus,
 } from "lucide-react";
 import {
   REPORT_DATE_RANGES,
@@ -90,6 +91,7 @@ import {
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify } from "@/lib/notify/toast";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function ReportDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -502,9 +504,6 @@ export function ReportDetailClient({ id }: { id: string }) {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-              {row.reportId}
-            </h1>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[9px] font-semibold",
@@ -527,6 +526,13 @@ export function ReportDetailClient({ id }: { id: string }) {
               </span>
             ) : null}
           </div>
+          <Link
+            href="/reports/create?layoutid=standard&redirect=false"
+            className={`${FINANCE_PRIMARY_BUTTON_SM} ml-auto shrink-0`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New report
+          </Link>
         </div>
 
         {/* Actions */}

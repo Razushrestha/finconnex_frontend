@@ -152,6 +152,10 @@ function writeStore(list: TimeEntry[]) {
   sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
+export function replaceTimeEntries(rows: TimeEntry[]) {
+  writeStore(rows);
+}
+
 export function listTimeEntries(): TimeEntry[] {
   return (
     readStore() ??

@@ -196,26 +196,7 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
 
   return (
     <div className="p-6">
-      <div className="mb-3 flex min-w-0 items-center gap-2">
-        <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-          Automations
-        </h1>
-        <span
-          aria-label="CRM live"
-          className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500"
-        />
-      </div>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-heading truncate text-2xl font-semibold text-slate-900">
-            {currentFolder?.name ?? "Workflows"}
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {currentFolder
-              ? "Workflows and folders filed in this folder."
-              : "Create and manage workflows to automate business processes, improve efficiency, and increase conversions."}
-          </p>
-        </div>
+      <div className="mb-4 flex flex-wrap items-start justify-end gap-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => router.push("/automations/logs")} className="gap-1.5">
             <ScrollText className="h-4 w-4" />
