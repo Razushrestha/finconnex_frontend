@@ -45,6 +45,7 @@ import {
   selfFromStores,
   type SignatureSelf,
 } from "@/lib/documents/signature/current-user";
+import { DaysToCompleteInput } from "@/components/documents/signature/create/DaysToCompleteInput";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES =
@@ -1270,23 +1271,12 @@ export function ZohoStyleSendForm({
               {moreOpen ? (
                 <div className="mt-4 max-w-[760px] space-y-4">
                   <SettingRow label="Days to complete">
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
+                    <DaysToCompleteInput
                       value={settings.daysToComplete}
-                      onChange={(event) =>
-                        onChangeSettings({
-                          daysToComplete: Math.max(
-                            1,
-                            Number(event.target.value) || 1,
-                          ),
-                        })
+                      onChange={(daysToComplete) =>
+                        onChangeSettings({ daysToComplete })
                       }
-                      className={cn(
-                        fieldClass,
-                        "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-                      )}
+                      className={fieldClass}
                     />
                   </SettingRow>
                   <SettingRow label="Agreement valid until">

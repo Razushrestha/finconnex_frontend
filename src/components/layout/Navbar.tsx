@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { menuEnter } from "@/lib/motion";
 import { logAuth } from "@/lib/rules";
 import { clearCrmTokens } from "@/lib/activity-timeline/auth";
+import { clearAllSignatureCreateDraftsForTenant } from "@/lib/documents/signature/create-draft-storage";
 import { listInboxConversations } from "@/lib/marketing/inbox/types";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -111,6 +112,7 @@ export function Navbar({
       logAuth("logout", user?.name || user?.email || "user");
       await fetch("/api/auth/logout", { method: "POST" });
       clearCrmTokens();
+      clearAllSignatureCreateDraftsForTenant();
       window.location.assign("/login");
     } catch {
       setIsLoggingOut(false);

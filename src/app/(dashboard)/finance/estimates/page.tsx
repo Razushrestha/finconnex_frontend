@@ -27,7 +27,7 @@ import {
   type EstimateStatus,
 } from "@/lib/finance/estimates/types";
 import { useCrmEstimates } from "@/lib/finance/estimates/use-crm-estimates";
-import { formatAUD } from "@/lib/finance/shared";
+import { financeInWindow, financeMatchesQuery, formatAUD } from "@/lib/finance/shared";
 import { onRecordsChange } from "@/lib/records-sync";
 import { cn } from "@/lib/utils";
 import { PaginationBar } from "@/components/ui/pagination-bar";
@@ -114,7 +114,7 @@ export function EstimatesPage() {
   const crm = useCrmEstimates();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [dateFilter, setDateFilter] = useState("30d");
+  const [dateFilter, setDateFilter] = useState("all");
   const [data, setData] = useState<Estimate[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -143,24 +143,25 @@ export function EstimatesPage() {
   }, [crm.source, crm.loading]);
 
   const filteredData = useMemo(() => {
-    const days =
-      dateFilter === "7d" ? 7 : dateFilter === "30d" ? 30 : dateFilter === "90d" ? 90 : null;
-    const cutoff = days ? Date.now() - days * 86_400_000 : null;
-
     return data.filter((item) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        item.estimateId.toLowerCase().includes(q) ||
-        item.clientName.toLowerCase().includes(q) ||
-        item.title.toLowerCase().includes(q);
+      const matchesSearch = financeMatchesQuery(search, [
+        item.estimateId,
+        item.clientName,
+        item.contactName,
+        item.title,
+        item.dealName,
+        item.notes,
+        item.owner,
+        ...item.lineItems.map((line) => line.name),
+      ]);
       const matchesStatus =
         statusFilter === "All" ||
         item.status.toLowerCase() === statusFilter.toLowerCase();
-      if (!matchesSearch || !matchesStatus) return false;
-      if (!cutoff) return true;
-      const created = parseWhen(item.createdAt)?.getTime();
-      return created == null || created >= cutoff;
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        financeInWindow(dateFilter, item.issueDate, item.createdAt)
+      );
     });
   }, [data, search, statusFilter, dateFilter]);
 
@@ -176,21 +177,21 @@ export function EstimatesPage() {
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, safePage, pageSize]);
 
-  const pendingItems = data.filter((e) => e.status === "Sent" || e.status === "Draft");
+  const pendingItems = filteredData.filter((e) => e.status === "Sent" || e.status === "Draft");
   const totalPendingValue = pendingItems.reduce((acc, curr) => acc + curr.total, 0);
-  const acceptedCount = data.filter(
+  const acceptedCount = filteredData.filter(
     (e) => e.status === "Accepted" || e.status === "Converted",
   ).length;
-  const totalCount = data.length;
+  const totalCount = filteredData.length;
   const conversionRate =
     totalCount > 0 ? Math.round((acceptedCount / totalCount) * 100) : 0;
 
-  const acceptedVal = data
+  const acceptedVal = filteredData
     .filter((e) => e.status === "Accepted" || e.status === "Converted")
     .reduce((acc, c) => acc + c.total, 0);
-  const sentVal = data.filter((e) => e.status === "Sent").reduce((acc, c) => acc + c.total, 0);
-  const draftVal = data.filter((e) => e.status === "Draft").reduce((acc, c) => acc + c.total, 0);
-  const rejectedVal = data
+  const sentVal = filteredData.filter((e) => e.status === "Sent").reduce((acc, c) => acc + c.total, 0);
+  const draftVal = filteredData.filter((e) => e.status === "Draft").reduce((acc, c) => acc + c.total, 0);
+  const rejectedVal = filteredData
     .filter((e) => e.status === "Rejected" || e.status === "Expired")
     .reduce((acc, c) => acc + c.total, 0);
   const totalPipelineVal = acceptedVal + sentVal + draftVal + rejectedVal;
@@ -202,8 +203,8 @@ export function EstimatesPage() {
     { label: "Rejected", value: rejectedVal, color: "#EF4444" },
   ];
 
-  const sentCount = data.filter((e) => e.status !== "Draft").length;
-  const draftCount = data.filter((e) => e.status === "Draft").length;
+  const sentCount = filteredData.filter((e) => e.status !== "Draft").length;
+  const draftCount = filteredData.filter((e) => e.status === "Draft").length;
 
   const activity = useMemo(() => {
     const events: {
@@ -425,7 +426,7 @@ export function EstimatesPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4 text-sm whitespace-nowrap text-slate-600">
-                            {item.createdAt || "—"}
+                            {item.issueDate || item.createdAt || "—"}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <span className="block text-sm text-slate-600">{item.validUntil || "—"}</span>

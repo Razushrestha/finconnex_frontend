@@ -27,7 +27,7 @@ import {
 } from "@/lib/finance/invoices/types";
 import { useCrmInvoices } from "@/lib/finance/invoices/use-crm-invoices";
 import { listPayments } from "@/lib/finance/payments/types";
-import { formatAUD } from "@/lib/finance/shared";
+import { financeInWindow, financeMatchesQuery, formatAUD } from "@/lib/finance/shared";
 import { onRecordsChange } from "@/lib/records-sync";
 import { cn } from "@/lib/utils";
 import { PaginationBar } from "@/components/ui/pagination-bar";
@@ -137,7 +137,7 @@ export function InvoicesPage() {
   const crm = useCrmInvoices();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [dateFilter, setDateFilter] = useState("30d");
+  const [dateFilter, setDateFilter] = useState("all");
   const [agingMode, setAgingMode] = useState<"days" | "months">("days");
   const [data, setData] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState(listPayments());
@@ -173,25 +173,26 @@ export function InvoicesPage() {
   }, [crm.source, crm.loading]);
 
   const filteredData = useMemo(() => {
-    const days =
-      dateFilter === "7d" ? 7 : dateFilter === "30d" ? 30 : dateFilter === "90d" ? 90 : null;
-    const cutoff = days ? Date.now() - days * 86_400_000 : null;
-
     return data.filter((item) => {
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        item.invoiceId.toLowerCase().includes(q) ||
-        item.clientName.toLowerCase().includes(q) ||
-        item.title.toLowerCase().includes(q) ||
-        String(item.amountDue).includes(q);
+      const matchesSearch = financeMatchesQuery(search, [
+        item.invoiceId,
+        item.clientName,
+        item.contactName,
+        item.title,
+        item.dealName,
+        item.notes,
+        item.owner,
+        item.amountDue,
+        ...item.lineItems.map((line) => line.name),
+      ]);
       const matchesStatus =
         statusFilter === "All" ||
         item.status.toLowerCase() === statusFilter.toLowerCase();
-      if (!matchesSearch || !matchesStatus) return false;
-      if (!cutoff) return true;
-      const created = parseWhen(item.createdAt)?.getTime();
-      return created == null || created >= cutoff;
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        financeInWindow(dateFilter, item.issueDate, item.createdAt)
+      );
     });
   }, [data, search, statusFilter, dateFilter]);
 
@@ -207,22 +208,22 @@ export function InvoicesPage() {
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, safePage, pageSize]);
 
-  const unpaidItems = data.filter(
+  const unpaidItems = filteredData.filter(
     (e) => e.status !== "Paid" && e.status !== "Void" && e.status !== "Cancelled",
   );
   const totalOutstanding = unpaidItems.reduce((acc, curr) => acc + curr.amountDue, 0);
-  const paidItems = data.filter((e) => e.status === "Paid");
+  const paidItems = filteredData.filter((e) => e.status === "Paid");
   const totalPaid = paidItems.reduce((acc, curr) => acc + curr.amountPaid, 0);
-  const overdueItems = data.filter((e) => e.status === "Overdue");
-  const totalCount = data.length;
+  const overdueItems = filteredData.filter((e) => e.status === "Overdue");
+  const totalCount = filteredData.length;
 
-  const paidVal = data
+  const paidVal = filteredData
     .filter((e) => e.status === "Paid")
     .reduce((acc, c) => acc + c.amountPaid, 0);
-  const partialVal = data
+  const partialVal = filteredData
     .filter((e) => e.status === "Partially Paid")
     .reduce((acc, c) => acc + c.total, 0);
-  const draftVal = data.filter((e) => e.status === "Draft").reduce((acc, c) => acc + c.total, 0);
+  const draftVal = filteredData.filter((e) => e.status === "Draft").reduce((acc, c) => acc + c.total, 0);
   const overdueVal = overdueItems.reduce((acc, c) => acc + c.amountDue, 0);
   const totalVolume = paidVal + partialVal + draftVal + overdueVal;
 
@@ -233,7 +234,7 @@ export function InvoicesPage() {
     { label: "Overdue", value: overdueVal, color: "#EF4444" },
   ];
 
-  const openReceivables = data.filter(
+  const openReceivables = filteredData.filter(
     (e) => e.amountDue > 0 && e.status !== "Paid" && e.status !== "Void" && e.status !== "Cancelled",
   );
   const agingTotals = [0, 0, 0, 0];

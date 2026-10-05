@@ -4,11 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
-  ArrowLeftRight,
-  Trash2,
-  RefreshCw,
-  Tag,
-  ShieldCheck,
   Download,
   ChevronDown,
   Copy,
@@ -129,13 +124,6 @@ export default function DealsPage() {
   const [isImportDealsOpen, setIsImportDealsOpen] = useState(false);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const defaults = defaultDealImportSettings();
-
-  // TODO: wire these up to the actual modals/handlers once they exist.
-  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
-  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
-  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
-  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
-  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
 
   useEffect(() => {
     function refresh() {
@@ -528,36 +516,6 @@ export default function DealsPage() {
   ];
 
   const actionOptions: ActionOption[] = [
-    {
-      id: "mass-transfer",
-      label: "Mass Transfer",
-      icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassTransferOpen(true),
-    },
-    {
-      id: "mass-delete",
-      label: "Mass Delete",
-      icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassDeleteOpen(true),
-    },
-    {
-      id: "mass-update",
-      label: "Mass Update",
-      icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassUpdateOpen(true),
-    },
-    {
-      id: "manage-tags",
-      label: "Manage Tags",
-      icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setManageTagsOpen(true),
-    },
-    {
-      id: "assignment-rules",
-      label: "Assignment Rules",
-      icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setAssignmentRulesOpen(true),
-    },
     {
       id: "clone-deal",
       label: "Clone Deal",

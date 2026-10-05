@@ -29,14 +29,14 @@ export function ESignatureHeader({
     <div className="flex flex-wrap items-center justify-end gap-4">
       <div className="flex items-center gap-2">
         <Link
-          href="/signature/request/new?layoutid=standard&redirect=false&type=send"
+          href="/signature/request/new?layoutid=standard&redirect=false&type=send&new=1"
           className={`${FINANCE_PRIMARY_BUTTON_SM} h-9 gap-2 px-4 text-xs`}
         >
           <Send className="h-3.5 w-3.5" />
           Send for Signature
         </Link>
         <Link
-          href="/signature/request/new?layoutid=standard&redirect=false&type=self"
+          href="/signature/request/new?layoutid=standard&redirect=false&type=self&new=1"
           className="inline-flex h-9 items-center gap-2 rounded-sm border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 transition-colors"
         >
           <PenTool className="h-3.5 w-3.5 text-slate-700" />

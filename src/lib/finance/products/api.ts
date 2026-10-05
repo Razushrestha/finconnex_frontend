@@ -75,12 +75,42 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
+const KIND_RE = /^\[kind:(Product|Service)\]\s*/i;
+
 export function mapProductType(raw: string): ProductType {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("product") || value.includes("item") || value.includes("goods")) {
     return "Product";
   }
   return "Service";
+}
+
+function readProductKind(description: string): {
+  type?: ProductType;
+  description?: string;
+} {
+  const match = description.match(KIND_RE);
+  if (!match) return { description: description.trim() || undefined };
+  const type: ProductType =
+    match[1].toLowerCase() === "product" ? "Product" : "Service";
+  const rest = description.replace(KIND_RE, "").trim();
+  return { type, description: rest || undefined };
+}
+
+/** Strip `[kind:…]` prefix from catalogue descriptions on customer-facing views. */
+export function displayProductDescription(raw: unknown): string | undefined {
+  const text = typeof raw === "string" ? raw.trim() : "";
+  if (!text) return undefined;
+  return readProductKind(text).description;
+}
+
+function withProductKind(
+  type: ProductType | undefined,
+  description?: string,
+): string | undefined {
+  const body = (description ?? "").replace(KIND_RE, "").trim();
+  if (!type) return body || undefined;
+  return body ? `[kind:${type}] ${body}` : `[kind:${type}]`;
 }
 
 export function apiProductType(type: ProductType): string {
@@ -121,9 +151,12 @@ export function normalizeProduct(
   const id = pickStr(raw.id, raw.productId, raw.uuid) || `crm-prod-${index}`;
   const sku = pickStr(raw.sku, raw.code, raw.itemCode, raw.productCode) || `SKU-${index + 100}`;
   const name = pickStr(raw.name, raw.title, raw.label, "Item");
-  const type = mapProductType(pickStr(raw.type, raw.itemType, raw.category, "Service"));
+  const storedDescription = pickStr(raw.description, raw.notes, raw.details);
+  const kind = storedDescription ? readProductKind(storedDescription) : {};
+  const explicitType = pickStr(raw.type, raw.itemType, raw.category);
+  const type = kind.type ?? mapProductType(explicitType || "Service");
   const status = mapProductStatus(pickStr(raw.status, raw.state, "Active"));
-  const description = pickStr(raw.description, raw.notes, raw.details) || undefined;
+  const description = kind.description;
   const unitPrice = toNum(raw.unitPrice ?? raw.price ?? raw.rate ?? raw.cost, 0);
   const taxRate = toNum(raw.taxRate ?? raw.taxPercent ?? raw.tax, 10);
   const unit = pickStr(raw.unit, raw.unitOfMeasure, raw.uom, "unit");
@@ -175,7 +208,8 @@ export function toCreateProductBody(input: {
     isActive: input.status !== "Inactive",
   };
   if (input.sku?.trim()) body.sku = input.sku.trim();
-  if (input.description?.trim()) body.description = input.description.trim();
+  const description = withProductKind(input.type, input.description);
+  if (description) body.description = description;
   if (typeof input.taxRate === "number") {
     body.taxRate = financeDecimal(input.taxRate);
   }
@@ -185,13 +219,20 @@ export function toCreateProductBody(input: {
 
 export function toUpdateProductBody(
   patch: Partial<FinanceProduct>,
+  existing?: Pick<FinanceProduct, "type" | "description">,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (patch.name?.trim()) body.name = patch.name.trim();
   if (patch.sku?.trim()) body.sku = patch.sku.trim();
   if (patch.status) body.isActive = patch.status !== "Inactive";
-  if (patch.description !== undefined) {
-    body.description = patch.description?.trim() || "";
+  const typeTouched = patch.type !== undefined;
+  const descTouched = patch.description !== undefined;
+  if (typeTouched || descTouched) {
+    const mergedType = patch.type ?? existing?.type ?? "Service";
+    const mergedDescription = descTouched
+      ? patch.description
+      : existing?.description;
+    body.description = withProductKind(mergedType, mergedDescription) ?? "";
   }
   if (typeof patch.unitPrice === "number") {
     body.unitPrice = financeDecimal(patch.unitPrice);

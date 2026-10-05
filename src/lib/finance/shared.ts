@@ -1,5 +1,7 @@
 /** Shared finance helpers: §13 / §20 */
 
+import { partyName } from "@/lib/activities/party";
+
 export interface FinanceLineItem {
   id: string;
   productId?: string;
@@ -105,6 +107,132 @@ export function financeNotes(...parts: Array<string | undefined>) {
     .filter((part): part is string => Boolean(part))
     .join("\n\n");
   return text || undefined;
+}
+
+/** The create form stores the title as the first paragraph of `notes`. */
+export function splitFinanceNotes(raw: string): { title: string; notes?: string } {
+  const text = raw.trim();
+  if (!text) return { title: "" };
+  const [head, ...rest] = text.split(/\n\n+/);
+  const title = head.trim();
+  const notes = rest.join("\n\n").trim();
+  return { title, notes: notes || undefined };
+}
+
+function textOf(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+/** Title and notes, including the title the create form folds into `notes`. */
+export function financeDocumentCopy(
+  raw: Record<string, unknown>,
+  fallback: string,
+): { title: string; notes?: string } {
+  const explicit = textOf(raw.title) || textOf(raw.subject) || textOf(raw.reason);
+  const stored = textOf(raw.notes) || textOf(raw.description);
+  const split = splitFinanceNotes(stored);
+  if (explicit) return { title: explicit, notes: stored || undefined };
+  return { title: split.title || fallback, notes: split.notes };
+}
+
+export function financeClientName(raw: Record<string, unknown>): string {
+  return (
+    partyName(raw.company) ||
+    partyName(raw.contact) ||
+    partyName(raw.client) ||
+    textOf(raw.clientName) ||
+    textOf(raw.customerName)
+  );
+}
+
+export function financeContactName(raw: Record<string, unknown>): string {
+  return partyName(raw.contact) || partyName(raw.client) || textOf(raw.contactName);
+}
+
+export function financeDealName(raw: Record<string, unknown>): string {
+  return partyName(raw.deal) || textOf(raw.dealName) || textOf(raw.relatedTo);
+}
+
+export function financeOwnerName(raw: Record<string, unknown>): string {
+  return (
+    textOf(raw.ownerName) ||
+    textOf(raw.createdByName) ||
+    (typeof raw.createdBy === "string" ? textOf(raw.createdBy) : partyName(raw.createdBy)) ||
+    (typeof raw.owner === "string" ? textOf(raw.owner) : partyName(raw.owner))
+  );
+}
+
+export function parseFinanceWhen(value?: string | null): Date | null {
+  if (!value) return null;
+  const iso = new Date(value);
+  if (!Number.isNaN(iso.getTime()) && /[a-z]/i.test(value) === false && value.includes("-")) {
+    return iso;
+  }
+  const au = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (au) return new Date(Number(au[3]), Number(au[2]) - 1, Number(au[1]));
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** True when any of the document dates falls in the list window. `all` keeps every row. */
+export function financeInWindow(
+  filter: string,
+  ...values: Array<string | undefined>
+): boolean {
+  const days =
+    filter === "7d" ? 7 : filter === "30d" ? 30 : filter === "90d" ? 90 : null;
+  if (!days) return true;
+  const cutoff = Date.now() - days * 86_400_000;
+  const stamps = values
+    .map((value) => parseFinanceWhen(value))
+    .filter((date): date is Date => date != null);
+  if (!stamps.length) return true;
+  return stamps.some((date) => date.getTime() >= cutoff);
+}
+
+export function financeMatchesQuery(
+  query: string,
+  parts: Array<string | number | undefined | null>,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return parts.some((part) => String(part ?? "").toLowerCase().includes(q));
+}
+
+export function mapFinanceLine(
+  row: Record<string, unknown>,
+  index: number,
+  idPrefix: string,
+): FinanceLineItem {
+  const product =
+    row.product && typeof row.product === "object"
+      ? (row.product as Record<string, unknown>)
+      : null;
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : "";
+  const num = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const n = Number(value);
+      if (Number.isFinite(n)) return n;
+    }
+    return 0;
+  };
+  const name =
+    text(row.name) ||
+    text(product?.name) ||
+    text(row.description) ||
+    text(row.title) ||
+    "Line";
+  return {
+    id: text(row.id) || `${idPrefix}-${index}`,
+    productId: text(row.productId) || text(product?.id) || undefined,
+    name,
+    description: text(row.description) || undefined,
+    quantity: num(row.quantity) || 1,
+    unitPrice: num(row.unitPrice ?? row.amount ?? row.price),
+    taxRate: num(row.taxRate ?? row.tax),
+  };
 }
 
 /** Line items in the shape `Create*Dto` accepts (decimal strings, no extras). */

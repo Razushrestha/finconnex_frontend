@@ -14,7 +14,7 @@ import {
   type CreditNoteStatus,
 } from "@/lib/finance/credit-notes/types";
 import { useCrmCreditNotes } from "@/lib/finance/credit-notes/use-crm-credit-notes";
-import { formatAUD } from "@/lib/finance/shared";
+import { financeInWindow, financeMatchesQuery, formatAUD } from "@/lib/finance/shared";
 import { CREDIT_NOTE_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { onRecordsChange } from "@/lib/records-sync";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,7 @@ export default function CreditNotesPage() {
   const crm = useCrmCreditNotes();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [dateFilter, setDateFilter] = useState("30d");
+  const [dateFilter, setDateFilter] = useState("all");
   const [data, setData] = useState<CreditNote[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -54,16 +54,25 @@ export default function CreditNotesPage() {
   }, [crm.source, crm.loading]);
 
   const filteredData = data.filter((item) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      item.creditNoteId.toLowerCase().includes(q) ||
-      item.clientName.toLowerCase().includes(q) ||
-      item.title.toLowerCase().includes(q) ||
-      item.owner.toLowerCase().includes(q);
+    const matchesSearch = financeMatchesQuery(search, [
+      item.creditNoteId,
+      item.clientName,
+      item.title,
+      item.owner,
+      item.notes,
+      item.reason,
+      item.invoiceRef,
+      item.total,
+      ...item.lineItems.map((line) => line.name),
+    ]);
     const matchesStatus =
       statusFilter === "All" ||
       item.status.toLowerCase() === statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      financeInWindow(dateFilter, item.issueDate, item.createdAt)
+    );
   });
 
   const headerProps = {
@@ -79,10 +88,10 @@ export default function CreditNotesPage() {
       ),
   };
 
-  const openTotal = data
+  const openTotal = filteredData
     .filter((n) => n.status === "Draft" || n.status === "Sent")
     .reduce((acc, curr) => acc + curr.total, 0);
-  const appliedCount = data.filter((n) => n.status === "Applied").length;
+  const appliedCount = filteredData.filter((n) => n.status === "Applied").length;
 
   const cardsData: MetricCardConfig[] = [
     {
@@ -99,7 +108,7 @@ export default function CreditNotesPage() {
     },
     {
       title: "TOTAL CREDIT NOTES",
-      value: data.length,
+      value: filteredData.length,
       subtext: crm.source === "api" ? "Live CRM" : "Tracked in system",
       subtextVariant: "default",
     },
@@ -172,6 +181,12 @@ export default function CreditNotesPage() {
         onStatusChange={setStatusFilter}
         dateValue={dateFilter}
         onDateChange={setDateFilter}
+        dateOptions={[
+          { label: "All time", value: "all" },
+          { label: "Last 7 Days", value: "7d" },
+          { label: "Last 30 Days", value: "30d" },
+          { label: "Last 90 Days", value: "90d" },
+        ]}
         statusOptions={[
           { label: "All", value: "All" },
           ...CREDIT_NOTE_STATUSES.map((status) => ({
@@ -183,7 +198,12 @@ export default function CreditNotesPage() {
       <EntityTable
         columns={columns}
         data={tableData}
-        paginationText={`Showing 1 to ${tableData.length} of ${data.length} entries`}
+        paginationText={
+          tableData.length === 0
+            ? "Showing 0 of 0 entries"
+            : `Showing 1 to ${tableData.length} of ${tableData.length} entries`
+        }
+        totalPages={1}
         onRowClick={(row) => router.push(`/finance/credit-notes/${row.id}`)}
       />
       <CreateCreditNoteForm

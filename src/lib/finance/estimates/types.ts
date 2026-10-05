@@ -48,6 +48,7 @@ export interface Estimate {
   dealName?: string;
   relatedTo?: string;
   owner: string;
+  issueDate?: string;
   validUntil: string;
   notes?: string;
   lineItems: FinanceLineItem[];

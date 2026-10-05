@@ -7,9 +7,15 @@ import {
   crmWorkspaceFetch,
 } from "@/lib/crm/request";
 import {
+  financeClientName,
+  financeContactName,
+  financeDealName,
+  financeDocumentCopy,
   financeLineItems,
   financeNotes,
+  financeOwnerName,
   financeUuid,
+  mapFinanceLine,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
@@ -129,19 +135,13 @@ function formatDate(raw: unknown): string {
 
 function mapLines(raw: unknown): FinanceLineItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((entry, index) => {
-    const row =
-      entry && typeof entry === "object"
-        ? (entry as Record<string, unknown>)
-        : {};
-    return {
-      id: pickStr(row.id) || `ili-${index}`,
-      name: pickStr(row.name, row.description, row.title, "Line"),
-      quantity: toNum(row.quantity) || 1,
-      unitPrice: toNum(row.unitPrice ?? row.amount ?? row.price),
-      taxRate: toNum(row.taxRate ?? row.tax),
-    };
-  });
+  return raw.map((entry, index) =>
+    mapFinanceLine(
+      entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {},
+      index,
+      "ili",
+    ),
+  );
 }
 
 export function normalizeInvoiceAttachment(
@@ -169,6 +169,7 @@ export function normalizeInvoice(
       ? (raw.contact as Record<string, unknown>)
       : null;
   const id = pickStr(raw.id, raw.uuid, raw.invoiceId) || `crm-inv-${index}`;
+  const copy = financeDocumentCopy(raw, "Invoice");
   const lineItems = mapLines(raw.lineItems ?? raw.lines ?? raw.items);
   const totalsHint = toNum(raw.total ?? raw.amount ?? raw.grandTotal);
   const amountPaid = toNum(raw.amountPaid ?? raw.paid ?? raw.paidAmount);
@@ -185,31 +186,22 @@ export function normalizeInvoice(
   return {
     id,
     invoiceId: pickStr(raw.number, raw.invoiceNumber, raw.reference, `INV-${index + 1}`),
-    title: pickStr(raw.title, raw.subject, raw.name, "Invoice"),
+    title: copy.title,
     status: mapInvoiceStatus(pickStr(raw.status, raw.state, "DRAFT")),
-    clientId: pickStr(client && client.id, raw.clientId, raw.customerId),
-    clientName: pickStr(
-      client && pickStr(client.name, client.title),
-      raw.clientName,
-      raw.customerName,
-      "—",
-    ),
-    contactName: pickStr(
-      contact && pickStr(contact.name, contact.fullName),
-      raw.contactName,
-      "—",
-    ),
+    clientId: pickStr(client && client.id, raw.clientId, raw.contactId, raw.customerId),
+    clientName: financeClientName(raw) || "—",
+    contactName: financeContactName(raw) || "—",
     contactEmail: pickStr(
       contact && contact.email,
       raw.contactEmail,
       raw.email,
       "",
     ),
-    dealName: pickStr(raw.dealName, raw.relatedTo) || undefined,
-    owner: pickStr(raw.ownerName, raw.createdBy, raw.owner, "—"),
+    dealName: financeDealName(raw) || undefined,
+    owner: financeOwnerName(raw) || "—",
     issueDate: formatDate(raw.issueDate ?? raw.issuedAt ?? raw.createdAt),
     dueDate: formatDate(raw.dueDate ?? raw.dueAt),
-    notes: pickStr(raw.notes, raw.description) || undefined,
+    notes: copy.notes,
     lineItems,
     subtotal:
       toNum(raw.subtotal) ||
@@ -222,7 +214,7 @@ export function normalizeInvoice(
     quotationRef: pickStr(raw.quotationRef, raw.quoteNumber) || undefined,
     publicLink: pickStr(raw.publicLink, raw.publicUrl) || undefined,
     attachments,
-    createdBy: pickStr(raw.createdBy, raw.ownerName, "—"),
+    createdBy: financeOwnerName(raw) || "—",
     createdAt: formatDate(raw.createdAt),
     sentAt: pickStr(raw.sentAt) || undefined,
     audit: [],

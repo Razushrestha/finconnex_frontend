@@ -5,6 +5,7 @@ import { Calendar, ChevronDown, FileText, Plus } from "lucide-react";
 import {
   type ZohoSendFormSettings,
 } from "@/components/documents/signature/create/ZohoStyleSendForm";
+import { DaysToCompleteInput } from "@/components/documents/signature/create/DaysToCompleteInput";
 import { cn } from "@/lib/utils";
 
 const DOCUMENT_TYPES = [
@@ -77,15 +78,10 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
           <div className="space-y-3">
             <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
               <FormLabel>Days to complete</FormLabel>
-              <input
-                type="number"
-                min={1}
-                max={365}
+              <DaysToCompleteInput
                 value={settings.daysToComplete}
-                onChange={(e) =>
-                  onChangeSettings({
-                    daysToComplete: Math.max(1, Number(e.target.value) || 1),
-                  })
+                onChange={(daysToComplete) =>
+                  onChangeSettings({ daysToComplete })
                 }
                 className={cn(fieldClass, "w-[88px]")}
               />

@@ -1,18 +1,13 @@
 import React, { useRef, useState } from "react";
 import { FileStack } from "lucide-react";
-import { CloudImportMenu } from "./CloudImportMenu";
 
 interface DocumentUploadCardProps {
   onFiles: (files: File[]) => void;
-  onImportFromGoogleDrive: () => void;
-  onImportFromOneDrive: () => void;
   accept: string;
 }
 
 export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   onFiles,
-  onImportFromGoogleDrive,
-  onImportFromOneDrive,
   accept,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,10 +68,6 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           <br />
           from computer
         </button>
-        <CloudImportMenu
-          onImportFromGoogleDrive={onImportFromGoogleDrive}
-          onImportFromOneDrive={onImportFromOneDrive}
-        />
       </div>
     </div>
   );

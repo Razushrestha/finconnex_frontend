@@ -63,14 +63,9 @@ import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import {
-  ArrowLeftRight,
   Download,
   GitMerge,
-  RefreshCw,
-  ShieldCheck,
   Sparkles,
-  Tag,
-  Trash2,
 } from "lucide-react";
 import { SORT_OPTIONS } from "../leads/page";
 import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
@@ -114,11 +109,6 @@ export default function CompaniesPage() {
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const defaults = defaultCompanyImportSettings();
 
-  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
-  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
-  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
-  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
-  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
   const crm = useCrmCompanies();
 
   useEffect(() => {
@@ -355,36 +345,6 @@ export default function CompaniesPage() {
 
   const actionOptions: ActionOption[] = [
     {
-      id: "mass-transfer",
-      label: "Mass Transfer",
-      icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassTransferOpen(true),
-    },
-    {
-      id: "mass-delete",
-      label: "Mass Delete",
-      icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassDeleteOpen(true),
-    },
-    {
-      id: "mass-update",
-      label: "Mass Update",
-      icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassUpdateOpen(true),
-    },
-    {
-      id: "manage-tags",
-      label: "Manage Tags",
-      icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setManageTagsOpen(true),
-    },
-    {
-      id: "assignment-rules",
-      label: "Assignment Rules",
-      icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setAssignmentRulesOpen(true),
-    },
-    {
       id: "merge-companies",
       label: "Merge Companies",
       icon: <GitMerge className="h-3.5 w-3.5 text-slate-400" />,
@@ -406,12 +366,6 @@ export default function CompaniesPage() {
       onClick: () => openPrintView(),
     },
   ];
-
-  void isMassTransferOpen;
-  void isMassDeleteOpen;
-  void isMassUpdateOpen;
-  void isManageTagsOpen;
-  void isAssignmentRulesOpen;
 
   return (
     <div className={BOARD_PAGE}>

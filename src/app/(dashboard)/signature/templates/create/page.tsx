@@ -189,7 +189,7 @@ function CreateTemplateForm() {
 
   function expiryFromDays(days: number) {
     const d = new Date();
-    d.setDate(d.getDate() + Math.max(1, days));
+    d.setDate(d.getDate() + Math.max(0, days));
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yyyy = d.getFullYear();

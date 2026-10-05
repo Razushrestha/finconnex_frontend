@@ -164,18 +164,6 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
     );
   };
 
-  const handleImportFromGoogleDrive = () => {
-    // TODO: open Google Picker, download selected file(s), then:
-    // handleIncomingFiles(downloadedFiles);
-    console.warn("Google Drive import not yet wired up.");
-  };
-
-  const handleImportFromOneDrive = () => {
-    // TODO: open OneDrive picker, download selected file(s), then:
-    // handleIncomingFiles(downloadedFiles);
-    console.warn("OneDrive import not yet wired up.");
-  };
-
   return (
     <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-5">
       <div className="flex items-center gap-2 text-slate-800 font-semibold">
@@ -215,8 +203,6 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
           <DocumentUploadCard
             accept={ACCEPTED_TYPES}
             onFiles={handleIncomingFiles}
-            onImportFromGoogleDrive={handleImportFromGoogleDrive}
-            onImportFromOneDrive={handleImportFromOneDrive}
           />
         </div>
 

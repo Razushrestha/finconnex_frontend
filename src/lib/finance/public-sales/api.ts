@@ -5,6 +5,7 @@ import {
   totalsFromLines,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
+import { displayProductDescription } from "@/lib/finance/products/api";
 
 export type PublicSalesKind = "quotes" | "estimates" | "invoices";
 
@@ -127,7 +128,10 @@ function mapLines(raw: unknown): FinanceLineItem[] {
       id: pickStr(row.id) || `line-${index}`,
       productId: pickStr(row.productId, row.itemId) || undefined,
       name: pickStr(row.name, row.title, row.description, "Item"),
-      description: pickStr(row.description, row.notes) || undefined,
+      description:
+        displayProductDescription(row.description) ||
+        displayProductDescription(row.notes) ||
+        undefined,
       quantity: toNum(row.quantity ?? row.qty) || 1,
       unitPrice: toNum(row.unitPrice ?? row.price ?? row.rate),
       taxRate: toNum(row.taxRate ?? row.taxPercent ?? row.tax),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, User, Hash, FileText } from "lucide-react";
 import {
@@ -28,6 +28,7 @@ import {
 } from "@/lib/finance/invoices/types";
 import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { formatAUD, formatFinanceDate } from "@/lib/finance/shared";
+import { onRecordsChange } from "@/lib/records-sync";
 import {
   financeOwnerOptions,
   useFinanceDirectory,
@@ -79,14 +80,34 @@ export function CreatePaymentForm({
   const [busy, setBusy] = useState(false);
   const [gatewayMsg, setGatewayMsg] = useState<string | null>(null);
 
+  function openInvoices() {
+    return listInvoices().filter(
+      (i) =>
+        i.amountDue > 0 &&
+        !["Void", "Cancelled", "Paid", "Draft"].includes(i.status),
+    );
+  }
+
+  const didPrefillRef = useRef(false);
+
   useEffect(() => {
     if (!directory.ready) return;
-    const list = listInvoices().filter(
-      (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
-    );
-    setInvoices(list);
-    const preferred =
-      initialInvoiceId && list.find((i) => i.id === initialInvoiceId);
+    const refreshList = () => {
+      const list = openInvoices();
+      setInvoices(list);
+      setInvoiceId((current) => {
+        if (current && list.some((row) => row.id === current)) return current;
+        return list[0]?.id ?? "";
+      });
+    };
+    refreshList();
+    return onRecordsChange(refreshList);
+  }, [directory.ready]);
+
+  useEffect(() => {
+    if (!directory.ready || didPrefillRef.current || !initialInvoiceId) return;
+    didPrefillRef.current = true;
+    const preferred = openInvoices().find((i) => i.id === initialInvoiceId);
     if (preferred) {
       setInvoiceId(preferred.id);
       setAmount(String(preferred.amountDue));
@@ -117,9 +138,7 @@ export function CreatePaymentForm({
       setReference("");
       setNotes("");
       setErrors({});
-      const list = listInvoices().filter(
-        (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
-      );
+      const list = openInvoices();
       setInvoices(list);
       if (list[0]) {
         setInvoiceId(list[0].id);

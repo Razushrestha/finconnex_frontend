@@ -7,10 +7,16 @@ import {
   crmWorkspaceFetch,
 } from "@/lib/crm/request";
 import {
+  financeClientName,
+  financeContactName,
+  financeDealName,
+  financeDocumentCopy,
   financeLineItems,
   financeNotes,
+  financeOwnerName,
   financeUuid,
   isoFinanceDate,
+  mapFinanceLine,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
@@ -122,19 +128,13 @@ function formatDate(raw: unknown): string {
 
 function mapLines(raw: unknown): FinanceLineItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((entry, index) => {
-    const row =
-      entry && typeof entry === "object"
-        ? (entry as Record<string, unknown>)
-        : {};
-    return {
-      id: pickStr(row.id) || `eli-${index}`,
-      name: pickStr(row.name, row.description, row.title, "Line"),
-      quantity: toNum(row.quantity) || 1,
-      unitPrice: toNum(row.unitPrice ?? row.amount ?? row.price),
-      taxRate: toNum(row.taxRate ?? row.tax),
-    };
-  });
+  return raw.map((entry, index) =>
+    mapFinanceLine(
+      entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {},
+      index,
+      "eli",
+    ),
+  );
 }
 
 export function normalizeEstimateAttachment(
@@ -162,6 +162,7 @@ export function normalizeEstimate(
       ? (raw.contact as Record<string, unknown>)
       : null;
   const id = pickStr(raw.id, raw.uuid, raw.estimateId) || `crm-est-${index}`;
+  const copy = financeDocumentCopy(raw, "Estimate");
   const lineItems = mapLines(raw.lineItems ?? raw.lines ?? raw.items);
   const totalsHint = toNum(raw.total ?? raw.amount ?? raw.grandTotal);
   const attachments = extractRecords(raw.attachments ?? raw.files).map(
@@ -170,30 +171,22 @@ export function normalizeEstimate(
   return {
     id,
     estimateId: pickStr(raw.number, raw.estimateNumber, raw.reference, `EST-${index + 1}`),
-    title: pickStr(raw.title, raw.subject, raw.name, "Estimate"),
+    title: copy.title,
     status: mapEstimateStatus(pickStr(raw.status, raw.state, "DRAFT")),
-    clientId: pickStr(client && client.id, raw.clientId, raw.customerId),
-    clientName: pickStr(
-      client && pickStr(client.name, client.title),
-      raw.clientName,
-      raw.customerName,
-      "—",
-    ),
-    contactName: pickStr(
-      contact && pickStr(contact.name, contact.fullName),
-      raw.contactName,
-      "—",
-    ),
+    clientId: pickStr(client && client.id, raw.clientId, raw.contactId, raw.customerId),
+    clientName: financeClientName(raw) || "—",
+    contactName: financeContactName(raw) || "—",
     contactEmail: pickStr(
       contact && contact.email,
       raw.contactEmail,
       raw.email,
       "",
     ),
-    dealName: pickStr(raw.dealName, raw.relatedTo) || undefined,
-    owner: pickStr(raw.ownerName, raw.createdBy, raw.owner, "—"),
+    dealName: financeDealName(raw) || undefined,
+    owner: financeOwnerName(raw) || "—",
+    issueDate: formatDate(raw.issueDate) || undefined,
     validUntil: formatDate(raw.validUntil ?? raw.expiryDate ?? raw.dueDate),
-    notes: pickStr(raw.notes, raw.description) || undefined,
+    notes: copy.notes,
     lineItems,
     subtotal:
       toNum(raw.subtotal) ||
@@ -207,7 +200,7 @@ export function normalizeEstimate(
       ),
     publicLink: pickStr(raw.publicLink, raw.publicUrl) || undefined,
     attachments,
-    createdBy: pickStr(raw.createdBy, raw.ownerName, "—"),
+    createdBy: financeOwnerName(raw) || "—",
     createdAt: formatDate(raw.createdAt),
     sentAt: pickStr(raw.sentAt) || undefined,
     audit: [],

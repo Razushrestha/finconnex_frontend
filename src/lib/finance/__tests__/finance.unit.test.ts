@@ -40,6 +40,13 @@ import {
   rewritePublicSalesUrl,
 } from "@/lib/finance/public-sales/api";
 import { financeLiveNote, isFinanceLiveOk } from "@/lib/finance/smoke-live";
+import {
+  financeInWindow,
+  financeMatchesQuery,
+  financeOwnerName,
+  splitFinanceNotes,
+} from "@/lib/finance/shared";
+import { toCreateProductBody, toUpdateProductBody } from "@/lib/finance/products/api";
 
 describe("finance unit: paths", () => {
   it("builds CRM finance paths", () => {
@@ -87,6 +94,72 @@ describe("finance unit: normalize", () => {
     expect(row.status).toBe("Sent");
     expect(row.clientName).toBe("Greystone");
     expect(row.lineItems).toHaveLength(1);
+  });
+
+  it("reads the title, client, and catalogue line the API stores on the document", () => {
+    const row = normalizeEstimate(
+      {
+        id: "e2",
+        status: "DRAFT",
+        notes: "Kitchen reno\n\nCall before the site visit",
+        company: { id: "c1", name: "Greystone" },
+        contact: { id: "p1", firstName: "Ada", lastName: "Lovelace" },
+        lineItems: [
+          {
+            description: "Labour",
+            quantity: "1.00",
+            unitPrice: "2200.00",
+            product: { id: "prod-1", name: "Install" },
+          },
+        ],
+        total: "2200.00",
+      },
+      0,
+    );
+    expect(row.title).toBe("Kitchen reno");
+    expect(row.notes).toBe("Call before the site visit");
+    expect(row.clientName).toBe("Greystone");
+    expect(row.contactName).toBe("Ada Lovelace");
+    expect(row.lineItems[0]?.name).toBe("Install");
+    expect(row.lineItems[0]?.productId).toBe("prod-1");
+  });
+
+  it("keeps product kind in the description the catalogue API stores", () => {
+    const body = toCreateProductBody({
+      name: "Install",
+      type: "Product",
+      description: "On-site",
+      unitPrice: 100,
+    });
+    expect(body.description).toBe("[kind:Product] On-site");
+    expect(
+      normalizeProduct(
+        { id: "pr2", name: "Install", description: body.description, unitPrice: 100 },
+        0,
+      ).type,
+    ).toBe("Product");
+  });
+
+  it("merges partial product patches without losing type or description", () => {
+    expect(
+      toUpdateProductBody(
+        { type: "Product" },
+        { type: "Service", description: "On-site" },
+      ).description,
+    ).toBe("[kind:Product] On-site");
+    expect(
+      toUpdateProductBody(
+        { description: "Updated copy" },
+        { type: "Product", description: "On-site" },
+      ).description,
+    ).toBe("[kind:Product] Updated copy");
+  });
+
+  it("reads plain-string owner fields from CRM payloads", () => {
+    expect(financeOwnerName({ createdBy: "Ada" })).toBe("Ada");
+    expect(
+      normalizeEstimate({ id: "e3", status: "DRAFT", createdBy: "Ada" }, 0).owner,
+    ).toBe("Ada");
   });
 
   it("normalizes quote / invoice / credit note / payment / product", () => {
@@ -173,6 +246,29 @@ describe("finance unit: public sales", () => {
     });
     expect(doc.total).toBe(110);
     expect(doc.title).toBe("Refinance");
+  });
+});
+
+describe("finance unit: shared filters", () => {
+  it("splits folded notes and matches the same window as the table", () => {
+    expect(splitFinanceNotes("Title\n\nBody text").title).toBe("Title");
+    expect(splitFinanceNotes("Title\n\nBody text").notes).toBe("Body text");
+    expect(financeInWindow("all", "01/01/2020")).toBe(true);
+    expect(financeInWindow("30d", "01/01/2020")).toBe(false);
+    expect(financeInWindow("30d")).toBe(true);
+    expect(
+      financeMatchesQuery("volupta", ["Credit note", "Ut quis esse volupta"]),
+    ).toBe(true);
+  });
+
+  it("filters short windows by document issue dates, not future due dates", () => {
+    expect(financeInWindow("7d", "01/01/2020")).toBe(false);
+    const future = new Date(Date.now() + 10 * 86_400_000);
+    const dd = String(future.getDate()).padStart(2, "0");
+    const mm = String(future.getMonth() + 1).padStart(2, "0");
+    const yyyy = future.getFullYear();
+    const issue = `${dd}/${mm}/${yyyy}`;
+    expect(financeInWindow("7d", issue)).toBe(true);
   });
 });
 

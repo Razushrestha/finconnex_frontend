@@ -17,11 +17,7 @@ import {
 } from "@/lib/kanban/column-prefs";
 import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 import {
-  ArrowLeftRight,
   Trash2,
-  RefreshCw,
-  Tag,
-  ShieldCheck,
   Download,
   Sparkles,
   GitMerge,
@@ -122,12 +118,6 @@ export default function ContactsPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // TODO: wire these up to the actual modals/handlers once they exist.
-  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
-  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
-  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
-  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
-  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
   const [isMergeOpen, setMergeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -303,37 +293,10 @@ export default function ContactsPage() {
 
   const actionOptions: ActionOption[] = [
     {
-      id: "mass-transfer",
-      label: "Mass Transfer",
-      icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassTransferOpen(true),
-    },
-    {
       id: "mass-delete",
       label: "Mass Delete",
       icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => {
-        setMassDeleteOpen(true);
-        runBulkDelete();
-      },
-    },
-    {
-      id: "mass-update",
-      label: "Mass Update",
-      icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassUpdateOpen(true),
-    },
-    {
-      id: "manage-tags",
-      label: "Manage Tags",
-      icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setManageTagsOpen(true),
-    },
-    {
-      id: "assignment-rules",
-      label: "Assignment Rules",
-      icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setAssignmentRulesOpen(true),
+      onClick: () => runBulkDelete(),
     },
     {
       id: "merge-contacts",

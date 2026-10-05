@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TableColumn } from "./types";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 
@@ -17,18 +17,42 @@ interface EntityTableProps<T> {
   columnResizeKey?: string;
 }
 
+function paginationItems(currentPage: number, totalPages: number): number[] {
+  if (totalPages <= 1) return [1];
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+  const pages = new Set<number>([1, totalPages, currentPage]);
+  if (currentPage > 1) pages.add(currentPage - 1);
+  if (currentPage < totalPages) pages.add(currentPage + 1);
+  if (currentPage <= 3) {
+    pages.add(2);
+    pages.add(3);
+  }
+  if (currentPage >= totalPages - 2) {
+    pages.add(totalPages - 1);
+    pages.add(totalPages - 2);
+  }
+  return Array.from(pages).sort((a, b) => a - b);
+}
+
 export function EntityTable<T>({
   columns,
   data,
   paginationText = "Showing entries",
   currentPage = 1,
-  totalPages = 50,
+  totalPages = 1,
   onPageChange,
   onPrevPage,
   onNextPage,
   onRowClick,
   columnResizeKey,
 }: EntityTableProps<T>) {
+  const pageButtons = useMemo(
+    () => paginationItems(currentPage, totalPages),
+    [currentPage, totalPages],
+  );
+
   return (
     <div className="bg-background text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden">
       <ResizableColumns
@@ -99,51 +123,27 @@ export function EntityTable<T>({
             &lt;
           </button>
 
-          <button
-            onClick={() => onPageChange?.(1)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg font-semibold transition-colors ${
-              currentPage === 1
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-background hover:bg-muted text-foreground"
-            }`}
-          >
-            1
-          </button>
-
-          <button
-            onClick={() => onPageChange?.(2)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg font-semibold transition-colors ${
-              currentPage === 2
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-background hover:bg-muted text-foreground"
-            }`}
-          >
-            2
-          </button>
-
-          <button
-            onClick={() => onPageChange?.(3)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg font-semibold transition-colors ${
-              currentPage === 3
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-background hover:bg-muted text-foreground"
-            }`}
-          >
-            3
-          </button>
-
-          <span className="px-1 text-muted-foreground">...</span>
-
-          <button
-            onClick={() => onPageChange?.(totalPages)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg font-semibold transition-colors ${
-              currentPage === totalPages
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-background hover:bg-muted text-foreground"
-            }`}
-          >
-            {totalPages}
-          </button>
+          {pageButtons.map((pageNumber, index) => {
+            const prev = pageButtons[index - 1];
+            const gap = prev != null && pageNumber - prev > 1;
+            return (
+              <span key={pageNumber} className="flex items-center gap-1.5">
+                {gap ? (
+                  <span className="px-1 text-muted-foreground">...</span>
+                ) : null}
+                <button
+                  onClick={() => onPageChange?.(pageNumber)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg font-semibold transition-colors ${
+                    currentPage === pageNumber
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "border border-border bg-background hover:bg-muted text-foreground"
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              </span>
+            );
+          })}
 
           <button
             onClick={onNextPage}

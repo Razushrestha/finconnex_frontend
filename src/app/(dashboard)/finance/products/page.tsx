@@ -108,9 +108,9 @@ export default function ProductsPage() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safePage, pageSize]);
 
-  const activeCount = rows.filter((r) => r.status === "Active").length;
-  const inactiveCount = rows.filter((r) => r.status === "Inactive").length;
-  const categoryCount = new Set(rows.map((r) => r.type)).size;
+  const activeCount = filtered.filter((r) => r.status === "Active").length;
+  const inactiveCount = filtered.filter((r) => r.status === "Inactive").length;
+  const categoryCount = new Set(filtered.map((r) => r.type)).size;
 
   const allVisibleSelected =
     paginated.length > 0 && paginated.every((r) => selected.includes(r.id));
@@ -122,7 +122,13 @@ export default function ProductsPage() {
     refresh();
     if (isCrmProductId(p.id)) {
       const remote = await tryCrmProduct(() =>
-        updateCrmProduct(p.id, toUpdateProductBody({ status: nextStatus })),
+        updateCrmProduct(
+          p.id,
+          toUpdateProductBody({ status: nextStatus }, {
+            type: p.type,
+            description: p.description,
+          }),
+        ),
       );
       if (remote) {
         persistRemoteProduct(remote);
@@ -206,7 +212,7 @@ export default function ProductsPage() {
           <KpiChip
             icon={Package}
             label="Total Items"
-            value={rows.length}
+            value={filtered.length}
             tone="violet"
           />
           <KpiChip icon={CheckCircle2} label="Active" value={activeCount} tone="emerald" />
@@ -292,18 +298,32 @@ export default function ProductsPage() {
                     <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-500">
                       <Package className="h-7 w-7" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-700">No catalogue items found</p>
-                    <p className="mt-1 text-[12px] text-slate-400">
-                      Start by adding your first item or service to your catalogue.
+                    <p className="text-sm font-semibold text-slate-700">
+                      {rows.length > 0 ? "No items match this view" : "No catalogue items found"}
                     </p>
-                    <button
-                      type="button"
-                      onClick={goCreate}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#6D5AE6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5B4BD4]"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Item
-                    </button>
+                    <p className="mt-1 text-[12px] text-slate-400">
+                      {rows.length > 0
+                        ? "This filter is hiding catalogue items. Choose All Items to see every product and service."
+                        : "Start by adding your first item or service to your catalogue."}
+                    </p>
+                    {rows.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={goCreate}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#6D5AE6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5B4BD4]"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Item
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setListFilter("all")}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#6D5AE6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5B4BD4]"
+                      >
+                        Show all items
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
