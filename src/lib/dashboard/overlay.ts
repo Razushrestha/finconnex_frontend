@@ -297,6 +297,8 @@ export function overlayExecutiveOverview(
   if (typeof summary === "string" && summary.trim()) {
     next.summary = summary.trim();
   }
+  const alerts = asAlerts(rec.alerts);
+  if (alerts?.length) next.alerts = alerts;
 
   return next;
 }
@@ -346,6 +348,137 @@ export function analyticsWidgetValue(raw: unknown): unknown {
   return rec.data ?? raw;
 }
 
+function asNamedValues(
+  value: unknown,
+): Array<{ name: string; value: number; count?: number }> | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: Array<{ name: string; value: number; count?: number }> = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const name = String(rec.name ?? rec.label ?? "").trim();
+    if (!name) continue;
+    const count = num(rec, ["count", "leads", "deals"]);
+    rows.push({
+      name,
+      value: num(rec, ["value", "pipeline", "leads", "count"]) ?? 0,
+      ...(count != null ? { count } : {}),
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function asSalesRanks(value: unknown): SalesDashboard["topSources"] | undefined {
+  const rows = asRankings(value);
+  return rows?.map((row) => ({
+    name: row.name,
+    leads: row.leads,
+    deals: row.deals,
+    conversion: row.conversion,
+    pipeline: row.pipeline,
+  }));
+}
+
+function asStageValues(
+  value: unknown,
+): Array<{ label: string; value: number }> | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: Array<{ label: string; value: number }> = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const label = String(rec.label ?? rec.stage ?? rec.name ?? "").trim();
+    if (!label) continue;
+    rows.push({ label, value: num(rec, ["value", "pipeline", "count"]) ?? 0 });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function asMonthPoints(value: unknown): PerformanceDashboard["trend"] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: PerformanceDashboard["trend"] = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const label = String(rec.label ?? rec.month ?? "").trim();
+    if (!label) continue;
+    const settlementValue = num(rec, ["settlementValue", "value"]) ?? 0;
+    const settlements = num(rec, ["settlements", "won"]) ?? 0;
+    rows.push({
+      label,
+      settlements,
+      settlementValue,
+      revenue: num(rec, ["revenue", "settlementValue"]) ?? settlementValue,
+      avgDeal:
+        num(rec, ["avgDeal", "avgDealSize"]) ??
+        (settlements ? settlementValue / settlements : 0),
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function asStageTimes(value: unknown): PerformanceDashboard["stageTimes"] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: PerformanceDashboard["stageTimes"] = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const stage = String(rec.stage ?? rec.label ?? "").trim();
+    if (!stage) continue;
+    rows.push({
+      stage,
+      days: num(rec, ["days"]) ?? 0,
+      delta: num(rec, ["delta"]) ?? 0,
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function asTeam(value: unknown): PerformanceDashboard["team"] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: PerformanceDashboard["team"] = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const name = String(rec.name ?? "").trim();
+    if (!name) continue;
+    rows.push({
+      name,
+      settlements: num(rec, ["settlements", "deals"]) ?? 0,
+      value: num(rec, ["value", "pipeline"]) ?? 0,
+      commission: num(rec, ["commission"]) ?? 0,
+      conversion: num(rec, ["conversion", "conversionRate"]) ?? 0,
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
+function asPerfRows(value: unknown): PerformanceDashboard["loanTypes"] | undefined {
+  return asNamedValues(value)?.map((row) => ({ name: row.name, value: row.value }));
+}
+
+function asAlerts(value: unknown): ExecutiveOverview["alerts"] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: ExecutiveOverview["alerts"] = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const title = String(rec.title ?? "").trim();
+    const body = String(rec.body ?? "").trim();
+    const href = String(rec.href ?? "/").trim() || "/";
+    const tone = String(rec.tone ?? "sky");
+    if (!title) continue;
+    rows.push({
+      title,
+      body,
+      href,
+      tone:
+        tone === "rose" || tone === "amber" || tone === "emerald" ? tone : "sky",
+    });
+  }
+  return rows.length ? rows : undefined;
+}
+
 function asPercent(n: number) {
   return n > 0 && n <= 1 ? Math.round(n * 1000) / 10 : n;
 }
@@ -391,21 +524,38 @@ export function overlaySalesDashboard(
   const lostDeals = num(rec, ["lostDeals"]);
   const conversion = num(rec, ["conversionRate", "LEAD_CONVERSION_RATE"]);
   const winLoss = num(rec, ["DEAL_WIN_LOSS_RATIO"]);
+  const pipelineValue = num(rec, ["pipelineValue", "activePipeline"]);
+  const qualified = num(rec, ["qualifiedLeads"]);
+  const appointments = num(rec, ["appointments", "appointmentsToday"]);
   if (totalLeads != null) next.newLeads = totalLeads;
   if (totalDeals != null) next.dealsCreated = totalDeals;
   if (wonDeals != null) next.settled = wonDeals;
   if (lostDeals != null) next.lostDeals = lostDeals;
+  if (pipelineValue != null) next.pipelineValue = pipelineValue;
+  if (qualified != null) next.qualifiedLeads = qualified;
+  if (appointments != null) next.appointments = appointments;
   if (conversion != null) next.leadToDeal = asPercent(conversion);
   if (winLoss != null) next.dealToSettle = asPercent(winLoss);
-  const funnel = funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
+  const funnel =
+    asFunnel(rec.funnel) ?? funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
   if (funnel) {
     next.funnel = funnel;
     next.dealsByStage = funnel.map((row) => ({
       name: row.label,
-      value: row.count,
+      value: row.value || row.count,
       count: row.count,
     }));
   }
+  const loanTypes = asNamedValues(rec.loanTypes);
+  const sources = asNamedValues(rec.sources);
+  const lostReasons = asNamedValues(rec.lostReasons);
+  const brokers = asSalesRanks(rec.brokers);
+  const topSources = asSalesRanks(rec.sources);
+  if (loanTypes) next.loanTypes = loanTypes;
+  if (sources) next.sources = sources;
+  if (lostReasons) next.lostReasons = lostReasons;
+  if (brokers) next.topBrokers = brokers;
+  if (topSources) next.topSources = topSources;
   return next;
 }
 
@@ -421,15 +571,40 @@ export function overlayPerformanceDashboard(
   const next = { ...base };
   const wonDeals = num(rec, ["wonDeals", "settlements"]);
   const conversion = num(rec, ["conversionRate", "LEAD_CONVERSION_RATE"]);
+  const settlementValue = num(rec, ["settlementValue", "wonDealsValue"]);
+  const commission = num(rec, ["commission"]);
+  const avgDealSize = num(rec, ["avgDealSize"]);
+  const pipelineValue = num(rec, ["pipelineValue"]);
   if (wonDeals != null) next.settlements = wonDeals;
   if (conversion != null) next.conversion = asPercent(conversion);
-  const funnel = funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
-  if (funnel) {
-    next.funnel = funnel;
-    next.pipelineByStage = funnel
-      .filter((row) => !/closed won|settled/i.test(row.label))
-      .map((row) => ({ label: row.label, value: row.count }));
-    next.pipelineValue = next.pipelineByStage.reduce((n, row) => n + row.value, 0);
+  if (settlementValue != null) next.settlementValue = settlementValue;
+  if (commission != null) next.commission = commission;
+  if (avgDealSize != null) next.avgDealSize = avgDealSize;
+  if (pipelineValue != null) next.pipelineValue = pipelineValue;
+  const bottleneck = rec.bottleneck;
+  if (typeof bottleneck === "string" && bottleneck.trim()) {
+    next.bottleneck = bottleneck.trim();
   }
+  const bottleneckDays = num(rec, ["bottleneckDays"]);
+  if (bottleneckDays != null) next.bottleneckDays = bottleneckDays;
+  const funnel =
+    asFunnel(rec.funnel) ?? funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
+  if (funnel) next.funnel = funnel;
+  const stages = asStageValues(rec.pipelineByStage);
+  if (stages) {
+    next.pipelineByStage = stages;
+  } else if (funnel) {
+    next.pipelineByStage = funnel
+      .filter((row) => !/closed won|closed lost|settled/i.test(row.label))
+      .map((row) => ({ label: row.label, value: row.value || row.count }));
+  }
+  const trend = asMonthPoints(rec.trend);
+  if (trend) next.trend = trend;
+  const stageTimes = asStageTimes(rec.stageTimes);
+  if (stageTimes) next.stageTimes = stageTimes;
+  const team = asTeam(rec.team);
+  if (team) next.team = team;
+  const loanTypes = asPerfRows(rec.loanTypes);
+  if (loanTypes) next.loanTypes = loanTypes;
   return next;
 }

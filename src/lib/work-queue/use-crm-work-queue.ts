@@ -25,6 +25,7 @@ const EMPTY_RECORDS: LiveRecordQueues = {
   leads: [],
   contacts: [],
   deals: [],
+  sla: [],
 };
 
 export function useCrmWorkQueue(opts: {

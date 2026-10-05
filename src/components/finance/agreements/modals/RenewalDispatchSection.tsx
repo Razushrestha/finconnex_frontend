@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Check } from "lucide-react";
+import { todayFinanceIso } from "@/lib/finance/shared";
 
 export function RenewalDispatchSection() {
   const [channels, setChannels] = useState({
@@ -113,6 +114,7 @@ export function RenewalDispatchSection() {
             </label>
             <input
               type="date"
+              min={todayFinanceIso()}
               defaultValue="2026-11-30"
               className="w-full bg-card border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />

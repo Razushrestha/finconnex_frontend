@@ -4,6 +4,7 @@ import {
   isBoundCrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmErrorMessage, unwrapCrmData } from "@/lib/crm/request";
+import { isWorkspaceStorageKey } from "@/lib/settings/api";
 
 export type CrmStorageObject = {
   key: string;
@@ -201,6 +202,57 @@ export async function uploadCrmStorageFile(
       "Could not upload the file to CRM storage. Stay signed in and try again.",
     );
   }
+}
+
+const resolvedUrlCache = new Map<string, string>();
+
+export function isDisplayableImageSrc(value: string): boolean {
+  return (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("/api/") ||
+    value.startsWith("data:") ||
+    value.startsWith("blob:")
+  );
+}
+
+function localStorageUrl(key: string): string {
+  const rest = key.trim().slice("local/".length);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) return "";
+  return `/api/auth/local-files/${rest.slice(0, slash)}/${encodeURIComponent(rest.slice(slash + 1))}`;
+}
+
+/** Turn a stored workspace key into a URL an <img> can load. */
+export async function resolveCrmStorageUrl(value: string): Promise<string> {
+  const raw = value.trim();
+  if (!raw) return "";
+  if (isDisplayableImageSrc(raw) || raw.startsWith("/")) return raw;
+  if (raw.startsWith("local/")) return localStorageUrl(raw);
+  if (!isWorkspaceStorageKey(raw)) return "";
+
+  const cached = resolvedUrlCache.get(raw);
+  if (cached) return cached;
+
+  const session = (await ensureCrmSession()) ?? (await ensureCrmAccess());
+  if (!session) return "";
+
+  const res = await fetch(
+    `/api/auth/crm/storage/url?key=${encodeURIComponent(raw)}`,
+    {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    },
+  );
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok) return "";
+  const data = unwrapCrmData<{ url?: string }>(json);
+  const url = typeof data?.url === "string" ? data.url.trim() : "";
+  if (url) resolvedUrlCache.set(raw, url);
+  return url;
 }
 
 export async function tryCrmStorage<T>(

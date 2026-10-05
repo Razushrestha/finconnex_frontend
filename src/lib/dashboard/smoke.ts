@@ -15,6 +15,7 @@ import {
   getCrmDashboardLayout,
   getCrmDashboardMetrics,
   getCrmDashboardWidget,
+  getCrmDashboardWorkQueue,
   getCrmDashboardWidgetData,
   listCrmDashboardLayouts,
   listCrmDashboardWidgetCatalog,
@@ -49,6 +50,7 @@ const DECOY_PATH = "/v1/__no_such_module_dashboard_probe__";
 
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/dashboard" },
+  { method: "GET", path: "/v1/dashboard/work-queue" },
   {
     method: "GET",
     path: `/v1/workspaces/${SESSION.workspaceId}/dashboard/layouts`,
@@ -116,6 +118,7 @@ export function smokeDashboardWiring() {
     "getCrmDashboardWidget",
     "getCrmDashboardWidgetData",
     "batchCrmDashboardWidgets",
+    "getCrmDashboardWorkQueue",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`dashboard client missing ${name}`);
@@ -228,6 +231,7 @@ export async function smokeDashboardMock() {
     await getCrmDashboardWidget("kpis");
     await getCrmDashboardWidgetData("kpis");
     await batchCrmDashboardWidgets(["kpis"]);
+    await getCrmDashboardWorkQueue();
     await deleteCrmDashboardLayout(LAYOUT_ID);
 
     const expected = [
@@ -242,6 +246,7 @@ export async function smokeDashboardMock() {
       `GET ${workspaceDashboardWidgetsPath(SESSION.workspaceId, "/kpis")}`,
       `GET ${workspaceDashboardWidgetsPath(SESSION.workspaceId, "/kpis/data")}`,
       `POST ${workspaceDashboardWidgetsPath(SESSION.workspaceId, "/batch")}`,
+      `GET ${dashboardMetricsPath("/work-queue")}`,
       `DELETE ${workspaceDashboardLayoutsPath(SESSION.workspaceId, `/${LAYOUT_ID}`)}`,
     ];
     for (const hit of expected) {

@@ -31,6 +31,20 @@ function pickStr(...values: unknown[]): string {
   return "";
 }
 
+function nestedName(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const rec = value as Record<string, unknown>;
+  const first = pickStr(rec.firstName, rec.givenName);
+  const last = pickStr(rec.lastName, rec.familyName);
+  return pickStr(
+    rec.name,
+    rec.fullName,
+    rec.displayName,
+    rec.title,
+    [first, last].filter(Boolean).join(" "),
+  );
+}
+
 function toQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -230,7 +244,21 @@ export function normalizeDocumentRequest(
       `DR-${String(index + 1).padStart(3, "0")}`,
     title,
     requestedFrom,
-    relatedTo: pickStr(raw.relatedTo, raw.relatedLabel) || undefined,
+    requestedFromId: pickStr(raw.requestedFromId, client && client.id) || undefined,
+    relatedTo:
+      pickStr(
+        raw.relatedTo,
+        raw.relatedLabel,
+        raw.relatedName,
+        nestedName(raw.deal),
+        nestedName(raw.lead),
+        nestedName(raw.contact),
+        nestedName(raw.company),
+      ) || undefined,
+    leadId: pickStr(raw.leadId) || undefined,
+    contactId: pickStr(raw.contactId) || undefined,
+    companyId: pickStr(raw.companyId) || undefined,
+    dealId: pickStr(raw.dealId) || undefined,
     documentType: mapDocumentRequestType(
       pickStr(raw.documentType, raw.type, raw.category, "Other"),
     ),
@@ -242,11 +270,14 @@ export function normalizeDocumentRequest(
       : undefined,
     requestedBy: pickStr(
       raw.requestedBy,
+      nestedName(raw.requestedByUser),
+      nestedName(raw.requestedBy),
+      nestedName(raw.owner),
       raw.ownerName,
       raw.createdByName,
-      raw.owner,
       "—",
     ),
+    requestedById: pickStr(raw.requestedById, raw.ownerId, raw.createdById) || undefined,
     requestedDate: formatDisplayDate(
       raw.requestedDate ?? raw.createdAt ?? raw.sentAt,
     ),

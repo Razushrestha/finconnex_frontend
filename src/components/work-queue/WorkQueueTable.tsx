@@ -181,6 +181,11 @@ function buildMinWidth(cols: ManageColumn[]): number {
   return sum;
 }
 
+function canCompleteQueueRow(row: QueueRow) {
+  const type = (row.itemType ?? "").toUpperCase();
+  return type === "TASK" || type === "CALL" || type === "MEETING" || type === "REMINDER";
+}
+
 function cellText(row: QueueRow, colId: string): string {
   switch (colId) {
     case "subject":
@@ -874,6 +879,7 @@ export function WorkQueueTable({
                     >
                       <FileText className="h-4 w-4" strokeWidth={2} />
                     </button>
+                    {canCompleteQueueRow(row) ? (
                     <button
                       type="button"
                       aria-label="Mark complete"
@@ -889,6 +895,7 @@ export function WorkQueueTable({
                         <Check className="h-2.5 w-2.5" strokeWidth={3} />
                       </span>
                     </button>
+                    ) : null}
                   </div>
 
                   {visibleCols.map((col) => {

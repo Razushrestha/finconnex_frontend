@@ -58,6 +58,7 @@ import {
   isStorageUnconfigured,
   saveLocalUpload,
 } from "@/lib/storage/local-fallback";
+import { presignWorkspaceUpload } from "@/lib/storage/presign-dev";
 
 const ALLOWED_ROOTS = new Set([
   "leads",
@@ -674,6 +675,25 @@ export async function proxyCrmV1(
             : raw,
         });
       status = 502;
+    }
+  }
+
+  if (
+    method === "GET" &&
+    path[0] === "storage" &&
+    path[1] === "url" &&
+    status >= 400 &&
+    auth?.accessToken
+  ) {
+    const key = new URL(request.url).searchParams.get("key") ?? "";
+    const signed = await presignWorkspaceUpload(proxyWorkspaceId, key);
+    if (signed) {
+      text = JSON.stringify({
+        statusCode: 200,
+        message: "Secure download link generated",
+        data: { key, url: signed },
+      });
+      status = 200;
     }
   }
 

@@ -1,5 +1,8 @@
 import type { CSSProperties } from "react";
-import type { CrmWorkspaceSettings } from "@/lib/settings/api";
+import {
+  isWorkspaceStorageKey,
+  type CrmWorkspaceSettings,
+} from "@/lib/settings/api";
 
 export const DEFAULT_BRAND_PRIMARY = "#5A32A3";
 export const DEFAULT_BRAND_SECONDARY = "#0F172A";
@@ -58,17 +61,26 @@ export function resolveWorkspaceBrand(
       (typeof page?.appName === "string" && page.appName.trim()
         ? page.appName.trim()
         : "") || "FinConnex",
-    logoLightUrl:
-      settings?.logoUrl ||
-      (catalogLight.startsWith("http") || catalogLight.startsWith("/")
-        ? catalogLight
-        : ""),
-    logoDarkUrl:
-      settings?.logoDarkUrl ||
-      (catalogDark.startsWith("http") || catalogDark.startsWith("/")
-        ? catalogDark
-        : ""),
+    logoLightUrl: usableLogoUrl(settings?.logoUrl, catalogLight),
+    logoDarkUrl: usableLogoUrl(settings?.logoDarkUrl, catalogDark),
   };
+}
+
+function usableLogoUrl(
+  stored: string | null | undefined,
+  catalog: string,
+): string {
+  const value = (stored?.trim() || catalog.trim());
+  if (!value) return "";
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("/") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+  return isWorkspaceStorageKey(value) ? value : "";
 }
 
 export function workspaceBrandCssVars(brand: WorkspaceBrand): CSSProperties {

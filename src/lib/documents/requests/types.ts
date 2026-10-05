@@ -121,7 +121,12 @@ export interface DocumentRequest {
   title: string;
   /** Applicant / client name(s) — comma-separated for joint apps */
   requestedFrom: string;
+  requestedFromId?: string;
   relatedTo?: string;
+  leadId?: string;
+  contactId?: string;
+  companyId?: string;
+  dealId?: string;
   documentType: DocumentRequestType;
   status: DocumentRequestStatus;
   dueDate: string;
@@ -130,6 +135,7 @@ export interface DocumentRequest {
   notifyBy?: string[];
   /** Broker / owner */
   requestedBy: string;
+  requestedById?: string;
   /** Start / invite date (display e.g. 20 Aug, 2026) */
   requestedDate: string;
   lastUpdated: string;

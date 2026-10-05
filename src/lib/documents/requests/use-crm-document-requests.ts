@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCrmDocumentRequests } from "@/lib/documents/requests/api";
+import { enrichDocumentRequestLabels } from "@/lib/documents/requests/labels";
 import { replaceDocumentRequests } from "@/lib/documents/requests/types";
 
 export type DocumentRequestsDataSource = "api" | "demo";
@@ -21,7 +22,9 @@ export function useCrmDocumentRequests() {
 
     void (async () => {
       try {
-        const remote = await listCrmDocumentRequests();
+        const remote = await enrichDocumentRequestLabels(
+          await listCrmDocumentRequests(),
+        );
         if (cancelled) return;
         replaceDocumentRequests(remote);
         setSource("api");
