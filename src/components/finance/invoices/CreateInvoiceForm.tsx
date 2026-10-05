@@ -18,7 +18,9 @@ import {
 } from "@/lib/finance/invoices/api";
 import {
   isoFinanceDate,
+  isFinanceDateOnOrAfterToday,
   newLineItem,
+  todayFinanceIso,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
@@ -106,6 +108,10 @@ export function CreateInvoiceForm({
     if (!title.trim()) next.title = "Title is required";
     if (!clientId) next.clientId = "Client is required";
     if (!dueDate.trim()) next.dueDate = "Due date is required";
+    else if (!isFinanceDateOnOrAfterToday(dueDate))
+      next.dueDate = "Due date cannot be in the past";
+    else if (issueDate && dueDate < issueDate)
+      next.dueDate = "Due date cannot be before the issue date";
     if (!lineItems.length || lineItems.some((i) => !i.name.trim()))
       next.lines = "Add at least one named line item";
     setErrors(next);
@@ -295,7 +301,13 @@ export function CreateInvoiceForm({
             type="date"
             className={elevatedInputClass(true)}
             value={issueDate}
-            onChange={(e) => setIssueDate(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setIssueDate(next);
+              const min =
+                next && next > todayFinanceIso() ? next : todayFinanceIso();
+              if (dueDate && dueDate < min) setDueDate(min);
+            }}
           />
         </InputShell>
       </Field>
@@ -303,9 +315,22 @@ export function CreateInvoiceForm({
         <InputShell icon={Calendar} error={!!errors.dueDate}>
           <input
             type="date"
+            min={
+              issueDate && issueDate > todayFinanceIso()
+                ? issueDate
+                : todayFinanceIso()
+            }
             className={elevatedInputClass(true)}
             value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              const min =
+                issueDate && issueDate > todayFinanceIso()
+                  ? issueDate
+                  : todayFinanceIso();
+              if (next && next < min) return;
+              setDueDate(next);
+            }}
           />
         </InputShell>
       </Field>

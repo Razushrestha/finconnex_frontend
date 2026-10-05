@@ -6,7 +6,12 @@ import {
   crmErrorMessage,
   crmWorkspaceFetch,
 } from "@/lib/crm/request";
-import type { FinanceLineItem } from "@/lib/finance/shared";
+import {
+  financeLineItems,
+  financeNotes,
+  financeUuid,
+  type FinanceLineItem,
+} from "@/lib/finance/shared";
 import {
   type Invoice,
   type InvoiceAttachment,
@@ -112,10 +117,6 @@ export function mapInvoiceStatus(raw: string): InvoiceStatus {
   if (value.includes("paid") && !value.includes("unpaid")) return "Paid";
   if (value.includes("send") || value.includes("sent")) return "Sent";
   return "Draft";
-}
-
-function apiStatus(status: InvoiceStatus): string {
-  return status.toUpperCase().replace(/ /g, "_");
 }
 
 function formatDate(raw: unknown): string {
@@ -431,57 +432,18 @@ export function toCreateInvoiceBody(input: {
   dueDate: string;
   lineItems: FinanceLineItem[];
 }): Record<string, unknown> {
-  const subtotal = input.lineItems.reduce(
-    (sum, line) => sum + line.quantity * line.unitPrice,
-    0,
-  );
-  const tax = input.lineItems.reduce(
-    (sum, line) =>
-      sum + (line.quantity * line.unitPrice * line.taxRate) / 100,
-    0,
-  );
   const issueDate = toIsoDate(input.issueDate);
   const dueDate = toIsoDate(input.dueDate);
-  const clientId =
-    input.clientId &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      input.clientId,
-    )
-      ? input.clientId
-      : undefined;
+  const contactId = financeUuid(input.clientId);
+  const notes = financeNotes(input.title, input.notes);
   return {
-    title: input.title,
-    subject: input.title,
-    clientName: input.clientName,
-    customerName: input.clientName,
-    ...(clientId ? { clientId, customerId: clientId } : {}),
-    contactName: input.contactName,
-    contactEmail: input.contactEmail,
-    dealName: input.dealName,
-    notes: input.notes,
-    description: input.notes,
-    status: apiStatus(input.status),
-    ownerName: input.owner,
-    owner: input.owner,
+    invoiceNumber: `INV-${Date.now()}`,
     issueDate,
-    issuedAt: issueDate,
     dueDate,
     currency: "AUD",
-    subtotal,
-    tax,
-    taxTotal: tax,
-    total: subtotal + tax,
-    amount: subtotal + tax,
-    amountPaid: 0,
-    amountDue: subtotal + tax,
-    lineItems: input.lineItems.map((line) => ({
-      name: line.name,
-      description: line.name,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      taxRate: line.taxRate,
-      amount: line.quantity * line.unitPrice,
-    })),
+    ...(contactId ? { contactId } : {}),
+    ...(notes ? { notes } : {}),
+    lineItems: financeLineItems(input.lineItems),
   };
 }
 

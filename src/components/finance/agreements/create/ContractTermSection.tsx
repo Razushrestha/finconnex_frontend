@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Calendar } from "lucide-react";
+import { todayFinanceIso } from "@/lib/finance/shared";
 
 interface TermData {
   startDate: string;
@@ -19,6 +20,11 @@ export function ContractTermSection({
   termData,
   onChange,
 }: ContractTermSectionProps) {
+  const today = todayFinanceIso();
+  const endMin =
+    termData.startDate && termData.startDate > today
+      ? termData.startDate
+      : today;
   return (
     <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between border-b border-border pb-3">
@@ -57,8 +63,13 @@ export function ContractTermSection({
           <div className="relative flex items-center">
             <input
               type="date"
+              min={endMin}
               value={termData.endDate}
-              onChange={(e) => onChange({ endDate: e.target.value })}
+              onChange={(e) => {
+                const endDate = e.target.value;
+                if (endDate && endDate < endMin) return;
+                onChange({ endDate });
+              }}
               className="w-full pl-3 pr-9 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
             />
             <Calendar className="w-4 h-4 text-muted-foreground absolute right-3 pointer-events-none" />

@@ -12,7 +12,6 @@ import {
   CreditCard,
   UserRound,
   ArrowRight,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -36,23 +35,7 @@ const ICONS: Record<SettingsNavIcon, LucideIcon> = {
 export function SettingsHome() {
   return (
     <div>
-      <div className="relative overflow-hidden rounded-3xl bg-[#5A32A3] px-6 py-8 text-white shadow-lg shadow-[#5A32A3]/20 sm:px-8">
-        <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 left-20 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-2xl" />
-        <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-violet-100 uppercase">
-          <Sparkles className="h-3.5 w-3.5" />
-          Workspace control panel
-        </p>
-        <h1 className="mt-2 max-w-xl text-[28px] leading-tight font-semibold tracking-tight">
-          Run FinConnex from one place
-        </h1>
-        <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-violet-100">
-          Brand, people, pipeline, mail, and backups — only the screens that
-          actually change this CRM.
-        </p>
-      </div>
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
         {SETTINGS_CONTROL_PANEL.map((group) => {
           const Icon = ICONS[group.icon];
           return (

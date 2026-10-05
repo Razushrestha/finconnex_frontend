@@ -58,6 +58,22 @@ type ShellBundle = {
 let shellInflight: Promise<ShellBundle> | null = null;
 let shellFetchedAt = 0;
 
+function isNewerRevision(
+  prev: CrmWorkspaceSettings | null,
+  incoming: CrmWorkspaceSettings,
+) {
+  return (
+    prev?.revision != null &&
+    incoming.revision != null &&
+    prev.revision > incoming.revision
+  );
+}
+
+export function invalidateCrmSettingsShell() {
+  shellInflight = null;
+  shellFetchedAt = 0;
+}
+
 function fetchShellSettings(force: boolean) {
   if (
     !force &&
@@ -101,7 +117,7 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   const [source, setSource] = useState<SettingsDataSource>("demo");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<CrmWorkspaceSettings | null>(null);
+  const [settings, setSettingsState] = useState<CrmWorkspaceSettings | null>(null);
   const [security, setSecurity] = useState<CrmSecuritySettings | null>(null);
   const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(null);
   const [previewBrand, setPreviewBrand] = useState<
@@ -111,12 +127,22 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
+  const setSettings = useCallback((next: CrmWorkspaceSettings | null) => {
+    setSettingsState(next);
+    const cached = readSettingsCache();
+    writeSettingsCache({
+      settings: next,
+      security: cached?.security ?? null,
+      capabilities: cached?.capabilities ?? null,
+    });
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const cachedNow = readSettingsCache();
     if (tick === 0 && cachedNow?.settings) {
-      setSettings(cachedNow.settings);
+      setSettingsState(cachedNow.settings);
       setSecurity(cachedNow.security);
       setCapabilities(cachedNow.capabilities);
       setSource("api");
@@ -131,24 +157,27 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       if (cancelled) return;
 
       if (ws.status === "fulfilled") {
-        setSettings((prev) => ({
-          ...ws.value,
-          catalog: { ...(ws.value.catalog ?? {}), ...(prev?.catalog ?? {}) },
-        }));
-        setSource("api");
-        writeSettingsCache({
-          settings: ws.value,
-          security:
-            sec.status === "fulfilled"
-              ? sec.value
-              : cachedNow?.security ?? null,
-          capabilities:
-            caps.status === "fulfilled"
-              ? caps.value
-              : cachedNow?.capabilities ?? null,
+        const security =
+          sec.status === "fulfilled" ? sec.value : cachedNow?.security ?? null;
+        const capabilities =
+          caps.status === "fulfilled"
+            ? caps.value
+            : cachedNow?.capabilities ?? null;
+        setSettingsState((prev) => {
+          if (isNewerRevision(prev, ws.value)) return prev;
+          const next = {
+            ...ws.value,
+            catalog: {
+              ...(prev?.catalog ?? {}),
+              ...(ws.value.catalog ?? {}),
+            },
+          };
+          writeSettingsCache({ settings: next, security, capabilities });
+          return next;
         });
+        setSource("api");
       } else if (!cachedNow?.settings) {
-        setSettings(null);
+        setSettingsState(null);
         setSource("demo");
         setError(
           ws.reason instanceof Error
@@ -178,10 +207,15 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
         pages[0]?.status === "fulfilled" ? pages[0].value.catalog : null;
       if (!catalog) return;
       mirrorOfficeCalendar(catalog);
-      setSettings((prev) => {
+      setSettingsState((prev) => {
+        if (isNewerRevision(prev, ws.value)) return prev;
         const next = {
           ...ws.value,
-          catalog: { ...catalog, ...(ws.value.catalog ?? {}), ...(prev?.catalog ?? {}) },
+          catalog: {
+            ...(prev?.catalog ?? {}),
+            ...(ws.value.catalog ?? {}),
+            ...catalog,
+          },
         };
         writeSettingsCache({
           settings: next,

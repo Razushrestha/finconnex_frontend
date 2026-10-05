@@ -1,6 +1,6 @@
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { crmWorkspaceFetch } from "@/lib/crm/request";
-import { formatFinanceDate } from "@/lib/finance/shared";
+import { financeDecimal, formatFinanceDate } from "@/lib/finance/shared";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
   type FinanceProduct,
@@ -170,18 +170,16 @@ export function toCreateProductBody(input: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     name: input.name.trim(),
+    unitPrice: financeDecimal(input.unitPrice ?? 0),
+    currency: "AUD",
+    isActive: input.status !== "Inactive",
   };
   if (input.sku?.trim()) body.sku = input.sku.trim();
-  if (input.type) body.type = apiProductType(input.type);
-  if (input.status) body.status = apiProductStatus(input.status);
   if (input.description?.trim()) body.description = input.description.trim();
-  if (typeof input.unitPrice === "number") {
-    body.unitPrice = input.unitPrice;
-    body.price = input.unitPrice;
+  if (typeof input.taxRate === "number") {
+    body.taxRate = financeDecimal(input.taxRate);
   }
-  if (typeof input.taxRate === "number") body.taxRate = input.taxRate;
   if (input.unit?.trim()) body.unit = input.unit.trim();
-  if (input.createdBy?.trim()) body.createdBy = input.createdBy.trim();
   return body;
 }
 
@@ -191,14 +189,16 @@ export function toUpdateProductBody(
   const body: Record<string, unknown> = {};
   if (patch.name?.trim()) body.name = patch.name.trim();
   if (patch.sku?.trim()) body.sku = patch.sku.trim();
-  if (patch.type) body.type = apiProductType(patch.type);
-  if (patch.status) body.status = apiProductStatus(patch.status);
-  if (patch.description !== undefined) body.description = patch.description?.trim() || "";
-  if (typeof patch.unitPrice === "number") {
-    body.unitPrice = patch.unitPrice;
-    body.price = patch.unitPrice;
+  if (patch.status) body.isActive = patch.status !== "Inactive";
+  if (patch.description !== undefined) {
+    body.description = patch.description?.trim() || "";
   }
-  if (typeof patch.taxRate === "number") body.taxRate = patch.taxRate;
+  if (typeof patch.unitPrice === "number") {
+    body.unitPrice = financeDecimal(patch.unitPrice);
+  }
+  if (typeof patch.taxRate === "number") {
+    body.taxRate = financeDecimal(patch.taxRate);
+  }
   if (patch.unit?.trim()) body.unit = patch.unit.trim();
   return body;
 }

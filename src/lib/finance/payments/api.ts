@@ -1,6 +1,10 @@
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { crmWorkspaceFetch } from "@/lib/crm/request";
-import { formatFinanceAt, formatFinanceDate } from "@/lib/finance/shared";
+import {
+  financeDecimal,
+  formatFinanceAt,
+  formatFinanceDate,
+} from "@/lib/finance/shared";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
   type Payment,
@@ -104,7 +108,7 @@ export function apiPaymentMethod(method: PaymentMethod): string {
     case "Bank transfer":
       return "BANK_TRANSFER";
     case "Card":
-      return "CARD";
+      return "CREDIT_CARD";
     case "PayPal":
       return "PAYPAL";
     case "Stripe":
@@ -282,16 +286,15 @@ export function toCreatePaymentBody(input: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     invoiceId: input.invoiceId,
-    amount: input.amount,
+    amount: financeDecimal(input.amount),
+    paymentMethod: input.method ? apiPaymentMethod(input.method) : "OTHER",
   };
-  if (input.method) body.paymentMethod = apiPaymentMethod(input.method);
   if (input.status) body.status = apiPaymentStatus(input.status);
-  if (input.reference?.trim()) body.reference = input.reference.trim();
+  if (input.reference?.trim()) body.transactionId = input.reference.trim();
   if (input.notes?.trim()) body.notes = input.notes.trim();
   if (input.paymentDate?.trim()) {
-    body.paymentDate = toIsoDate(input.paymentDate);
+    body.paidAt = toIsoDate(input.paymentDate);
   }
-  if (input.recordedBy?.trim()) body.recordedBy = input.recordedBy.trim();
   return body;
 }
 
@@ -299,13 +302,14 @@ export function toUpdatePaymentBody(
   patch: Partial<Payment>,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if (typeof patch.amount === "number") body.amount = patch.amount;
   if (patch.method) body.paymentMethod = apiPaymentMethod(patch.method);
   if (patch.status) body.status = apiPaymentStatus(patch.status);
-  if (patch.reference !== undefined) body.reference = patch.reference?.trim() || "";
+  if (patch.reference !== undefined) {
+    body.transactionId = patch.reference?.trim() || "";
+  }
   if (patch.notes !== undefined) body.notes = patch.notes?.trim() || "";
   if (patch.receivedAt?.trim()) {
-    body.paymentDate = toIsoDate(patch.receivedAt);
+    body.paidAt = toIsoDate(patch.receivedAt);
   }
   return body;
 }

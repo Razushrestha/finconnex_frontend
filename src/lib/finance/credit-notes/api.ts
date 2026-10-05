@@ -6,7 +6,12 @@ import {
   crmErrorMessage,
   crmWorkspaceFetch,
 } from "@/lib/crm/request";
-import type { FinanceLineItem } from "@/lib/finance/shared";
+import {
+  financeLineItems,
+  financeNotes,
+  financeUuid,
+  type FinanceLineItem,
+} from "@/lib/finance/shared";
 import {
   type CreditNote,
   type CreditNoteAttachment,
@@ -102,10 +107,6 @@ export function mapCreditNoteStatus(raw: string): CreditNoteStatus {
   if (value.includes("void")) return "Void";
   if (value.includes("cancel")) return "Cancelled";
   return "Draft";
-}
-
-function apiStatus(status: CreditNoteStatus): string {
-  return status.toUpperCase().replace(/ /g, "_");
 }
 
 function formatDate(raw: unknown): string {
@@ -381,54 +382,17 @@ export function toCreateBody(input: {
   issueDate: string;
   lineItems: FinanceLineItem[];
 }): Record<string, unknown> {
-  const subtotal = input.lineItems.reduce(
-    (sum, line) => sum + line.quantity * line.unitPrice,
-    0,
-  );
-  const tax = input.lineItems.reduce(
-    (sum, line) =>
-      sum + (line.quantity * line.unitPrice * line.taxRate) / 100,
-    0,
-  );
   const issueDate = toIsoDate(input.issueDate);
-  const clientId =
-    input.clientId &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      input.clientId,
-    )
-      ? input.clientId
-      : undefined;
+  const contactId = financeUuid(input.clientId);
+  const invoiceId = financeUuid(input.invoiceId);
+  const notes = financeNotes(input.title, input.reason, input.notes);
   return {
-    title: input.title,
-    subject: input.title,
-    clientName: input.clientName,
-    customerName: input.clientName,
-    ...(clientId ? { clientId, customerId: clientId } : {}),
-    invoiceRef: input.invoiceRef,
-    invoiceNumber: input.invoiceRef,
-    invoiceId: input.invoiceId,
-    reason: input.reason,
-    memo: input.reason,
-    notes: input.notes,
-    description: input.notes,
-    status: apiStatus(input.status),
-    ownerName: input.owner,
-    owner: input.owner,
+    creditNoteNumber: `CN-${Date.now()}`,
     issueDate,
-    issuedAt: issueDate,
     currency: "AUD",
-    subtotal,
-    tax,
-    taxTotal: tax,
-    total: subtotal + tax,
-    amount: subtotal + tax,
-    lineItems: input.lineItems.map((line) => ({
-      name: line.name,
-      description: line.name,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      taxRate: line.taxRate,
-      amount: line.quantity * line.unitPrice,
-    })),
+    ...(contactId ? { contactId } : {}),
+    ...(invoiceId ? { invoiceId } : {}),
+    ...(notes ? { notes } : {}),
+    lineItems: financeLineItems(input.lineItems),
   };
 }

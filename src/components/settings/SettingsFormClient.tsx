@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Upload } from "lucide-react";
 import {
@@ -14,6 +14,7 @@ import {
   type SettingsValues,
 } from "@/lib/settings/settings-store";
 import {
+  isWorkspaceStorageKey,
   overlayCatalogValues,
   overlaySecurityValues,
   overlaySettingsValues,
@@ -23,7 +24,10 @@ import {
   type CrmSecuritySettings,
   type CrmWorkspaceSettings,
 } from "@/lib/settings/api";
-import { useCrmSettings } from "@/lib/settings/use-crm-settings";
+import {
+  invalidateCrmSettingsShell,
+  useCrmSettings,
+} from "@/lib/settings/use-crm-settings";
 import {
   overlayMemberPreferences,
   tryCrmWorkspaceOperations,
@@ -32,6 +36,7 @@ import {
 import { useCrmWorkspaceMemberPreferences } from "@/lib/workspace-operations/use-crm-workspace-member-preferences";
 import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
 import { uploadCrmStorageFile, type CrmStorageObject } from "@/lib/storage/api";
+import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import { loadSignature, saveSignature } from "@/lib/emails/signature";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
@@ -62,12 +67,15 @@ export function SettingsFormClient({
     defaultsFromSchema(schema),
   );
   const [saving, setSaving] = useState(false);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
+    if (dirtyRef.current) return;
     setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
   }, [schemaKey, schema, crm.settings, crm.security, memberPrefs.preferences]);
 
   function setField(id: string, value: string | boolean | number) {
+    dirtyRef.current = true;
     setValues((v) => ({ ...v, [id]: value }));
     if (
       schemaKey === "organization/branding" &&
@@ -79,56 +87,80 @@ export function SettingsFormClient({
         [id]: value,
       });
     }
-    if (schemaKey === "organization/branding" && id === "logoLight") {
+    if (
+      schemaKey === "organization/branding" &&
+      (id === "logoLight" || id === "logoDark")
+    ) {
+      const next =
+        typeof value === "string" && value.trim() ? value.trim() : "";
+      const usable =
+        next &&
+        (next.startsWith("http://") ||
+          next.startsWith("https://") ||
+          next.startsWith("/") ||
+          next.startsWith("data:") ||
+          isWorkspaceStorageKey(next))
+          ? next
+          : null;
       crm.setSettings({
         ...(crm.settings ?? {}),
-        logoUrl: typeof value === "string" && value ? crm.settings?.logoUrl ?? null : null,
-      });
-    }
-    if (schemaKey === "organization/branding" && id === "logoDark") {
-      crm.setSettings({
-        ...(crm.settings ?? {}),
-        logoDarkUrl:
-          typeof value === "string" && value
-            ? crm.settings?.logoDarkUrl ?? null
-            : null,
+        ...(id === "logoLight"
+          ? { logoUrl: usable }
+          : { logoDarkUrl: usable }),
       });
     }
   }
 
   function onCancel() {
+    dirtyRef.current = false;
     crm.setPreviewBrand(null);
     setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
     notify("Reverted to last saved");
   }
 
+  function valuesToSave(): SettingsValues {
+    if (schemaKey !== "organization/branding") return values;
+    const preview = crm.previewBrand;
+    return {
+      ...values,
+      ...(preview?.primaryColor ? { primaryColor: preview.primaryColor } : {}),
+      ...(preview?.secondaryColor
+        ? { secondaryColor: preview.secondaryColor }
+        : {}),
+    };
+  }
+
   async function onSave() {
+    const nextValues = valuesToSave();
+    setValues(nextValues);
     setSaving(true);
-    saveSettingsValues(schemaKey, values, {
+    saveSettingsValues(schemaKey, nextValues, {
       path,
       title: schema.title,
     });
     if (schemaKey === "organization/branding") {
       crm.setSettings({
         ...(crm.settings ?? {}),
-        primaryColor: String(values.primaryColor ?? crm.settings?.primaryColor ?? ""),
+        primaryColor: String(
+          nextValues.primaryColor ?? crm.settings?.primaryColor ?? "",
+        ),
         secondaryColor: String(
-          values.secondaryColor ?? crm.settings?.secondaryColor ?? "",
+          nextValues.secondaryColor ?? crm.settings?.secondaryColor ?? "",
         ),
         catalog: {
           ...(crm.settings?.catalog ?? {}),
-          [schemaKey]: values,
+          [schemaKey]: nextValues,
         },
       });
       crm.setPreviewBrand(null);
     }
     if (schemaKey === "communication/email-signatures" || schemaKey === "my-preferences/signature") {
-      const body = String(values.body ?? "");
+      const body = String(nextValues.body ?? "");
       if (body.trim()) saveSignature(body);
     }
     if (categorySlug === "my-preferences") {
       const patched = await tryCrmWorkspaceOperations(() =>
-        updateCrmWorkspaceMemberPreferences(values),
+        updateCrmWorkspaceMemberPreferences(nextValues),
       );
       if (patched) memberPrefs.setPreferences(patched);
     }
@@ -137,14 +169,16 @@ export function SettingsFormClient({
         const patched =
           categorySlug === "my-preferences"
             ? await patchCrmWorkspaceSettings(
-                valuesToSettingsPatch(values, crm.settings?.revision),
+                valuesToSettingsPatch(nextValues, crm.settings?.revision),
               )
             : await saveCrmSettingsFormPage(
                 categorySlug,
                 subpageSlug,
-                values,
+                nextValues,
                 crm.settings?.revision,
               );
+        dirtyRef.current = false;
+        invalidateCrmSettingsShell();
         crm.setSettings(patched);
         notify("Saved to CRM");
       } catch (err) {
@@ -570,16 +604,10 @@ function ColorField({
   );
 }
 
-function previewSrc(value: string): string {
-  if (
-    value.startsWith("http://") ||
-    value.startsWith("https://") ||
-    value.startsWith("/api/") ||
-    value.startsWith("data:")
-  ) {
-    return value;
-  }
-  return "";
+function storedFileName(value: string): string {
+  const path = value.split("?")[0] ?? value;
+  const name = path.split("/").pop()?.trim() ?? "";
+  return name || "Uploaded logo";
 }
 
 function BrandingFileField({
@@ -595,12 +623,12 @@ function BrandingFileField({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const preview = previewSrc(value);
+  const preview = useResolvedImageSrc(value);
 
   return (
     <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-4 sm:flex-row sm:items-center">
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-violet-600">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-violet-600">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-contain" />
@@ -608,7 +636,7 @@ function BrandingFileField({
             <Upload className="h-4 w-4" />
           )}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[12px] font-semibold text-slate-800">
             {field.label}
           </p>
@@ -616,14 +644,16 @@ function BrandingFileField({
             PNG, JPG, SVG, or WebP up to 5 MB. Stored on CRM storage.
           </p>
           {value && !preview ? (
-            <p className="mt-0.5 truncate text-[10px] text-slate-500">{value}</p>
+            <p className="mt-0.5 max-w-full truncate text-[10px] text-slate-500">
+              {storedFileName(value)}
+            </p>
           ) : null}
           {error ? (
             <p className="mt-0.5 text-[11px] font-medium text-rose-600">{error}</p>
           ) : null}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <label className="inline-flex h-8 cursor-pointer items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white disabled:opacity-60">
           {busy ? "Uploading…" : "Upload"}
           <input

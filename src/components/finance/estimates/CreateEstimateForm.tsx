@@ -17,7 +17,9 @@ import {
   toCreateEstimateBody,
 } from "@/lib/finance/estimates/api";
 import {
+  isFinanceDateOnOrAfterToday,
   newLineItem,
+  todayFinanceIso,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
@@ -124,6 +126,8 @@ export function CreateEstimateForm({
     if (!clientId) next.clientId = "Client is required";
     if (!owner) next.owner = "Owner is required";
     if (!validUntil.trim()) next.validUntil = "Valid until is required";
+    else if (!isFinanceDateOnOrAfterToday(validUntil))
+      next.validUntil = "Valid until cannot be in the past";
     if (!lineItems.length || lineItems.some((i) => !i.name.trim()))
       next.lines = "Add at least one named line item";
     setErrors(next);
@@ -303,9 +307,14 @@ export function CreateEstimateForm({
         <InputShell icon={Calendar} error={!!errors.validUntil}>
           <input
             type="date"
+            min={todayFinanceIso()}
             className={elevatedInputClass(true)}
             value={validUntil}
-            onChange={(e) => setValidUntil(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next && !isFinanceDateOnOrAfterToday(next)) return;
+              setValidUntil(next);
+            }}
           />
         </InputShell>
       </Field>

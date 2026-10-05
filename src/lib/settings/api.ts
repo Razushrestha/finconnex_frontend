@@ -435,7 +435,9 @@ export function overlaySecurityValues(
 export function isWorkspaceStorageKey(value: unknown): boolean {
   return (
     typeof value === "string" &&
-    /^workspaces\/[0-9a-f-]{36}\/uploads\//i.test(value.trim())
+    /^workspaces\/[0-9a-f-]{36}\/(?:users\/[0-9a-f-]{36}\/)?uploads\//i.test(
+      value.trim(),
+    )
   );
 }
 

@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { resolveWorkspaceBrand } from "@/lib/settings/brand";
+import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import {
   Package,
   BadgePercent,
@@ -205,6 +206,19 @@ const dashboardItems: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
+function BrandLogo({ src }: { src: string }) {
+  const resolved = useResolvedImageSrc(src);
+  if (!resolved) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={resolved}
+      alt=""
+      className="h-8 w-8 shrink-0 rounded-md object-contain"
+    />
+  );
+}
+
 interface SidebarProps {
   collapsed?: boolean;
   tenantName?: string;
@@ -348,14 +362,7 @@ export function Sidebar({
               collapsed && "md:text-base",
             )}
           >
-            {logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoSrc}
-                alt=""
-                className="h-8 w-8 shrink-0 rounded-md object-contain"
-              />
-            ) : null}
+            <BrandLogo src={logoSrc} />
             <span className={collapsed ? "md:hidden" : undefined}>
               {brand.appName}
             </span>

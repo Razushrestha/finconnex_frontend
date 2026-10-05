@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -169,6 +170,12 @@ function SortHeader({
   );
 }
 
+function shownField(value?: string) {
+  const text = value?.trim() ?? "";
+  if (!text || text === "—" || text === "-" || text === "–") return "";
+  return text;
+}
+
 function DateCell({ value }: { value: string }) {
   const relative = formatRelativeFromDisplay(value);
   return (
@@ -200,7 +207,10 @@ function RowActions({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [notifyCancel, setNotifyCancel] = useState(false);
   const [editingReminders, setEditingReminders] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const closed =
     request.status === "Approved" ||
@@ -209,16 +219,46 @@ function RowActions({
   const hasFiles = uploadedItems(request).length > 0;
 
   useEffect(() => {
-    if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setConfirmCancel(false);
-        setNotifyCancel(false);
-      }
+    if (!open) {
+      setMenuStyle(null);
+      return;
     }
+    function place() {
+      const button = actionButtonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+      const available = (openUp ? spaceAbove : spaceBelow) - 12;
+      const maxHeight = Math.min(320, Math.max(96, available));
+      setMenuStyle({
+        position: "fixed",
+        right: Math.max(8, window.innerWidth - rect.right),
+        width: 208,
+        maxHeight,
+        zIndex: 80,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+      });
+    }
+    function onDoc(e: MouseEvent) {
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+      setConfirmCancel(false);
+      setNotifyCancel(false);
+    }
+    place();
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [open]);
 
   function downloadDocs() {
@@ -340,8 +380,10 @@ function RowActions({
           <Eye className="h-4 w-4" />
         </button>
         <button
+          ref={actionButtonRef}
           type="button"
           aria-label="Actions"
+          aria-expanded={open}
           onClick={(e) => {
             e.stopPropagation();
             setOpen((v) => !v);
@@ -364,8 +406,13 @@ function RowActions({
           }}
         />
       ) : null}
-      {open ? (
-        <div className="absolute right-0 z-30 mt-1 w-52 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+      {open && menuStyle
+        ? createPortal(
+        <div
+          ref={menuRef}
+          style={menuStyle}
+          className="overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
+        >
           {confirmCancel ? (
             <div className="px-3 py-2">
               <p className="text-[12px] leading-snug text-slate-600">
@@ -466,8 +513,10 @@ function RowActions({
               </button>
             </>
           )}
-        </div>
-      ) : null}
+        </div>,
+          document.body,
+        )
+        : null}
     </div>
   );
 }
@@ -683,11 +732,13 @@ export function DocumentRequestsList({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3" title={r.requestedBy}>
-                    <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-slate-800">
-                      <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                      <span className="truncate">{r.requestedBy}</span>
-                    </p>
+                  <td className="px-3 py-3" title={shownField(r.requestedBy)}>
+                    {shownField(r.requestedBy) ? (
+                      <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+                        <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{shownField(r.requestedBy)}</span>
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3" title={r.requestId}>
                     <p className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] text-slate-600">
@@ -696,10 +747,12 @@ export function DocumentRequestsList({
                     </p>
                   </td>
                   {showRelatedTo ? (
-                    <td className="px-3 py-3" title={r.relatedTo}>
-                      <p className="truncate text-[13px] text-slate-700">
-                        {r.relatedTo || "—"}
-                      </p>
+                    <td className="px-3 py-3" title={shownField(r.relatedTo)}>
+                      {shownField(r.relatedTo) ? (
+                        <p className="truncate text-[13px] text-slate-700">
+                          {shownField(r.relatedTo)}
+                        </p>
+                      ) : null}
                     </td>
                   ) : null}
                   <td className="px-3 py-3">

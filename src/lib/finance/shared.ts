@@ -76,6 +76,52 @@ export function isoFinanceDate(d = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function todayFinanceIso() {
+  return isoFinanceDate(new Date());
+}
+
+/** Calendar date `yyyy-mm-dd` that is today or later. */
+export function isFinanceDateOnOrAfterToday(value: string) {
+  const iso = value.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso >= todayFinanceIso();
+}
+
+const FINANCE_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function financeUuid(value?: string) {
+  const trimmed = value?.trim() ?? "";
+  return FINANCE_UUID.test(trimmed) ? trimmed : undefined;
+}
+
+export function financeDecimal(value: number) {
+  const amount = Number.isFinite(value) ? value : 0;
+  return amount.toFixed(2);
+}
+
+export function financeNotes(...parts: Array<string | undefined>) {
+  const text = parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join("\n\n");
+  return text || undefined;
+}
+
+/** Line items in the shape `Create*Dto` accepts (decimal strings, no extras). */
+export function financeLineItems(lines: FinanceLineItem[]) {
+  return lines.map((line, index) => {
+    const productId = financeUuid(line.productId);
+    return {
+      description: line.description?.trim() || line.name.trim() || "Line",
+      quantity: financeDecimal(line.quantity),
+      unitPrice: financeDecimal(line.unitPrice),
+      taxRate: financeDecimal(line.taxRate),
+      ...(productId ? { productId } : {}),
+      sortOrder: index,
+    };
+  });
+}
+
 export function newLineItem(
   partial?: Partial<FinanceLineItem>,
 ): FinanceLineItem {

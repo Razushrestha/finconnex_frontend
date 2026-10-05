@@ -135,9 +135,15 @@ describe("finance unit: normalize", () => {
       validUntil: "20/10/2026",
       lineItems: [{ id: "l1", name: "Fee", quantity: 1, unitPrice: 100, taxRate: 10 }],
     });
-    expect(body.status).toBe("DRAFT");
     expect(body.currency).toBe("AUD");
-    expect(body.title).toBe("Test");
+    expect(body.expiryDate).toBe("2026-10-20");
+    expect(body.estimateNumber).toMatch(/^EST-\d+$/);
+    expect(body.notes).toBe("Test");
+    expect(body.title).toBeUndefined();
+    expect((body.lineItems as { description: string; quantity: string }[])[0]).toMatchObject({
+      description: "Fee",
+      quantity: "1.00",
+    });
   });
 });
 
