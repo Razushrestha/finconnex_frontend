@@ -262,6 +262,22 @@ describe("POST /api/book/[slug]/book", () => {
     });
   });
 
+  it("returns the Google Meet URL from the CRM booking and nothing else", async () => {
+    backend(201, {
+      data: {
+        id: "booking-1",
+        location: "Google Meet",
+        meeting: { meetingLink: "https://meet.google.com/abc-defg-hij" },
+        internalNotes: "do not leak",
+      },
+    });
+    const res = await post(valid);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.meetingLink).toBe("https://meet.google.com/abc-defg-hij");
+    expect(JSON.stringify(body)).not.toContain("do not leak");
+  });
+
   it("forwards nothing the guest should not control", async () => {
     const fetchMock = backend(201, { data: { id: "b" } });
     await post({

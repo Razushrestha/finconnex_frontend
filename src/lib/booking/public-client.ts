@@ -49,6 +49,7 @@ export type PublicBookedResult =
       hostName?: string;
       cancelToken?: string;
       rescheduleToken?: string;
+      meetingLink?: string;
     }
   | PublicFailure;
 
@@ -60,6 +61,7 @@ export type PublicManagedResult =
       startAt?: string;
       cancelToken?: string;
       rescheduleToken?: string;
+      meetingLink?: string;
     }
   | PublicFailure;
 
@@ -213,6 +215,7 @@ export async function bookPublicSlot(
     hostName: str(rec, "hostName"),
     cancelToken: str(rec, "cancelToken"),
     rescheduleToken: str(rec, "rescheduleToken"),
+    meetingLink: str(rec, "meetingLink"),
   };
 }
 
@@ -232,5 +235,6 @@ export async function managePublicBooking(
     startAt: str(rec, "startAt"),
     cancelToken: str(rec, "cancelToken"),
     rescheduleToken: str(rec, "rescheduleToken"),
+    meetingLink: str(rec, "meetingLink"),
   };
 }

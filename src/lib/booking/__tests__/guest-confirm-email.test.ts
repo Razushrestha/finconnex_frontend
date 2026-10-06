@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { allocateConferencingLink } from "@/lib/booking/meeting-link";
+import {
+  allocateConferencingLink,
+  firstHostJoinUrl,
+  joinUrlFromRecord,
+} from "@/lib/booking/meeting-link";
 import { bookingConfirmEmailHtml } from "@/lib/booking/guest-confirm-email";
 import { WEEKDAYS, type BookingPage } from "@/lib/booking/types";
 
@@ -62,6 +66,25 @@ describe("booking conferencing + guest email", () => {
         }),
       ),
     ).toBe("https://meet.google.com/abc-defg-hij");
+  });
+
+  it("reads a Google Meet URL out of a CRM booking", () => {
+    expect(
+      joinUrlFromRecord({
+        id: "booking-1",
+        location: "Google Meet",
+        conferenceData: {
+          entryPoints: [
+            { entryPointType: "video", uri: "https://meet.google.com/lookup/abc-defg-hij" },
+          ],
+        },
+        internalNotes: "staff room https://meet.google.com/zzz-yyyy-xxx",
+      }),
+    ).toBe("https://meet.google.com/lookup/abc-defg-hij");
+    expect(firstHostJoinUrl("Google Meet", "https://meet.google.com/abc-defg-hij")).toBe(
+      "https://meet.google.com/abc-defg-hij",
+    );
+    expect(firstHostJoinUrl("Google Meet")).toBeUndefined();
   });
 
   it("builds the guest confirmation email with host, number, join link, and manage links", () => {

@@ -604,7 +604,10 @@ function publishSnapshot(page: BookingPage) {
   );
 }
 
-export function upsertBookingPage(page: BookingPage) {
+export function upsertBookingPage(
+  page: BookingPage,
+  options?: { publish?: boolean },
+) {
   const normalized = applyMeetingViaToLegacy(page);
   const list = listBookingPages();
   const i = list.findIndex((p) => p.id === normalized.id);
@@ -613,6 +616,7 @@ export function upsertBookingPage(page: BookingPage) {
   else list.unshift(normalized);
   writeStore(list);
   const shouldPublish =
+    options?.publish !== false &&
     normalized.status === "Live" &&
     (!previous || publishSnapshot(previous) !== publishSnapshot(normalized));
   if (shouldPublish) {

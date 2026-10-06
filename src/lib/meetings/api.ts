@@ -10,6 +10,7 @@ import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertMeeting } from "@/lib/meetings/store";
+import { joinUrlFromRecord } from "@/lib/booking/meeting-link";
 import { meetingRelatedApiFields } from "@/lib/meetings/invite-related";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import type {
@@ -291,7 +292,10 @@ export function normalizeMeeting(
       raw.endAt ?? raw.endDateTime ?? raw.endsAt ?? raw.scheduledEndAt,
     ),
     location: pickStr(raw.location, raw.venue) || undefined,
-    meetingLink: pickStr(raw.meetingLink, raw.meetingUrl, raw.url, raw.joinUrl) || undefined,
+    meetingLink:
+      pickStr(raw.meetingLink, raw.meetingUrl, raw.url, raw.joinUrl) ||
+      joinUrlFromRecord(raw) ||
+      undefined,
     attendees: [...internals, ...guests],
     organizerId,
     bookingHostName:

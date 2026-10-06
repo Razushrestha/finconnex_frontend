@@ -102,7 +102,7 @@ export function PublicBookClient({ slug }: { slug: string }) {
     void (async () => {
       const adopt = (found: BookingPage) => {
         const live = found.status === "Live" ? found : { ...found, status: "Live" as const };
-        upsertBookingPage(live);
+        upsertBookingPage(live, { publish: false });
         if (live.status === "Live") recordBookingPageView(live.id);
         setPage(getBookingPageBySlug(slug) ?? live);
       };
@@ -2223,8 +2223,13 @@ function BookFlow({
                     <a
                       href={googleCalendarUrl({
                         title: page.title,
-                        details: page.description,
-                        location: locationLabel,
+                        details: [
+                          page.description,
+                          confirmed.joinUrl ? `Join meeting: ${confirmed.joinUrl}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join("\n"),
+                        location: confirmed.joinUrl || locationLabel,
                         start: confirmed.start,
                         end: confirmed.end,
                       })}
@@ -2242,8 +2247,13 @@ function BookFlow({
                           `${page.slug}.ics`,
                           buildBookingIcs({
                             title: page.title,
-                            description: page.description,
-                            location: locationLabel,
+                            description: [
+                              page.description,
+                              confirmed.joinUrl ? `Join meeting: ${confirmed.joinUrl}` : "",
+                            ]
+                              .filter(Boolean)
+                              .join("\n"),
+                            location: confirmed.joinUrl || locationLabel,
                             start: confirmed.start,
                             end: confirmed.end,
                             guestEmail: confirmed.guestEmail,

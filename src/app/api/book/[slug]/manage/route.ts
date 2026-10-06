@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { crmAuthBaseUrl } from "@/lib/auth/public-api";
+import { joinUrlFromRecord } from "@/lib/booking/meeting-link";
 import { callPublicCrm, publicManagePath } from "@/lib/booking/public-crm";
 import {
   crmFailureResponse,
@@ -70,11 +71,13 @@ export async function POST(
   const booking = asRecord(result.data);
   const str = (key: string) =>
     typeof booking?.[key] === "string" ? (booking[key] as string) : undefined;
+  const meetingLink = joinUrlFromRecord(booking);
   return NextResponse.json({
     bookingId: str("id"),
     status: str("status"),
     startAt: str("startAt"),
     cancelToken: str("cancelToken"),
     rescheduleToken: str("rescheduleToken"),
+    ...(meetingLink ? { meetingLink } : {}),
   });
 }

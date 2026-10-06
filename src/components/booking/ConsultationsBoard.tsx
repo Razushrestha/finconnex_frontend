@@ -110,7 +110,7 @@ async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
   const merged = mergeCrmEventTypePages(local, remote).filter(
     (page) => page.eventType === "Consultation",
   );
-  for (const page of merged) upsertBookingPage(page);
+  for (const page of merged) upsertBookingPage(page, { publish: false });
   return merged;
 }
 

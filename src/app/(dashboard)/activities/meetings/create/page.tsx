@@ -35,6 +35,7 @@ import {
   listActiveConsultations,
   type BookingPage,
 } from "@/lib/booking/types";
+import { firstHostJoinUrl, joinUrlFromRecord } from "@/lib/booking/meeting-link";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
 import { dateInTimezone, isPastBookingStart } from "@/lib/booking/timezones";
 import { asRelatedKind } from "@/lib/activities/create-defaults";
@@ -282,11 +283,9 @@ export default function ScheduleMeetingPage({
           : undefined;
     const meetingLinkValue =
       locationMode === "default"
-        ? selectedCalendar?.meetingViaDetail ||
-          selectedCalendar?.videoLink ||
-          undefined
+        ? firstHostJoinUrl(selectedCalendar?.videoLink)
         : isVideo
-          ? meetingLink
+          ? firstHostJoinUrl(meetingLink)
           : undefined;
     const meetingTypeValue =
       locationMode === "default" && selectedCalendar
@@ -325,6 +324,7 @@ export default function ScheduleMeetingPage({
           : inviteKind === "Contact" || inviteKind === "Lead"
             ? invitees[0]?.relatedId
             : undefined;
+      let emailedLink = meetingLinkValue;
       if (updating && existingId) {
         const startDate = starts[0];
         const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
@@ -352,9 +352,15 @@ export default function ScheduleMeetingPage({
               "The time was moved, but the title, location, and notes could not be saved.",
             );
           }
+          emailedLink = firstHostJoinUrl(
+            updated.meetingLink,
+            joinUrlFromRecord(fresh?.raw),
+            meetingLinkValue,
+          );
         } else {
           const updated = await updateCrmMeeting(existingId, patch);
           if (!updated) throw new Error("Could not update this meeting");
+          emailedLink = firstHostJoinUrl(updated.meetingLink, meetingLinkValue);
         }
         let emailed = false;
         if (invitees.length) {
@@ -365,7 +371,7 @@ export default function ScheduleMeetingPage({
               startLabel: first.startLabel,
               endLabel: first.endLabel,
               location,
-              meetingLink: meetingLinkValue,
+              meetingLink: emailedLink,
               agenda: note,
               relatedKind: inviteKind,
               relatedName: inviteName,
@@ -421,7 +427,10 @@ export default function ScheduleMeetingPage({
         if (!createdId) {
           throw new Error("CRM did not save the meeting");
         }
-        if (!firstCreatedId) firstCreatedId = createdId;
+        if (!firstCreatedId) {
+          firstCreatedId = createdId;
+          emailedLink = firstHostJoinUrl(remote?.meetingLink, meetingLinkValue);
+        }
       }
 
       await sendRelatedMeetingInvites({
@@ -430,7 +439,7 @@ export default function ScheduleMeetingPage({
         startLabel: first.startLabel,
         endLabel: first.endLabel,
         location,
-        meetingLink: meetingLinkValue,
+        meetingLink: emailedLink,
         agenda: note,
         relatedKind: inviteKind,
         relatedName: inviteName,

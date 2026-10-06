@@ -25,7 +25,11 @@ import {
   dispatchBookingNotifications,
   queueBookingLifecycleNotifies,
 } from "@/lib/booking/notify";
-import { allocateConferencingLink } from "@/lib/booking/meeting-link";
+import {
+  allocateConferencingLink,
+  firstHostJoinUrl,
+  joinUrlFromRecord,
+} from "@/lib/booking/meeting-link";
 import {
   PublicBookingError,
   bookPublicSlot,
@@ -107,7 +111,7 @@ const EXACT_SLOT_TOLERANCE_MS = 60 * 1000;
 /** Longest the guest waits on the CRM before their confirmation is shown anyway. */
 const CRM_SYNC_TIMEOUT_MS = 20_000;
 
-type CrmSaved = { bookingId?: string; meeting?: Meeting };
+type CrmSaved = { bookingId?: string; meeting?: Meeting; joinUrl?: string };
 
 async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -167,7 +171,10 @@ async function saveNewAppointmentInCrm(args: {
       }),
     );
     if (booked) {
-      return { bookingId: crmBookingFromResponse(booked.raw)?.id };
+      return {
+        bookingId: crmBookingFromResponse(booked.raw)?.id,
+        joinUrl: joinUrlFromRecord(booked.raw),
+      };
     }
   }
 
@@ -204,8 +211,12 @@ async function moveAppointmentInCrm(args: {
     const moved = await tryCrmBooking(() =>
       rescheduleCrmBooking(bookingId, args.startIso),
     );
+    const record = crmBookingFromResponse(moved);
     // A reschedule replaces the booking with a new one; follow the new id.
-    return { bookingId: crmBookingFromResponse(moved)?.id ?? bookingId };
+    return {
+      bookingId: record?.id ?? bookingId,
+      joinUrl: joinUrlFromRecord(record?.raw ?? moved),
+    };
   }
 
   const meetingId = args.crmMeetingId!;
@@ -235,6 +246,7 @@ type GuestSaved = {
   bookingId: string;
   cancelToken?: string;
   rescheduleToken?: string;
+  joinUrl?: string;
 };
 
 /** Answers worth telling the host; sensitive (ePHI) answers never leave the guest's browser. */
@@ -280,6 +292,7 @@ async function bookGuestSlotInCrm(args: {
       bookingId: res.bookingId,
       cancelToken: res.cancelToken,
       rescheduleToken: res.rescheduleToken,
+      joinUrl: firstHostJoinUrl(res.meetingLink),
     };
   }
   if (res.code === "not_connected") return null;
@@ -307,6 +320,7 @@ async function moveGuestSlotInCrm(args: {
       bookingId: res.bookingId,
       cancelToken: res.cancelToken,
       rescheduleToken: res.rescheduleToken,
+      joinUrl: firstHostJoinUrl(res.meetingLink),
     };
   }
   if (!res.ok && res.code === "not_connected") return null;
@@ -404,7 +418,7 @@ export async function confirmPublicBooking(input: {
     ? input.start
     : new Date(startMs).toISOString();
   const crmSaved: CrmSaved = guestSaved
-    ? { bookingId: guestSaved.bookingId }
+    ? { bookingId: guestSaved.bookingId, joinUrl: guestSaved.joinUrl }
     : ((await withTimeout(
         existing
           ? moveAppointmentInCrm({
@@ -438,6 +452,13 @@ export async function confirmPublicBooking(input: {
     : existing?.crmRescheduleToken;
 
   const joinUrl =
+    firstHostJoinUrl(
+      guestSaved?.joinUrl,
+      crmSaved.joinUrl,
+      crmMeeting?.meetingLink,
+      existing?.joinUrl,
+      page.videoLink,
+    ) ||
     existing?.joinUrl ||
     crmMeeting?.meetingLink ||
     allocateConferencingLink(page, `${page.slug}-${reference}`);
