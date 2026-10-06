@@ -63,6 +63,7 @@ import { BookingPageDesigner } from "@/components/booking/BookingPageDesigner";
 import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
+import { BodyPortal } from "@/components/shared/BodyPortal";
 import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
@@ -910,68 +911,79 @@ function ChooseCalendarTypeModal({
   const [more, setMore] = useState(false);
   const types = more ? [...CALENDAR_TYPES, ...MORE_CALENDAR_TYPES] : CALENDAR_TYPES;
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-labelledby="choose-calendar-title"
-        className="flex max-h-[90vh] w-full max-w-[920px] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative border-b border-[#E5E7EB] px-5 pt-5 pb-4 sm:px-7 sm:pt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <h2
-            id="choose-calendar-title"
-            className="pr-10 text-[18px] font-bold text-slate-800 sm:text-[20px]"
-          >
-            Choose calendar type
-          </h2>
-        </div>
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
-        <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-7 sm:pb-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {types.map((t) => {
-              const Icon = t.icon;
-              return (
-                <button
-                  key={t.title}
-                  type="button"
-                  onClick={() => onSelect({ mode: t.mode, title: t.title })}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
-                >
-                  <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#5A32A3]" />
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-bold text-[#5A32A3]">
-                      {t.title}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+  return (
+    <BodyPortal>
+      <div
+        className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
+        onClick={onClose}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="choose-calendar-title"
+          className="flex max-h-[min(90dvh,720px)] w-full max-w-[min(920px,100%)] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative border-b border-[#E5E7EB] px-5 pt-5 pb-4 sm:px-7 sm:pt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h2
+              id="choose-calendar-title"
+              className="pr-10 text-[18px] font-bold text-slate-800 sm:text-[20px]"
+            >
+              Choose calendar type
+            </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => setMore((v) => !v)}
-            className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-[#5A32A3] hover:underline"
-          >
-            <ChevronRight
-              className={cn("h-4 w-4 transition-transform", more && "rotate-90")}
-            />
-            {more ? "Show fewer types" : "Explore more types"}
-          </button>
+
+          <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-7 sm:pb-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {types.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.title}
+                    type="button"
+                    onClick={() => onSelect({ mode: t.mode, title: t.title })}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
+                  >
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#5A32A3]" />
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-bold text-[#5A32A3]">
+                        {t.title}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setMore((v) => !v)}
+              className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+            >
+              <ChevronRight
+                className={cn("h-4 w-4 transition-transform", more && "rotate-90")}
+              />
+              {more ? "Show fewer types" : "Explore more types"}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </BodyPortal>
   );
 }
 
