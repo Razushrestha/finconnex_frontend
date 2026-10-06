@@ -83,11 +83,13 @@ export type ScheduleMeetingSeed = {
 };
 
 export default function ScheduleMeetingPage({
+  heading = "Schedule Meeting",
   onCancel,
   onSent,
   embedded = false,
   initial,
 }: {
+  heading?: string;
   onCancel?: () => void;
   onSent?: () => void;
   embedded?: boolean;
@@ -404,6 +406,7 @@ export default function ScheduleMeetingPage({
         }
       >
         <MeetingHeader
+          title={heading}
           onCancel={() =>
             onCancel ? onCancel() : router.push("/activities/meetings")
           }

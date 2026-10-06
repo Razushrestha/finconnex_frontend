@@ -59,8 +59,12 @@ export function smokeRecordSearchWiring() {
   }
 
   const hook = readSrc("src/lib/search/use-crm-record-search.ts");
-  if (!hook.includes("searchCrmRecords")) {
-    fail("search hook does not call searchCrmRecords");
+  if (!hook.includes("searchWorkspaceRecords")) {
+    fail("search hook does not call searchWorkspaceRecords");
+  }
+  const wide = readSrc("src/lib/search/workspace-search.ts");
+  if (!wide.includes("searchCrmRecords")) {
+    fail("workspace search does not call searchCrmRecords");
   }
 
   const hit = normalizeRecordSearchHit(

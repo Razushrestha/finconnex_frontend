@@ -8,11 +8,13 @@ import ScheduleMeetingPage, {
 /** Booking "New Appointment" opens the Schedule Meeting form in a dialog. */
 export function NewAppointmentModal({
   open,
+  title = "Schedule Meeting",
   onClose,
   onCreated,
   initial,
 }: {
   open: boolean;
+  title?: string;
   onClose: () => void;
   onCreated: () => void;
   initial?: ScheduleMeetingSeed;
@@ -35,7 +37,7 @@ export function NewAppointmentModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Schedule Meeting"
+        aria-label={title}
         className="flex max-h-[min(92vh,920px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
@@ -43,9 +45,10 @@ export function NewAppointmentModal({
           <ScheduleMeetingPage
             key={
               initial
-                ? `${initial.contactName ?? ""}-${initial.date ?? ""}-${initial.time ?? ""}`
+                ? `${title}-${initial.contactName ?? ""}-${initial.date ?? ""}-${initial.time ?? ""}`
                 : "new"
             }
+            heading={title}
             embedded
             initial={initial}
             onCancel={onClose}

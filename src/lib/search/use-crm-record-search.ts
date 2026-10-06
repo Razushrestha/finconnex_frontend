@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  searchCrmRecords,
-  type CrmRecordSearchHit,
-} from "@/lib/search/api";
+import type { CrmRecordSearchHit } from "@/lib/search/api";
 
 export type RecordSearchSource = "idle" | "api" | "error";
 
@@ -16,7 +13,7 @@ export function useCrmRecordSearch(query: string) {
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
+    if (!q) {
       setHits([]);
       setLoading(false);
       setSource("idle");
@@ -25,12 +22,15 @@ export function useCrmRecordSearch(query: string) {
     }
 
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError(null);
       void (async () => {
         try {
-          const remote = await searchCrmRecords({ q, limit: 12 });
+          const { searchWorkspaceRecords } = await import(
+            "@/lib/search/workspace-search"
+          );
+          const remote = await searchWorkspaceRecords(q);
           if (cancelled) return;
           setHits(remote);
           setSource("api");
@@ -43,7 +43,7 @@ export function useCrmRecordSearch(query: string) {
           if (!cancelled) setLoading(false);
         }
       })();
-    }, 250);
+    }, 300);
 
     return () => {
       cancelled = true;

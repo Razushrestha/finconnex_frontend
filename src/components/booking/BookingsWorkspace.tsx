@@ -301,7 +301,10 @@ function HomeView({
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
   const [editing, setEditing] = useState(false);
-  const [reschedule, setReschedule] = useState<DashboardAppointment | null>(null);
+  const [reschedule, setReschedule] = useState<{
+    row: DashboardAppointment;
+    title: "Edit" | "Reschedule";
+  } | null>(null);
   const [pageSize, setPageSize] = useState(10);
 
   const kpi = useMemo(
@@ -352,7 +355,11 @@ function HomeView({
   }
 
   function openEdit(row: DashboardAppointment) {
-    setReschedule(row);
+    setReschedule({ row, title: "Edit" });
+  }
+
+  function openReschedule(row: DashboardAppointment) {
+    setReschedule({ row, title: "Reschedule" });
   }
 
   async function removeAppointment(row: DashboardAppointment) {
@@ -485,6 +492,7 @@ function HomeView({
                 }
                 onView={() => openView(row)}
                 onEdit={() => openEdit(row)}
+                onReschedule={() => openReschedule(row)}
                 onDelete={() => void removeAppointment(row)}
               />
             ))}
@@ -539,6 +547,7 @@ function HomeView({
                     }
                     onView={openView}
                     onEdit={openEdit}
+                    onReschedule={openReschedule}
                     onDelete={(row) => void removeAppointment(row)}
                   />
                 ))}
@@ -661,7 +670,13 @@ function HomeView({
             const row = detail;
             setDetail(null);
             setEditing(false);
-            if (row) setReschedule(row);
+            if (row) setReschedule({ row, title: "Reschedule" });
+          }}
+          onEditMeeting={() => {
+            const row = detail;
+            setDetail(null);
+            setEditing(false);
+            if (row) setReschedule({ row, title: "Edit" });
           }}
           onCancel={() => {
             if (detail) void removeAppointment(detail);
@@ -675,7 +690,8 @@ function HomeView({
       ) : null}
       <NewAppointmentModal
         open={reschedule != null}
-        initial={reschedule ? scheduleSeed(reschedule) : undefined}
+        title={reschedule?.title ?? "Schedule Meeting"}
+        initial={reschedule ? scheduleSeed(reschedule.row) : undefined}
         onClose={() => setReschedule(null)}
         onCreated={() => {
           setReschedule(null);
@@ -780,10 +796,12 @@ function consultantLabel(row: DashboardAppointment) {
 }
 
 function BookingStatusMenu({
+  onEdit,
   onReschedule,
   onCancel,
   tone = "neutral",
 }: {
+  onEdit: () => void;
   onReschedule: () => void;
   onCancel: () => void;
   tone?: "neutral" | "blue";
@@ -849,6 +867,18 @@ function BookingStatusMenu({
                 role="menuitem"
                 onClick={() => {
                   setOpen(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[#5B4FE8]" />
+                Edit
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
                   onReschedule();
                 }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
@@ -882,6 +912,7 @@ function AppointmentDayGroup({
   dimmedFor,
   onView,
   onEdit,
+  onReschedule,
   onDelete,
 }: {
   label: string;
@@ -889,6 +920,7 @@ function AppointmentDayGroup({
   dimmedFor: (row: DashboardAppointment) => boolean;
   onView: (row: DashboardAppointment) => void;
   onEdit: (row: DashboardAppointment) => void;
+  onReschedule: (row: DashboardAppointment) => void;
   onDelete: (row: DashboardAppointment) => void;
 }) {
   return (
@@ -908,6 +940,7 @@ function AppointmentDayGroup({
           dimmed={dimmedFor(row)}
           onView={() => onView(row)}
           onEdit={() => onEdit(row)}
+          onReschedule={() => onReschedule(row)}
           onDelete={() => onDelete(row)}
         />
       ))}
@@ -920,12 +953,14 @@ function AppointmentCard({
   dimmed = false,
   onView,
   onEdit,
+  onReschedule,
   onDelete,
 }: {
   row: DashboardAppointment;
   dimmed?: boolean;
   onView: () => void;
   onEdit: () => void;
+  onReschedule: () => void;
   onDelete: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -970,7 +1005,11 @@ function AppointmentCard({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <BookingStatusMenu onReschedule={onEdit} onCancel={onDelete} />
+              <BookingStatusMenu
+                onEdit={onEdit}
+                onReschedule={onReschedule}
+                onCancel={onDelete}
+              />
             </div>
           </div>
           <div className="mt-2.5 grid grid-cols-1 gap-1.5 text-[12px] text-slate-600 min-[480px]:grid-cols-2">
@@ -1032,12 +1071,14 @@ function AppointmentRow({
   dimmed = false,
   onView,
   onEdit,
+  onReschedule,
   onDelete,
 }: {
   row: DashboardAppointment;
   dimmed?: boolean;
   onView: () => void;
   onEdit: () => void;
+  onReschedule: () => void;
   onDelete: () => void;
 }) {
   const eventName = row.eventTypeName || row.type;
@@ -1103,7 +1144,11 @@ function AppointmentRow({
         )}
       </td>
       <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
-        <BookingStatusMenu onReschedule={onEdit} onCancel={onDelete} />
+        <BookingStatusMenu
+          onEdit={onEdit}
+          onReschedule={onReschedule}
+          onCancel={onDelete}
+        />
       </td>
     </tr>
   );
@@ -1325,6 +1370,7 @@ function AppointmentDrawer({
   editing,
   onClose,
   onEdit,
+  onEditMeeting,
   onReschedule,
   onCancel,
   onSaved,
@@ -1333,6 +1379,7 @@ function AppointmentDrawer({
   editing: boolean;
   onClose: () => void;
   onEdit: () => void;
+  onEditMeeting: () => void;
   onReschedule: () => void;
   onCancel: () => void;
   onSaved: () => void;
@@ -1412,6 +1459,7 @@ function AppointmentDrawer({
         whenLabel={whenLabel}
         timeLabel={timeLabel}
         onClose={onClose}
+        onEdit={onEditMeeting}
         onReschedule={onReschedule}
         onCancel={onCancel}
       />
@@ -1575,6 +1623,7 @@ function AppointmentSummary({
   whenLabel,
   timeLabel,
   onClose,
+  onEdit,
   onReschedule,
   onCancel,
 }: {
@@ -1584,11 +1633,11 @@ function AppointmentSummary({
   whenLabel: string;
   timeLabel: string;
   onClose: () => void;
+  onEdit: () => void;
   onReschedule: () => void;
   onCancel: () => void;
 }) {
   const [tab, setTab] = useState<"appointment" | "customer" | "audit">("appointment");
-  const price = listPriceLabel(row);
   const tabs = [
     { id: "appointment" as const, label: "Appointment Info" },
     { id: "customer" as const, label: "Customer Info" },
@@ -1620,7 +1669,12 @@ function AppointmentSummary({
           <div className="rounded-lg border border-[#E7E9F2] bg-[#F8F7FC] px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <p className="text-[15px] font-semibold leading-snug text-slate-900">{whenLabel}</p>
-              <BookingStatusMenu tone="blue" onReschedule={onReschedule} onCancel={onCancel} />
+              <BookingStatusMenu
+                tone="blue"
+                onEdit={onEdit}
+                onReschedule={onReschedule}
+                onCancel={onCancel}
+              />
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-500">
               <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -1680,7 +1734,7 @@ function AppointmentSummary({
             ) : null}
 
             {tab === "customer" ? (
-              <CustomerInfoTab row={row} email={email} price={price} />
+              <CustomerInfoTab row={row} email={email} />
             ) : null}
 
             {tab === "audit" ? <AuditInfoTab row={row} email={email} /> : null}
@@ -1694,11 +1748,9 @@ function AppointmentSummary({
 function CustomerInfoTab({
   row,
   email,
-  price,
 }: {
   row: DashboardAppointment;
   email: string;
-  price: string | null;
 }) {
   const [section, setSection] = useState<"booking" | "questions" | "payment">("booking");
   const paid = row.paymentStatus === "Paid";
@@ -1760,13 +1812,42 @@ function CustomerInfoTab({
         <p className="px-4 py-6 text-[13px] text-slate-400">No answers yet.</p>
       ) : null}
       {section === "payment" ? (
-        <div>
-          <SummaryRow label="Status">{row.paymentStatus || "—"}</SummaryRow>
-          <SummaryRow label="Price">{price || "—"}</SummaryRow>
-        </div>
+        <PaymentBreakdown row={row} />
       ) : null}
     </div>
   );
+}
+
+function PaymentBreakdown({ row }: { row: DashboardAppointment }) {
+  const total = row.price && row.price > 0 ? row.price : 0;
+  const paidAmount = row.paymentStatus === "Paid" ? total : 0;
+  const outstanding = Math.max(0, total - paidAmount);
+  const status = row.paymentStatus || (total > 0 ? "Due" : "Free");
+  return (
+    <div>
+      <SummaryRow label="Status">
+        <span className={status === "Paid" ? "font-medium text-red-500" : undefined}>
+          {status}
+        </span>
+      </SummaryRow>
+      <SummaryRow label="Total">{formatPaymentAmount(total, row.currency)}</SummaryRow>
+      <SummaryRow label="Paid">{formatPaymentAmount(paidAmount, row.currency)}</SummaryRow>
+      <SummaryRow label="To Be Paid">
+        <span className="font-medium text-red-500">
+          {formatPaymentAmount(outstanding, row.currency, outstanding === 0)}
+        </span>
+      </SummaryRow>
+    </div>
+  );
+}
+
+function formatPaymentAmount(amount: number, currency?: string, plainZero = false) {
+  const known = ["NPR", "INR", "AUD", "USD", "GBP"];
+  const code = (known.includes(currency || "") ? currency : "NPR") as BookingCurrency;
+  const prefix = currencyPrefix(code);
+  const value = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  if (plainZero || value === 0) return `${prefix} 0`;
+  return `${prefix} ${value.toFixed(2)}`;
 }
 
 function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string }) {

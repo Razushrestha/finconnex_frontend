@@ -60,6 +60,22 @@ const DESTINATIONS: SearchItem[] = [
   { label: "Notifications", href: "/notifications", icon: Bell, keywords: ["notifications"] },
   { label: "Rules", href: "/settings/data-management/rules", icon: Scale, keywords: ["rules"] },
   { label: "Users", href: "/users", icon: Users, keywords: ["users", "invite", "role", "members"] },
+  { label: "Companies", href: "/sales/companies", icon: Building2, keywords: ["companies", "accounts"] },
+  { label: "Calls", href: "/activities/calls", icon: Phone, keywords: ["calls"] },
+  { label: "Meetings", href: "/activities/meetings", icon: Calendar, keywords: ["meetings", "appointments"] },
+  { label: "Notes", href: "/activities/notes", icon: StickyNote, keywords: ["notes"] },
+  { label: "Reminders", href: "/activities/reminders", icon: Bell, keywords: ["reminders"] },
+  { label: "Booking", href: "/booking", icon: Calendar, keywords: ["booking", "appointments", "consultations"] },
+  { label: "Documents", href: "/documents/library", icon: FileText, keywords: ["documents", "library"] },
+  { label: "Document Requests", href: "/documents/requests", icon: FileText, keywords: ["document requests"] },
+  { label: "Signature", href: "/signature", icon: FileText, keywords: ["signature", "sign"] },
+  { label: "Estimates", href: "/finance/estimates", icon: FileText, keywords: ["estimates"] },
+  { label: "Quotations", href: "/finance/quotations", icon: FileText, keywords: ["quotations", "quotes"] },
+  { label: "Invoices", href: "/finance/invoices", icon: FileText, keywords: ["invoices"] },
+  { label: "Payments", href: "/finance/payments", icon: FileText, keywords: ["payments"] },
+  { label: "Products", href: "/finance/products", icon: FileText, keywords: ["products", "services", "items"] },
+  { label: "Reports", href: "/reports", icon: FileText, keywords: ["reports"] },
+  { label: "Automations", href: "/automations", icon: Settings, keywords: ["automations", "workflow"] },
   { label: "Settings", href: "/settings", icon: Settings, keywords: ["settings"] },
   { label: "My Preferences", href: "/settings/my-preferences", icon: Settings, keywords: ["preferences", "theme"] },
 ];
@@ -117,9 +133,9 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return DESTINATIONS.filter((d) => {
-      const hay = (d.keywords ?? []).join(" ").toLowerCase();
+      const hay = `${d.label} ${(d.keywords ?? []).join(" ")}`.toLowerCase();
       return hay.includes(q);
-    }).slice(0, 10);
+    });
   }, [query]);
 
   const recentItems = React.useMemo(() => {
@@ -197,7 +213,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
 
         <div className="border-t border-border" />
 
-        <div className="max-h-96 overflow-y-auto px-3 py-3">
+        <div className="max-h-[min(70vh,36rem)] overflow-y-auto px-3 py-3">
           {!showRecent ? (
             <div className="mb-3">
               <div className="flex items-center justify-between px-2">
@@ -215,7 +231,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                   {records.loading
                     ? "Searching…"
                     : records.source === "api"
-                      ? "Live CRM"
+                      ? `${records.hits.length} live`
                       : records.source === "error"
                         ? "Offline"
                         : "Type to search"}
@@ -260,7 +276,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                 records.source === "api" &&
                 records.hits.length === 0 ? (
                   <p className="px-2 py-2 text-[12px] text-slate-400">
-                    No CRM records match
+                    No live records match
                   </p>
                 ) : null}
               </div>

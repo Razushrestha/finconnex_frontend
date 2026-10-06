@@ -301,7 +301,7 @@ export function WorkQueueSidebar({
                 onTimeFilterChange(value as WorkQueueTimeFilter);
               }
             }}
-            className="h-8 w-full appearance-none border-0 border-b border-[var(--wq-line)] bg-transparent pr-6 text-[12.5px] font-medium text-slate-700 outline-none focus:border-slate-400"
+            className="fc-select-caret h-8 w-full appearance-none border-0 border-b border-[var(--wq-line)] bg-transparent pr-6 text-[12.5px] font-medium text-slate-700 outline-none focus:border-slate-400"
             aria-label="Activity time filter"
           >
             <option value="today-overdue">Today &amp; Overdue</option>

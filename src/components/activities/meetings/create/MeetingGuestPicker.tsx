@@ -184,8 +184,8 @@ export function MeetingGuestPicker({
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {query.trim()
-                    ? `+ Add contact “${query.trim()}”`
-                    : "+ Add contact"}
+                    ? `Add contact “${query.trim()}”`
+                    : "Add contact"}
                 </button>
                 {matches.length === 0 ? (
                   <p className="px-3 py-2 text-sm text-slate-400">
