@@ -56,6 +56,20 @@ function fieldHasOptions(type: BookingFormFieldType | null) {
   return type === "radio" || type === "checkbox" || type === "dropdown";
 }
 
+/** Trimmed, non-blank options, each once (case and spacing ignored). */
+export function cleanFieldOptions(options: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of options ?? []) {
+    const option = raw.trim();
+    const key = option.toLowerCase().replace(/\s+/g, " ");
+    if (!option || seen.has(key)) continue;
+    seen.add(key);
+    out.push(option);
+  }
+  return out;
+}
+
 type AddressPart = { id: string; label: string; enabled: boolean };
 
 function defaultAddressParts(): AddressPart[] {
@@ -151,7 +165,7 @@ export function bookingFormFromQuestions(
           required: hit.required,
           hidden: Boolean(hit.hidden),
           ephi: hit.ephi,
-          options: hit.options,
+          options: hit.options ? cleanFieldOptions(hit.options) : undefined,
           addressParts: hit.addressParts,
           type: isBookingFieldType(hit.fieldType) ? hit.fieldType : field.type,
         }
@@ -167,7 +181,7 @@ export function bookingFormFromQuestions(
       required: row.required,
       hidden: Boolean(row.hidden),
       ephi: row.ephi,
-      options: row.options,
+      options: row.options ? cleanFieldOptions(row.options) : undefined,
       addressParts: row.addressParts,
       type: isBookingFieldType(row.fieldType) ? row.fieldType : "single_line",
     });
@@ -242,6 +256,7 @@ function AddFieldDrawer({
   const [mandatory, setMandatory] = useState(false);
   const [ephi, setEphi] = useState(false);
   const [options, setOptions] = useState<string[]>([""]);
+  const [optionsError, setOptionsError] = useState("");
   const [addressParts, setAddressParts] = useState<AddressPart[]>(defaultAddressParts);
 
   useEffect(() => {
@@ -252,6 +267,7 @@ function AddFieldDrawer({
       setMandatory(false);
       setEphi(false);
       setOptions([""]);
+      setOptionsError("");
       setAddressParts(defaultAddressParts());
       const frame = requestAnimationFrame(() => {
         requestAnimationFrame(() => setVisible(true));
@@ -280,17 +296,18 @@ function AddFieldDrawer({
     if (!picked) return;
     const nextLabel = label.trim();
     if (!nextLabel) return;
-    const nextOptions = options.map((item) => item.trim()).filter(Boolean);
+    const nextOptions = cleanFieldOptions(options);
+    // A choice field needs real choices; never invent a placeholder option.
+    if (fieldHasOptions(picked) && !nextOptions.length) {
+      setOptionsError("Add at least one option.");
+      return;
+    }
     onSelect({
       type: picked,
       label: nextLabel,
       required: mandatory,
       ephi: picked === "address" ? false : ephi,
-      options: fieldHasOptions(picked)
-        ? nextOptions.length
-          ? nextOptions
-          : ["Option"]
-        : undefined,
+      options: fieldHasOptions(picked) ? nextOptions : undefined,
       addressParts:
         picked === "address"
           ? addressParts.map((part) => ({
@@ -370,13 +387,14 @@ function AddFieldDrawer({
                       <input
                         value={option}
                         placeholder="Option"
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setOptionsError("");
                           setOptions((prev) =>
                             prev.map((item, itemIndex) =>
                               itemIndex === index ? e.target.value : item,
                             ),
-                          )
-                        }
+                          );
+                        }}
                         className="h-10 min-w-0 flex-1 rounded-md border border-[#D6D3E0] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/50"
                       />
                       {index === options.length - 1 ? (
@@ -404,6 +422,11 @@ function AddFieldDrawer({
                       )}
                     </div>
                   ))}
+                  {optionsError ? (
+                    <p role="alert" className="text-[12px] font-medium text-rose-600">
+                      {optionsError}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {picked === "address" ? (

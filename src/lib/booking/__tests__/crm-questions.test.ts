@@ -42,3 +42,19 @@ describe("booking form ↔ CRM questions", () => {
     ]);
   });
 });
+
+describe("choice field options", () => {
+  it("drops blank and repeated options", async () => {
+    const { cleanFieldOptions } = await import("@/components/booking/BookingFormStep");
+    expect(cleanFieldOptions(["", " Yes ", "yes", "No", "  ", "No "])).toEqual(["Yes", "No"]);
+    expect(cleanFieldOptions(undefined)).toEqual([]);
+  });
+
+  it("cleans blank options out of a form saved before the fix", async () => {
+    const { bookingFormFromQuestions } = await import("@/components/booking/BookingFormStep");
+    const form = bookingFormFromQuestions([
+      { id: "q", label: "Test Radio", required: false, fieldType: "radio", options: ["", "A", " ", "B"] },
+    ]);
+    expect(form.fields.find((f) => f.id === "q")?.options).toEqual(["A", "B"]);
+  });
+});

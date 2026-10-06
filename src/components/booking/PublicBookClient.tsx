@@ -2845,7 +2845,7 @@ function GuestQuestion({
   const inputClass =
     "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 hover:border-violet-300 focus:border-[#5B4BDB] focus:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]";
 
-  if (question.fieldType === "dropdown" && question.options?.length) {
+  if (question.fieldType === "dropdown" && question.options?.some((option) => option.trim())) {
     return (
       <label className="block">
         {label}
@@ -2855,7 +2855,7 @@ function GuestQuestion({
           className={inputClass}
         >
           <option value="">Select</option>
-          {question.options.map((option) => (
+          {question.options.filter((option) => option.trim()).map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
@@ -2866,12 +2866,12 @@ function GuestQuestion({
     );
   }
 
-  if (question.fieldType === "radio" && question.options?.length) {
+  if (question.fieldType === "radio" && question.options?.some((option) => option.trim())) {
     return (
       <div>
         {label}
         <div className="space-y-2">
-          {question.options.map((option) => (
+          {question.options.filter((option) => option.trim()).map((option) => (
             <label
               key={option}
               className="flex items-center gap-2 text-[13px] text-slate-700"
