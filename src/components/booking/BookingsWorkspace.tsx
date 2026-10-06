@@ -28,6 +28,7 @@ import {
   Pencil,
   ExternalLink,
 } from "lucide-react";
+import { BodyPortal } from "@/components/shared/BodyPortal";
 import { cn } from "@/lib/utils";
 import { crmRecordHref, useCrmRecordName } from "@/lib/crm/related-record";
 import { toast } from "@/lib/notify/toast";
@@ -246,6 +247,7 @@ export function BookingsWorkspace({
           {section === "consultants" ? (
             <ConsultantsPanel
               consultants={crm.consultants}
+              appointments={crm.appointments}
               loading={crm.loading}
               error={crm.error}
             />
@@ -2127,15 +2129,64 @@ function PagesPanel({
   );
 }
 
+type ConsultantMeetings = {
+  completed: DashboardAppointment[];
+  upcoming: DashboardAppointment[];
+};
+
+/**
+ * Splits a consultant's appointments at "now": a meeting that has ended is
+ * completed; one still to start or under way is upcoming. Appointments are
+ * matched by consultant id, or by name for CRM meetings that carry only the
+ * host's name.
+ */
+function meetingsByConsultant(
+  consultants: DashboardConsultant[],
+  appointments: DashboardAppointment[],
+  now = Date.now(),
+): Map<string, ConsultantMeetings> {
+  const byId = new Map<string, ConsultantMeetings>();
+  const byName = new Map<string, ConsultantMeetings>();
+  for (const c of consultants) {
+    const bucket: ConsultantMeetings = { completed: [], upcoming: [] };
+    byId.set(c.id, bucket);
+    byName.set(c.name.trim().toLowerCase(), bucket);
+  }
+  for (const row of appointments) {
+    const bucket =
+      byId.get(row.consultantId) ??
+      byName.get((row.consultantName ?? "").trim().toLowerCase());
+    if (!bucket) continue;
+    const start = parseAppointmentStart(row.start).getTime();
+    const end = row.end ? parseAppointmentStart(row.end).getTime() : start;
+    if (Number.isNaN(start)) continue;
+    (Math.max(start, end || start) < now ? bucket.completed : bucket.upcoming).push(row);
+  }
+  for (const bucket of byId.values()) {
+    const at = (row: DashboardAppointment) => parseAppointmentStart(row.start).getTime();
+    bucket.upcoming.sort((a, b) => at(a) - at(b));
+    bucket.completed.sort((a, b) => at(b) - at(a));
+  }
+  return byId;
+}
+
 function ConsultantsPanel({
   consultants,
+  appointments,
   loading,
   error,
 }: {
   consultants: DashboardConsultant[];
+  appointments: DashboardAppointment[];
   loading: boolean;
   error: string | null;
 }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const meetings = useMemo(
+    () => meetingsByConsultant(consultants, appointments),
+    [consultants, appointments],
+  );
+
   if (error) {
     return <p className="text-[13px] text-rose-600">{error}</p>;
   }
@@ -2148,27 +2199,169 @@ function ConsultantsPanel({
     );
   }
 
+  const open = consultants.find((c) => c.id === openId) ?? null;
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {consultants.map((c) => (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {consultants.map((c) => {
+          const counts = meetings.get(c.id) ?? { completed: [], upcoming: [] };
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setOpenId(c.id)}
+              aria-label={`${c.name}: ${counts.completed.length} completed and ${counts.upcoming.length} upcoming meetings`}
+              className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[#5A32A3]/30 hover:bg-[#FBF9FE] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
+            >
+              <div className="flex items-center gap-3">
+                <ConsultantFace name={c.name} photo={c.photo} className="h-12 w-12 shrink-0 text-[13px]" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900">{c.name}</p>
+                  <p className="truncate text-[12px] text-slate-500">{c.role}</p>
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold">
+                    <span className="text-emerald-600">{counts.completed.length} completed</span>
+                    <span className="text-[var(--brand-primary,#5A32A3)]">
+                      {counts.upcoming.length} upcoming
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {open ? (
+        <ConsultantMeetingsModal
+          consultant={open}
+          meetings={meetings.get(open.id) ?? { completed: [], upcoming: [] }}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function ConsultantMeetingsModal({
+  consultant,
+  meetings,
+  onClose,
+}: {
+  consultant: DashboardConsultant;
+  meetings: ConsultantMeetings;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <BodyPortal>
+      <div
+        className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
+        onClick={onClose}
+      >
         <div
-          key={c.id}
-          className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="consultant-meetings-title"
+          className="flex max-h-[min(90dvh,760px)] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F3ECFB] text-[13px] font-bold text-[#5A32A3]">
-              {appointmentInitials(c.name)}
-            </div>
+          <div className="flex items-center gap-3 border-b border-[#E5E7EB] px-5 py-4">
+            <ConsultantFace
+              name={consultant.name}
+              photo={consultant.photo}
+              className="h-10 w-10 shrink-0 text-[12px]"
+            />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-slate-900">{c.name}</p>
-              <p className="text-[12px] text-slate-500">{c.role}</p>
+              <h2 id="consultant-meetings-title" className="truncate text-[16px] font-bold text-slate-900">
+                {consultant.name}
+              </h2>
+              <p className="text-[12px] font-semibold">
+                <span className="text-emerald-600">{meetings.completed.length} completed</span>
+                <span className="text-slate-300"> · </span>
+                <span className="text-[var(--brand-primary,#5A32A3)]">
+                  {meetings.upcoming.length} upcoming
+                </span>
+              </p>
             </div>
-            <span className="text-[13px] font-bold tabular-nums text-slate-700">
-              {c.bookings}
-            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="min-h-0 space-y-5 overflow-y-auto px-5 py-4">
+            <MeetingList
+              title="Upcoming"
+              tone="text-[var(--brand-primary,#5A32A3)]"
+              rows={meetings.upcoming}
+              empty="No upcoming meetings."
+            />
+            <MeetingList
+              title="Completed"
+              tone="text-emerald-600"
+              rows={meetings.completed}
+              empty="No completed meetings yet."
+            />
           </div>
         </div>
-      ))}
-    </div>
+      </div>
+    </BodyPortal>
+  );
+}
+
+function MeetingList({
+  title,
+  tone,
+  rows,
+  empty,
+}: {
+  title: string;
+  tone: string;
+  rows: DashboardAppointment[];
+  empty: string;
+}) {
+  return (
+    <section>
+      <h3 className={cn("mb-2 text-[12px] font-bold tracking-wide uppercase", tone)}>
+        {title} <span className="text-slate-400">({rows.length})</span>
+      </h3>
+      {rows.length === 0 ? (
+        <p className="rounded-lg bg-slate-50 px-3 py-3 text-[12px] text-slate-500">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+          {rows.map((row) => (
+            <li key={row.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5">
+              <div className="w-[118px] shrink-0">
+                <p className="text-[12px] font-semibold text-slate-800">{formatGroupDate(row.start)}</p>
+                <p className="text-[11px] text-slate-500">{formatTimeRange(row)}</p>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-slate-900">
+                  {row.guestName || "Guest"}
+                </p>
+                <p className="truncate text-[12px] text-slate-500">
+                  {row.eventTypeName || row.topic}
+                </p>
+              </div>
+              {row.relatedId ? (
+                <div className="shrink-0 text-[12px]">
+                  <RelatedRecordLink kind={row.relatedKind} id={row.relatedId} />
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
