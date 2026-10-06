@@ -8,6 +8,8 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { fromCrmQuestions } from "@/lib/booking/crm-questions";
+import type { BookingQuestion } from "@/lib/booking/types";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { silentRequest } from "@/lib/notify/fetch-notifier";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
@@ -74,6 +76,8 @@ export type CrmEventType = {
   isPublic?: boolean;
   locationType?: string;
   location?: string;
+  /** The consultation's booking form, as saved in the CRM. */
+  questions?: BookingQuestion[];
 };
 
 export type CrmAvailableSlot = {
@@ -428,6 +432,7 @@ export function normalizeCrmEventType(
     hostNames,
     locationType: locationType || undefined,
     location: location || undefined,
+    questions: fromCrmQuestions(row.questions),
   };
 }
 
@@ -636,7 +641,7 @@ export function crmEventTypeToBookingPage(
       start: "09:00",
       end: "17:00",
     })),
-    questions: [],
+    questions: eventType.questions ?? [],
     confirmationTemplate: "",
     reminderTemplate: "",
     status,

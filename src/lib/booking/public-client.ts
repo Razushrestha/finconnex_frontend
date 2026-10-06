@@ -202,6 +202,7 @@ export async function bookPublicSlot(
     notes?: string;
     timezone?: string;
     hostId?: string;
+    answers?: Record<string, string>;
   },
 ): Promise<PublicBookedResult> {
   const res = await post(endpoint(slug, "book"), input);

@@ -262,6 +262,21 @@ function guestNotes(page: BookingPage, answers: Record<string, string>): string 
 }
 
 /**
+ * Answers the CRM saves on the lead as custom field values. Sensitive (ePHI)
+ * answers and the invitee's own details are not sent.
+ */
+function crmAnswers(page: BookingPage, answers: Record<string, string>) {
+  const out: Record<string, string> = {};
+  for (const [id, value] of Object.entries(answers)) {
+    const question = page.questions?.find((q) => q.id === id);
+    if (!question || question.ephi || !value?.trim()) continue;
+    if (["name", "email", "phone", "guests"].includes(id)) continue;
+    out[id] = value.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
  * Books through the backend's public booking API, which needs no CRM login: the
  * only way a signed-out guest's appointment can reach Bookings → Upcoming
  * Appointments. Returns null when this page is not connected to the CRM (the
@@ -286,6 +301,7 @@ async function bookGuestSlotInCrm(args: {
     timezone: args.timezone,
     hostId: args.hostId,
     notes: notes || undefined,
+    answers: crmAnswers(args.page, args.answers),
   });
   if (res.ok) {
     return {

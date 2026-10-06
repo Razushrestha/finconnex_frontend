@@ -68,6 +68,7 @@ import {
   updateCrmEventType,
 } from "@/lib/booking/api";
 import { toast } from "@/lib/notify/toast";
+import { toCrmQuestions } from "@/lib/booking/crm-questions";
 import {
   OfflineLocationFields,
   initialOfflineLocation,
@@ -1644,22 +1645,37 @@ export function ConsultationOverview({
               embedded
               initial={bookingFormFromQuestions(page.questions, page)}
               onNext={(values) => {
+                const questions = values.fields.map((field) => ({
+                  id: field.id,
+                  label: field.label,
+                  required: field.required,
+                  hidden: field.hidden,
+                  fieldType: field.type,
+                  ephi: field.ephi,
+                  options: field.options,
+                  addressParts: field.addressParts,
+                }));
                 onSaved({
                   ...page,
-                  questions: values.fields.map((field) => ({
-                    id: field.id,
-                    label: field.label,
-                    required: field.required,
-                    hidden: field.hidden,
-                    fieldType: field.type,
-                    ephi: field.ephi,
-                    options: field.options,
-                    addressParts: field.addressParts,
-                  })),
+                  questions,
                   termsEnabled: values.terms,
                   termsHtml: values.termsText,
                   confirmationTemplate: values.freeButton,
                 });
+                // The CRM keeps the form for every browser and the guest page,
+                // and lists each custom field under Settings → Custom Fields.
+                const crmId = crmEventTypeIdOf(page);
+                if (crmId) {
+                  void patchCrmEventType(crmId, { questions: toCrmQuestions(questions) }).catch(
+                    (err: unknown) => {
+                      toast.error(
+                        err instanceof Error
+                          ? `The form was saved here, but not in the CRM: ${err.message}`
+                          : "The form was saved here, but not in the CRM.",
+                      );
+                    },
+                  );
+                }
               }}
             />
           ) : null}

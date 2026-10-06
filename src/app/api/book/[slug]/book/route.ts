@@ -58,6 +58,16 @@ export async function POST(
   const notes = text(body.notes, 5000);
   const timezone = validTimeZone(body.timezone);
   const hostId = typeof body.hostId === "string" ? body.hostId.trim() : "";
+  // The form's custom answers; the CRM checks them against the questions.
+  const answersIn = asRecord(body.answers);
+  const answers = answersIn
+    ? Object.fromEntries(
+        Object.entries(answersIn)
+          .filter(([key, value]) => key.length <= 60 && typeof value === "string" && value.trim())
+          .slice(0, 50)
+          .map(([key, value]) => [key, String(value).trim().slice(0, 2000)]),
+      )
+    : {};
   if (hostId && !HOST_ID.test(hostId)) return invalid("Choose a valid host");
 
   const result = await callPublicCrm(crmAuthBaseUrl(), publicBookingPath(ref, "/book"), {
@@ -70,6 +80,7 @@ export async function POST(
       ...(notes ? { notes } : {}),
       ...(timezone ? { timezone } : {}),
       ...(hostId ? { hostId } : {}),
+      ...(Object.keys(answers).length ? { answers } : {}),
     },
   });
   if (!result.ok) return crmFailureResponse(result);
