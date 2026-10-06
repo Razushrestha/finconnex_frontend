@@ -687,7 +687,7 @@ function CreateSignatureRequestForm() {
 
   const expiryFromDays = (days: number) => {
     const date = new Date();
-    date.setDate(date.getDate() + Math.max(0, days));
+    date.setDate(date.getDate() + Math.min(31, Math.max(0, days)));
     const dd = String(date.getDate()).padStart(2, "0");
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const yyyy = date.getFullYear();

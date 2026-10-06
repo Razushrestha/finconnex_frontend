@@ -5,7 +5,10 @@ import { Calendar, ChevronDown, FileText, Plus } from "lucide-react";
 import {
   type ZohoSendFormSettings,
 } from "@/components/documents/signature/create/ZohoStyleSendForm";
-import { DaysToCompleteInput } from "@/components/documents/signature/create/DaysToCompleteInput";
+import {
+  DaysToCompleteInput,
+  ReminderEveryDaysInput,
+} from "@/components/documents/signature/create/DaysToCompleteInput";
 import { cn } from "@/lib/utils";
 
 const DOCUMENT_TYPES = [
@@ -204,21 +207,12 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
                 <div className="flex flex-col gap-3 text-[13px] text-slate-600">
                   <div className="flex flex-wrap items-center gap-2">
                     <span>Send a reminder every</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={90}
+                    <ReminderEveryDaysInput
                       value={settings.reminderEveryDays}
-                      onChange={(e) =>
-                        onChangeSettings({
-                          reminderEveryDays: Math.max(
-                            1,
-                            Number(e.target.value) || 1,
-                          ),
-                        })
+                      onChange={(reminderEveryDays) =>
+                        onChangeSettings({ reminderEveryDays })
                       }
                       className={cn(fieldClass, "w-[72px]")}
-                      aria-label="Reminder interval in days"
                     />
                     <span>day(s)</span>
                   </div>
