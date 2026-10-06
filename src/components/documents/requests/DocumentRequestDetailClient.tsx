@@ -33,10 +33,12 @@ import {
   type RequestedDocLine,
 } from "@/lib/documents/requests/types";
 import {
+  approveCrmDocumentRequest,
   getCrmDocumentRequest,
   isCrmDocumentRequestId,
+  receiveCrmDocumentRequest,
   syncCrmDocumentRequestStatus,
-  toCreateDocumentRequestBody,
+  toUpdateDocumentRequestBody,
   tryCrmDocumentRequest,
   updateCrmDocumentRequest,
 } from "@/lib/documents/requests/api";
@@ -55,8 +57,11 @@ import {
   downloadRequestFiles,
   getCachedRequestFile,
   interactionTimeline,
+  requestHasClientUpload,
+  requestWasOpened,
   nowStamp,
   patchItem,
+  progressFromItems,
   requestItems,
   triggerDownload,
   uploadedItems,
@@ -79,11 +84,41 @@ const DETAIL_PIPELINE: {
   { status: "Approved", label: "Completed" },
 ];
 
-function pipelineIndex(status: DocumentRequestStatus) {
-  if (status === "Approved") return 3;
-  if (status === "Received") return 2;
-  if (status === "Pending") return 1;
-  if (status === "Requested") return 0;
+function mergeReviewItems(
+  local: RequestedDocLine[] | undefined,
+  remote: RequestedDocLine[] | undefined,
+): RequestedDocLine[] | undefined {
+  if (!remote?.length) return local;
+  if (!local?.length) return remote;
+  const localById = new Map(local.map((item) => [item.id, item]));
+  return remote.map((item) => {
+    const prev = localById.get(item.id);
+    if (!prev) return item;
+    const reviewed =
+      (prev.status === "Accepted" || prev.status === "Rejected") &&
+      (item.status === "Awaiting" || item.status === "Uploaded");
+    if (!reviewed) {
+      return {
+        ...prev,
+        ...item,
+        fileName: item.fileName || prev.fileName,
+      };
+    }
+    return {
+      ...item,
+      ...prev,
+      fileName: prev.fileName || item.fileName,
+      status: prev.status,
+      rejectionReason: prev.rejectionReason,
+    };
+  });
+}
+
+function pipelineIndex(request: DocumentRequest) {
+  if (request.status === "Approved") return 3;
+  if (request.status === "Received" || requestHasClientUpload(request)) return 2;
+  if (requestWasOpened(request)) return 1;
+  if (request.status === "Pending" || request.status === "Requested") return 0;
   return -1;
 }
 
@@ -113,7 +148,8 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
       const merged = {
         ...local,
         ...remote,
-        items: remote.items ?? local?.items,
+        items: mergeReviewItems(local?.items, remote.items),
+        openedAt: remote.openedAt || local?.openedAt,
         timeline: local?.timeline ?? remote.timeline,
         messages: local?.messages ?? remote.messages,
         internalNotes: local?.internalNotes ?? remote.notes,
@@ -147,7 +183,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
     [request],
   );
 
-  const statusIndex = request ? pipelineIndex(request.status) : 0;
+  const statusIndex = request ? pipelineIndex(request) : 0;
 
   function flash(msg: string) {
     notify(msg);
@@ -160,9 +196,15 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   ) {
     upsertDocumentRequest(next);
     setRequest(next);
-    if (options?.patch !== false && isCrmDocumentRequestId(next.id)) {
+    // PATCH is metadata-only and only while the request is still REQUESTED.
+    // In progress / received requests reject that body with 400.
+    if (
+      options?.patch !== false &&
+      next.status === "Requested" &&
+      isCrmDocumentRequestId(next.id)
+    ) {
       void tryCrmDocumentRequest(() =>
-        updateCrmDocumentRequest(next.id, toCreateDocumentRequestBody(next)),
+        updateCrmDocumentRequest(next.id, toUpdateDocumentRequestBody(next)),
       );
     }
     if (msg) flash(msg);
@@ -171,18 +213,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   function setStatus(status: DocumentRequestStatus) {
     if (!request) return;
     const today = nowStamp();
-    const progress =
-      status === "Approved"
-        ? 100
-        : status === "Received"
-          ? 86
-          : status === "Pending"
-            ? Math.max(request.progress, 32)
-            : status === "Rejected"
-              ? Math.max(request.progress, 45)
-              : status === "Requested" || status === "Expired"
-                ? 0
-                : request.progress;
+    const progress = progressFromItems(requestItems(request));
     save(
       {
         ...request,
@@ -219,6 +250,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         }),
       },
       `Invitation resent to ${request.requestedFrom}`,
+      { patch: false },
     );
   }
 
@@ -285,17 +317,22 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
       rejectionReason: undefined,
       rejectedAt: undefined,
     });
-    save(
-      applyItemChange(request, nextItems, {
-        timeline: appendTimeline(request, {
-          at: today,
-          by: request.requestedBy,
-          label: `${item.title} submitted`,
-          detail: `${cached.name} (manual / WhatsApp)`,
-        }),
+    const next = applyItemChange(request, nextItems, {
+      timeline: appendTimeline(request, {
+        at: today,
+        by: request.requestedBy,
+        label: `${item.title} submitted`,
+        detail: `${cached.name} (manual / WhatsApp)`,
       }),
-      `Uploaded ${cached.name}`,
-    );
+    });
+    save(next, `Uploaded ${cached.name}`, { patch: false });
+    if (
+      request.status === "Pending" &&
+      next.status === "Received" &&
+      isCrmDocumentRequestId(request.id)
+    ) {
+      void tryCrmDocumentRequest(() => receiveCrmDocumentRequest(request.id));
+    }
     uploadFor.current = null;
   }
 
@@ -330,16 +367,17 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         },
       ],
     });
-    save(
-      applyItemChange(request, nextItems, {
-        timeline: appendTimeline(request, {
-          at: today,
-          by: request.requestedBy,
-          label: `${item.title} approved`,
-        }),
+    const next = applyItemChange(request, nextItems, {
+      timeline: appendTimeline(request, {
+        at: today,
+        by: request.requestedBy,
+        label: `${item.title} approved`,
       }),
-      `${item.title} accepted`,
-    );
+    });
+    save(next, `${item.title} accepted`, { patch: false });
+    if (next.status === "Approved" && isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() => approveCrmDocumentRequest(request.id));
+    }
   }
 
   function rejectItem(
@@ -377,6 +415,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
       notifyClient
         ? `Rejected · email sent to ${request.requestedFrom}`
         : `${item.title} rejected`,
+      { patch: false },
     );
     setRejecting(null);
   }
@@ -422,6 +461,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         }),
       },
       "Reply sent to the client portal",
+      { patch: false },
     );
   }
 
@@ -563,8 +603,17 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
             <div className="flex items-center gap-0">
               {DETAIL_PIPELINE.map((step, i) => {
                 const exception = isRejected || isCancelled;
-                const active = !exception && request.status === step.status;
-                const past = !exception && statusIndex > i;
+                const openedStep = step.label === "Opened";
+                const opened =
+                  requestWasOpened(request) || requestHasClientUpload(request);
+                const active =
+                  !exception &&
+                  statusIndex === i &&
+                  (openedStep ? opened : true);
+                const past =
+                  !exception &&
+                  statusIndex > i &&
+                  (openedStep ? opened : true);
                 return (
                   <button
                     key={step.status}
@@ -835,7 +884,12 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                   value={internalNotes}
                   onChange={(next) => {
                     setInternalNotes(next);
-                    save({ ...request, internalNotes: next });
+                    if (next === (request.internalNotes ?? "")) return;
+                    save(
+                      { ...request, internalNotes: next, notes: next },
+                      undefined,
+                      { patch: request.status === "Requested" },
+                    );
                   }}
                   placeholder="Team notes only. Type @ to mention."
                 />

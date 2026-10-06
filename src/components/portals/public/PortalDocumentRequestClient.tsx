@@ -50,12 +50,23 @@ export function PortalDocumentRequestClient({
   useEffect(() => {
     if (!portal || !request) return;
     logActivity(`Opened document request ${request.requestId}`);
-    if (request.status !== "Requested") return;
+    const alreadyOpened = (request.timeline ?? []).some((event) =>
+      /^opened$/i.test(event.label.trim()),
+    );
+    if (
+      alreadyOpened ||
+      request.status === "Approved" ||
+      request.status === "Rejected" ||
+      request.status === "Expired"
+    ) {
+      return;
+    }
     const today = nowStamp();
     const next = {
       ...request,
-      status: "Pending" as const,
-      progress: Math.max(request.progress, 12),
+      status: request.status === "Requested" ? ("Pending" as const) : request.status,
+      openedAt: today,
+      progress: request.progress,
       lastUpdated: today,
       timeline: appendTimeline(request, {
         at: today,

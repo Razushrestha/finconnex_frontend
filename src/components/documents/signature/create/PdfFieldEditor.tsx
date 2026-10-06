@@ -14,6 +14,7 @@ import {
   pointerToPagePercent,
 } from "@/lib/documents/signature/field-placement";
 import { SenderFieldErrorTooltip } from "@/components/documents/signature/create/SenderFieldErrorTooltip";
+import { SignatureInkImage } from "@/components/documents/signature/SignatureInkImage";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -346,6 +347,13 @@ export default function PdfFieldEditor({
               const showEmptyError = emptyFieldErrorId === field.id;
               const selected = selectedFieldId === field.id;
               const displayLabel = field.fieldName || field.label;
+              const signatureInk =
+                Boolean(field.value?.startsWith("data:")) &&
+                (field.type === "signature" || field.type === "initials");
+              const boxShape =
+                field.type === "signature" || field.type === "initials"
+                  ? "rounded-[2px]"
+                  : "rounded-md";
               const textStyle =
                 field.type === "email" ||
                 field.type === "name" ||
@@ -377,7 +385,11 @@ export default function PdfFieldEditor({
                           if (e.button !== 0) return;
                           onSelectField?.(field);
                           const target = e.target as HTMLElement;
-                          if (target.closest("input, textarea, select, button")) {
+                          if (
+                            target.closest(
+                              "input, textarea, select, button, [data-resize-handle]",
+                            )
+                          ) {
                             e.stopPropagation();
                             return;
                           }
@@ -414,13 +426,17 @@ export default function PdfFieldEditor({
                     height: `${height}px`,
                     transform: "none",
                   }}
-                  className={`group absolute flex items-center justify-between gap-1.5 ${
+                  className={`group absolute flex items-center ${
+                    signatureInk ? "justify-center p-1" : "justify-between gap-1.5 px-2.5 py-1.5"
+                  } ${
                     showEmptyError
                       ? "z-40 bg-white text-slate-700 border-2 border-dashed border-sky-400 ring-2 ring-sky-300/60"
                       : color
                         ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
                         : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
-                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none ${
+                  } text-[11px] font-semibold ${boxShape} ${
+                    signatureInk ? "shadow-none" : "shadow-md"
+                  } select-none ${
                     showEmptyError ? "" : "z-10"
                   } ${selected ? "ring-2 ring-slate-800/80 ring-offset-1" : ""} ${
                     readOnly
@@ -437,12 +453,12 @@ export default function PdfFieldEditor({
                   {isSignaturePick &&
                   (field.type === "signature" || field.type === "initials") ? (
                     field.value?.startsWith("data:") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={field.value}
-                        alt=""
-                        className="h-full max-h-7 w-full object-contain object-left"
-                      />
+                      <div className="pointer-events-none absolute inset-1 overflow-hidden">
+                        <SignatureInkImage
+                          src={field.value}
+                          className="block h-full w-full object-contain"
+                        />
+                      </div>
                     ) : (
                       <span className="truncate" style={textStyle}>
                         {field.value || displayLabel}
@@ -450,12 +466,12 @@ export default function PdfFieldEditor({
                     )
                   ) : isSignaturePick ? (
                     field.value?.startsWith("data:") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={field.value}
-                        alt=""
-                        className="h-full max-h-7 w-full object-contain object-left"
-                      />
+                      <div className="pointer-events-none absolute inset-1 overflow-hidden">
+                        <SignatureInkImage
+                          src={field.value}
+                          className="block h-full w-full object-contain"
+                        />
+                      </div>
                     ) : (
                       <span className="truncate" style={textStyle}>
                         {field.value || displayLabel}
@@ -520,38 +536,63 @@ export default function PdfFieldEditor({
                         type="button"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => onRemoveField(field.id)}
-                        className={`ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
-                          color ? "hover:bg-black/10" : "hover:bg-indigo-700"
-                        }`}
+                        className={
+                          signatureInk
+                            ? "absolute -left-1.5 -top-2 z-30 text-[#2563eb]"
+                            : `ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
+                                color ? "hover:bg-black/10" : "hover:bg-indigo-700"
+                              }`
+                        }
                       >
-                        <X className="w-3 h-3" />
+                        <X className={signatureInk ? "h-3.5 w-3.5" : "w-3 h-3"} />
                       </button>
                       {onResizeField && field.resizable !== false ? (
                         <div
+                          data-resize-handle=""
                           onPointerDown={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
+                            const handle = e.currentTarget;
+                            handle.setPointerCapture(e.pointerId);
                             const startX = e.clientX;
                             const startY = e.clientY;
+                            const box = handle.parentElement?.getBoundingClientRect();
+                            const scaleX =
+                              box && box.width > 0 ? width / box.width : 1;
+                            const scaleY =
+                              box && box.height > 0 ? height / box.height : 1;
                             const onMove = (moveEvent: PointerEvent) => {
                               const newWidth = Math.max(
-                                80,
-                                width + (moveEvent.clientX - startX),
+                                48,
+                                Math.round(
+                                  width + (moveEvent.clientX - startX) * scaleX,
+                                ),
                               );
                               const newHeight = Math.max(
-                                30,
-                                height + (moveEvent.clientY - startY),
+                                28,
+                                Math.round(
+                                  height + (moveEvent.clientY - startY) * scaleY,
+                                ),
                               );
                               onResizeField(field.id, newWidth, newHeight);
                             };
-                            const onUp = () => {
-                              window.removeEventListener("pointermove", onMove);
-                              window.removeEventListener("pointerup", onUp);
+                            const onUp = (upEvent: PointerEvent) => {
+                              if (handle.hasPointerCapture(upEvent.pointerId)) {
+                                handle.releasePointerCapture(upEvent.pointerId);
+                              }
+                              handle.removeEventListener("pointermove", onMove);
+                              handle.removeEventListener("pointerup", onUp);
+                              handle.removeEventListener("pointercancel", onUp);
                             };
-                            window.addEventListener("pointermove", onMove);
-                            window.addEventListener("pointerup", onUp);
+                            handle.addEventListener("pointermove", onMove);
+                            handle.addEventListener("pointerup", onUp);
+                            handle.addEventListener("pointercancel", onUp);
                           }}
-                          className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border border-current rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-30"
+                          className={`absolute -right-1.5 -bottom-1.5 z-30 h-4 w-4 cursor-se-resize rounded-full border border-current bg-white ${
+                            selected
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100"
+                          }`}
                         />
                       ) : null}
                     </>

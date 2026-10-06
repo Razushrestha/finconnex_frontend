@@ -44,6 +44,8 @@ export interface LibraryDocument {
   mimeType?: string;
   sizeBytes?: number;
   description?: string;
+  /** CRM user id for the uploader, when the list does not include a name. */
+  ownerId?: string;
   leadId?: string;
   contactId?: string;
   companyId?: string;

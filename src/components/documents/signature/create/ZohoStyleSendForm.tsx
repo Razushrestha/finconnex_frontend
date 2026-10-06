@@ -1,23 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   Calendar,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CloudUpload,
   FileText,
   GripVertical,
-  LayoutTemplate,
   MessageSquare,
   Plus,
   Trash2,
   Upload,
   UserPlus,
-  X,
 } from "lucide-react";
 import {
   makeSigner,
@@ -36,7 +32,7 @@ import {
   requiresDirectEmailMobile,
 } from "@/components/documents/signature/create/RecipientsSection";
 import {
-  renamedStoredFileName,
+  sanitizeDocumentBaseName,
   splitFileName,
   type AdditionalDocument,
 } from "@/components/documents/signature/create/DocumentDetailsSection";
@@ -45,6 +41,12 @@ import {
   selfFromStores,
   type SignatureSelf,
 } from "@/lib/documents/signature/current-user";
+import {
+  mergeBulkRecipients,
+  parseRecipientFile,
+} from "@/lib/documents/signature/bulk-recipients";
+import { AddDocumentMenu } from "@/components/documents/signature/create/AddDocumentMenu";
+import { SignatureFileCard } from "@/components/documents/signature/create/SignatureFileCard";
 import { DaysToCompleteInput } from "@/components/documents/signature/create/DaysToCompleteInput";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +95,7 @@ interface ZohoStyleSendFormProps {
   onIncomingFiles: (files: File[]) => void;
   onRemovePrimary: () => void;
   onRemoveAdditional: (id: string) => void;
+  onRenameAdditional?: (id: string, name: string) => void;
   fileError?: string;
   recipients: SignatureSigner[];
   onChangeRecipients: (next: SignatureSigner[]) => void;
@@ -120,17 +123,6 @@ const chipBtn =
 
 const colLabel =
   "mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400";
-
-function formatFileSize(bytes: number) {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function fileExt(name: string) {
-  return splitFileName(name).ext.toUpperCase() || "FILE";
-}
 
 function isoDate(date: Date) {
   const year = date.getFullYear();
@@ -439,90 +431,6 @@ function AgreementValidUntilField({
   );
 }
 
-function NamedOptionField({
-  value,
-  options,
-  placeholder,
-  addLabel,
-  plain = false,
-  onChange,
-  onAdd,
-}: {
-  value: string;
-  options?: string[];
-  placeholder: string;
-  addLabel: string;
-  plain?: boolean;
-  onChange: (value: string) => void;
-  onAdd: (name: string) => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState("");
-  const save = () => {
-    const name = draft.trim();
-    if (!name) {
-      setAdding(false);
-      setDraft("");
-      return;
-    }
-    onAdd(name);
-    setDraft("");
-    setAdding(false);
-  };
-  if (adding) {
-    return (
-      <form
-        className="relative"
-        onSubmit={(event) => {
-          event.preventDefault();
-          save();
-        }}
-      >
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setDraft("");
-              setAdding(false);
-            }
-          }}
-          placeholder={placeholder}
-          autoFocus
-          className="h-10 w-full rounded-lg border border-emerald-500 bg-white px-3 pr-11 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none"
-        />
-        <button
-          type="submit"
-          className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600"
-          aria-label={addLabel}
-        >
-          <Check className="h-3.5 w-3.5" />
-        </button>
-      </form>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      {plain || !options ? (
-        <div className={cn(selectClass, "flex items-center text-slate-800")}>
-          {value || "Others"}
-        </div>
-      ) : (
-        <CheckedMenu value={value} options={options} onChange={onChange} />
-      )}
-      <button
-        type="button"
-        onClick={() => setAdding(true)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
-        title={addLabel}
-        aria-label={addLabel}
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
-
 function FormLabel({ children }: { children: React.ReactNode }) {
   return (
     <label className="w-[150px] shrink-0 text-[13px] text-slate-600">
@@ -541,6 +449,7 @@ export function ZohoStyleSendForm({
   onIncomingFiles,
   onRemovePrimary,
   onRemoveAdditional,
+  onRenameAdditional,
   fileError,
   recipients,
   onChangeRecipients,
@@ -558,31 +467,12 @@ export function ZohoStyleSendForm({
 }: ZohoStyleSendFormProps) {
   const isTemplate = variant === "template";
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
-
-  useEffect(() => {
-    const removedTypes = new Set([
-      "Contract",
-      "NDA",
-      "Proposal",
-      "Agreement",
-      "Invoice",
-      "HR document",
-    ]);
-    const removedFolders = new Set([
-      "Sales",
-      "Legal",
-      "HR",
-      "Finance",
-      "Clients",
-    ]);
-    const patch: Partial<ZohoSendFormSettings> = {};
-    if (removedTypes.has(settings.documentType)) patch.documentType = "Others";
-    if (removedFolders.has(settings.folder)) patch.folder = "None";
-    if (Object.keys(patch).length) onChangeSettings(patch);
-  }, [settings.documentType, settings.folder, onChangeSettings]);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkReading, setBulkReading] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [crmResults, setCrmResults] = useState<SignatureCrmEntityOption[]>([]);
   const [crmSearching, setCrmSearching] = useState(false);
@@ -614,34 +504,38 @@ export function ZohoStyleSendForm({
 
   const uploadedDocs: {
     id: string;
-    name: string;
-    fileName: string;
-    sizeLabel: string;
-    ext: string;
+    file: File;
+    label: string;
     onRemove: () => void;
+    onRename: (name: string) => void;
   }[] = [
     ...(documentFile
       ? [
           {
             id: "primary",
-            name:
+            file: documentFile,
+            label:
               documentName ||
               splitFileName(documentFile.name).base ||
               documentFile.name,
-            fileName: renamedStoredFileName(documentName, documentFile.name),
-            sizeLabel: formatFileSize(documentFile.size),
-            ext: fileExt(documentFile.name),
             onRemove: onRemovePrimary,
+            onRename: (name: string) => {
+              const { ext } = splitFileName(documentFile.name);
+              const clean = sanitizeDocumentBaseName(name, ext);
+              if (clean) onChangeName(clean);
+            },
           },
         ]
       : []),
     ...additionalFiles.map((doc) => ({
       id: doc.id,
-      name: doc.name,
-      fileName: `${doc.name}.${doc.extension}`,
-      sizeLabel: formatFileSize(doc.file.size),
-      ext: doc.extension.toUpperCase(),
+      file: doc.file,
+      label: doc.extension ? `${doc.name}.${doc.extension}` : doc.name,
       onRemove: () => onRemoveAdditional(doc.id),
+      onRename: (name: string) => {
+        const clean = sanitizeDocumentBaseName(name, doc.extension);
+        if (clean) onRenameAdditional?.(doc.id, clean);
+      },
     })),
   ];
 
@@ -708,6 +602,30 @@ export function ZohoStyleSendForm({
       setMe(self);
       applySelf(self);
     });
+  };
+
+  const importRecipients = async (file: File | undefined) => {
+    if (!file) return;
+    setBulkError("");
+    setBulkReading(true);
+    try {
+      const imported = await parseRecipientFile(file);
+      const merged = mergeBulkRecipients(recipients, imported);
+      if (!merged.added) {
+        setBulkError(
+          imported.length
+            ? "Those recipients are already on the list."
+            : "No recipients with an email address were found. Use columns Email and Name.",
+        );
+        return;
+      }
+      onChangeRecipients(merged.recipients);
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Could not read that file.");
+    } finally {
+      setBulkReading(false);
+      if (bulkInputRef.current) bulkInputRef.current.value = "";
+    }
   };
 
   const removeRecipient = (id: string) => {
@@ -804,7 +722,22 @@ export function ZohoStyleSendForm({
               <h2 className="mb-4 text-[14px] font-semibold text-slate-800">
                 Add documents
               </h2>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="flex flex-wrap items-start gap-4">
+              {uploadedDocs.map((doc) => (
+                <SignatureFileCard
+                  key={doc.id}
+                  file={doc.file}
+                  label={doc.label}
+                  selected={selectedDocId === doc.id}
+                  onSelect={() =>
+                    setSelectedDocId((current) =>
+                      current === doc.id ? null : doc.id,
+                    )
+                  }
+                  onRename={doc.onRename}
+                  onRemove={doc.onRemove}
+                />
+              ))}
               <div
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -817,10 +750,8 @@ export function ZohoStyleSendForm({
                   onIncomingFiles(Array.from(e.dataTransfer.files ?? []));
                 }}
                 className={cn(
-                  "flex min-h-[168px] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center lg:w-[320px] lg:shrink-0",
-                  dragging
-                    ? "border-primary bg-primary/5"
-                    : "border-primary/25 bg-primary/[0.03]",
+                  "flex h-[322px] w-[220px] shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed bg-white px-4 text-center",
+                  dragging ? "border-emerald-600 bg-emerald-50" : "border-slate-300",
                 )}
               >
                 <input
@@ -834,92 +765,17 @@ export function ZohoStyleSendForm({
                     e.target.value = "";
                   }}
                 />
-                <CloudUpload className="h-8 w-8 text-primary" strokeWidth={1.6} />
-                <p className="mt-2 text-[13px] font-medium text-slate-700">
+                <FileText className="h-10 w-10 text-slate-400" strokeWidth={1.4} />
+                <p className="mt-3 text-[15px] font-medium text-slate-800">
                   Drag files here
                 </p>
-                <p className="text-[12px] text-slate-400">or</p>
-                <div className="relative mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setAddMenuOpen((v) => !v)}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[12px] font-semibold text-white shadow-sm hover:bg-primary/90"
-                  >
-                    Add document
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </button>
-                  {addMenuOpen ? (
-                    <>
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setAddMenuOpen(false)}
-                      />
-                      <div className="absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
-                          onClick={() => {
-                            setAddMenuOpen(false);
-                            fileInputRef.current?.click();
-                          }}
-                        >
-                          <Upload className="h-3.5 w-3.5 text-primary" />
-                          From computer
-                        </button>
-                        {!isTemplate ? (
-                          <Link
-                            href="/signature/templates"
-                            className="flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50"
-                            onClick={() => setAddMenuOpen(false)}
-                          >
-                            <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
-                            Use template
-                          </Link>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-                <p className="mt-2 text-[10px] text-slate-400">
-                  Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 25MB)
-                </p>
-              </div>
-
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                {uploadedDocs.length === 0 ? (
-                  <div className="flex min-h-[168px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 text-center text-[13px] text-slate-400">
-                    Uploaded files will appear here
-                  </div>
-                ) : (
-                  uploadedDocs.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-[#F8F7FC] px-3 py-3"
-                    >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-primary shadow-sm ring-1 ring-slate-200/80">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-semibold text-slate-800">
-                          {doc.fileName || doc.name}
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          {doc.sizeLabel}
-                          {doc.sizeLabel ? " · " : ""}
-                          {doc.ext}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={doc.onRemove}
-                        className="rounded-md p-1 text-slate-400 hover:bg-white hover:text-slate-700"
-                        aria-label={`Remove ${doc.name}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
+                <p className="mt-1 text-[13px] text-slate-400">or</p>
+                <AddDocumentMenu
+                  onDesktop={() => fileInputRef.current?.click()}
+                  onFiles={onIncomingFiles}
+                  showTemplates={!isTemplate}
+                  buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#1e9e57] px-3.5 text-[13px] font-semibold text-white hover:bg-[#18864b]"
+                />
               </div>
             </div>
 
@@ -962,7 +818,27 @@ export function ZohoStyleSendForm({
                 <UserPlus className="h-3.5 w-3.5" />
                 Add me
               </button>
+              <button
+                type="button"
+                onClick={() => bulkInputRef.current?.click()}
+                disabled={bulkReading}
+                className={chipBtn}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {bulkReading ? "Reading file…" : "Bulk recipients"}
+              </button>
+              <input
+                ref={bulkInputRef}
+                type="file"
+                accept=".xlsx,.xls,.xml,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/xml,application/xml,text/csv"
+                className="hidden"
+                aria-label="Upload recipient spreadsheet"
+                onChange={(event) => void importRecipients(event.target.files?.[0])}
+              />
             </div>
+            {bulkError ? (
+              <p className="mb-3 text-[12px] text-rose-600">{bulkError}</p>
+            ) : null}
 
             <div className="space-y-3">
               {recipients.map((signer, index) => {
@@ -1289,28 +1165,6 @@ export function ZohoStyleSendForm({
                       onChange={(agreementValidUntil) =>
                         onChangeSettings({ agreementValidUntil })
                       }
-                    />
-                  </SettingRow>
-                  <SettingRow label="Document type">
-                    <NamedOptionField
-                      plain
-                      value={settings.documentType || "Others"}
-                      placeholder="Enter document type"
-                      addLabel="Add document type"
-                      onChange={(documentType) =>
-                        onChangeSettings({ documentType })
-                      }
-                      onAdd={(name) => onChangeSettings({ documentType: name })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Folder">
-                    <NamedOptionField
-                      plain
-                      value={settings.folder || "None"}
-                      placeholder="Enter folder name"
-                      addLabel="Add folder"
-                      onChange={(folder) => onChangeSettings({ folder })}
-                      onAdd={(name) => onChangeSettings({ folder: name })}
                     />
                   </SettingRow>
                   <SettingRow label="Description">

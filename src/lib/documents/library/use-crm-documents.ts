@@ -8,6 +8,7 @@ import {
   listRecentCrmDocuments,
   tryCrmDocument,
 } from "@/lib/documents/library/api";
+import { enrichLibraryDocumentLabels } from "@/lib/documents/library/labels";
 import {
   replaceLibraryDocuments,
   type LibraryDocument,
@@ -34,9 +35,13 @@ export function useCrmDocuments() {
     void (async () => {
       try {
         const [library, myFiles, recentFiles, folderRows] = await Promise.all([
-          listCrmDocumentLibrary(),
-          tryCrmDocument(() => listMyCrmDocuments()),
-          tryCrmDocument(() => listRecentCrmDocuments()),
+          listCrmDocumentLibrary().then((rows) => enrichLibraryDocumentLabels(rows)),
+          tryCrmDocument(() =>
+            listMyCrmDocuments().then((rows) => enrichLibraryDocumentLabels(rows)),
+          ),
+          tryCrmDocument(() =>
+            listRecentCrmDocuments().then((rows) => enrichLibraryDocumentLabels(rows)),
+          ),
           tryCrmDocument(() => listCrmDocumentFolders()),
         ]);
         if (cancelled) return;

@@ -38,6 +38,10 @@ import {
 import { sessionRememberMe } from "@/lib/auth/constants";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
 import {
+  adaptSignatureRequestPayload,
+  isSignatureRequestUpsert,
+} from "@/lib/documents/signature/request-payload";
+import {
   createTwilioVoiceCall,
   parseDialPath,
   pickCallPhone,
@@ -821,6 +825,33 @@ export async function proxyCrmV1(
       values,
     });
     status = 200;
+  }
+
+  if (
+    status === 400 &&
+    typeof body === "string" &&
+    isSignatureRequestUpsert(path, method)
+  ) {
+    const adapted = adaptSignatureRequestPayload(body, text);
+    if (adapted && adapted !== body) {
+      try {
+        const retried = await fetch(target, {
+          method: request.method,
+          headers,
+          body: adapted,
+        });
+        text = await retried.text();
+        status = retried.status;
+      } catch {
+        /* keep the original 400 */
+      }
+    }
+    if (status === 400) {
+      console.error(
+        `[crm] signature-requests ${method} 400`,
+        text.slice(0, 800),
+      );
+    }
   }
 
   const response = new NextResponse(text, {

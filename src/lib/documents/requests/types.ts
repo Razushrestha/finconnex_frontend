@@ -138,6 +138,8 @@ export interface DocumentRequest {
   requestedById?: string;
   /** Start / invite date (display e.g. 20 Aug, 2026) */
   requestedDate: string;
+  /** Set only when the client opens the invitation. */
+  openedAt?: string;
   lastUpdated: string;
   /** 0–100 completion of the document pack */
   progress: number;
@@ -161,23 +163,18 @@ export interface DocumentRequestColumn {
   requests: DocumentRequest[];
 }
 
-export function progressForStatus(status: DocumentRequestStatus): number {
-  switch (status) {
-    case "Requested":
-      return 0;
-    case "Pending":
-      return 32;
-    case "Received":
-      return 86;
-    case "Approved":
-      return 100;
-    case "Rejected":
-      return 45;
-    case "Expired":
-      return 0;
-    default:
-      return 0;
-  }
+export function progressForStatus(_status: DocumentRequestStatus): number {
+  return 0;
+}
+
+/** Share of requested documents the client has uploaded. */
+export function progressFromItems(items: RequestedDocLine[]): number {
+  if (items.length === 0) return 0;
+  const uploaded = items.filter((item) => {
+    if (item.status === "Uploaded" || item.status === "Accepted") return true;
+    return Boolean(item.fileName) && item.status !== "Unavailable";
+  }).length;
+  return Math.round((uploaded / items.length) * 100);
 }
 
 export const documentRequests: DocumentRequest[] = [];
@@ -297,10 +294,7 @@ function normalize(req: DocumentRequest): DocumentRequest {
   return {
     ...withItems,
     lastUpdated: req.lastUpdated || req.requestedDate,
-    progress:
-      typeof req.progress === "number"
-        ? req.progress
-        : progressForStatus(req.status),
+    progress: progressFromItems(items),
     priority: req.priority ?? "Normal",
     items,
     timeline: deriveTimeline(withItems),

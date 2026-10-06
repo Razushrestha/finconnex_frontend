@@ -1,5 +1,8 @@
 export const DEFAULT_PLACED_FIELD_WIDTH = 140;
 export const DEFAULT_PLACED_FIELD_HEIGHT = 36;
+/** Starting size for a new signature field. Later resizes keep the size the user sets. */
+export const SIGNATURE_FIELD_WIDTH = 200;
+export const SIGNATURE_FIELD_HEIGHT = 52;
 
 const PREVIEW_PAGE_WIDTH = 700;
 

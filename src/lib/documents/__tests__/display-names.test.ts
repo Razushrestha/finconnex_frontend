@@ -4,6 +4,7 @@ import { normalizeLibraryDocument } from "@/lib/documents/library/api";
 import {
   normalizeDocumentRequest,
   toCreateDocumentRequestBody,
+  toUpdateDocumentRequestBody,
 } from "@/lib/documents/requests/api";
 import { normalizeSignatureRequestRemote } from "@/lib/documents/signature/api";
 
@@ -41,6 +42,11 @@ describe("document display names", () => {
             name: "Payslip",
             status: "RECEIVED",
             document: { id: "doc-1", name: "payslip.pdf" },
+          },
+          {
+            id: "item-2",
+            name: "ID",
+            status: "AWAITING",
           },
         ],
       },
@@ -84,6 +90,26 @@ describe("document display names", () => {
     expect(body.reminderAt).toEqual(expect.any(String));
   });
 
+  it("omits create-only fields from a document request update", () => {
+    const body = toUpdateDocumentRequestBody({
+      title: "Payslips",
+      documentType: "Financial",
+      requestedFromId: "22222222-2222-4222-8222-222222222222",
+      dealId: "44444444-4444-4444-8444-444444444444",
+      repeat: "Off",
+      notes: "Chase the payslip",
+      items: [
+        { id: "line-1", title: "Payslip", status: "Uploaded" },
+      ],
+    });
+
+    expect(body).toEqual({
+      title: "Payslips",
+      documentType: "FINANCIAL",
+      notes: "Chase the payslip",
+    });
+  });
+
   it("fills a library file owner, folder, and related record", () => {
     const doc = normalizeLibraryDocument(
       {
@@ -104,6 +130,23 @@ describe("document display names", () => {
     expect(doc.owner).toBe("Grace Hopper");
     expect(doc.folder).toBe("Signed");
     expect(doc.relatedTo).toBe("Deal: Home loan");
+  });
+
+  it("keeps the uploader and lead ids when the list has no names", () => {
+    const doc = normalizeLibraryDocument(
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        name: "Letter.pdf",
+        uploadedById: "33333333-3333-4333-8333-333333333333",
+        leadId: "22222222-2222-4222-8222-222222222222",
+      },
+      0,
+    );
+
+    expect(doc.owner).toBe("—");
+    expect(doc.ownerId).toBe("33333333-3333-4333-8333-333333333333");
+    expect(doc.leadId).toBe("22222222-2222-4222-8222-222222222222");
+    expect(doc.relatedTo).toBeUndefined();
   });
 
   it("fills a signature owner, document name, and related record", () => {

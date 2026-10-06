@@ -7,7 +7,7 @@ import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   DOCUMENT_REQUEST_TYPES,
-  progressForStatus,
+  progressFromItems,
   type DocumentRequest,
   type DocumentRequestStatus,
   type DocumentRequestType,
@@ -215,9 +215,10 @@ function mapItems(raw: unknown): RequestedDocLine[] | undefined {
         ? "Accepted"
         : pickStr(row.status).toLowerCase().includes("reject")
           ? "Rejected"
-          : pickStr(row.status).toLowerCase().includes("upload")
-            ? "Uploaded"
-            : "Awaiting",
+          : pickStr(row.status).toLowerCase().includes("upload") ||
+          pickStr(row.status).toLowerCase().includes("receiv")
+        ? "Uploaded"
+        : "Awaiting",
     fileName:
       pickStr(
         row.fileName,
@@ -229,10 +230,11 @@ function mapItems(raw: unknown): RequestedDocLine[] | undefined {
   }));
 }
 
-function progressPercent(raw: unknown, status: DocumentRequestStatus): number {
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return Math.max(0, Math.min(100, Math.round(raw)));
-  }
+function progressPercent(
+  raw: unknown,
+  items?: RequestedDocLine[],
+): number {
+  if (items && items.length > 0) return progressFromItems(items);
   if (raw && typeof raw === "object") {
     const rec = raw as Record<string, unknown>;
     const total = Number(rec.total);
@@ -241,7 +243,7 @@ function progressPercent(raw: unknown, status: DocumentRequestStatus): number {
       return Math.max(0, Math.min(100, Math.round((received / total) * 100)));
     }
   }
-  return progressForStatus(status);
+  return 0;
 }
 
 function formatDisplayDateTime(raw: unknown): string {
@@ -284,6 +286,7 @@ export function normalizeDocumentRequest(
   );
   const title = pickStr(raw.title, raw.name, raw.subject, `Document request ${index + 1}`);
   const id = pickStr(raw.id, raw.uuid, raw.documentRequestId) || `crm-dr-${index}`;
+  const items = mapItems(raw.items ?? raw.documents ?? raw.requestedDocuments);
   return {
     id,
     requestId:
@@ -327,8 +330,12 @@ export function normalizeDocumentRequest(
     requestedDate: formatDisplayDate(
       raw.requestedDate ?? raw.createdAt ?? raw.sentAt,
     ),
+    openedAt:
+      formatDisplayDateTime(
+        raw.openedAt ?? raw.viewedAt ?? raw.firstOpenedAt ?? raw.openedDate,
+      ) || undefined,
     lastUpdated: formatDisplayDate(raw.updatedAt ?? raw.lastUpdated ?? raw.createdAt),
-    progress: progressPercent(raw.progress, status),
+    progress: progressPercent(raw.progress, items),
     receivedDate:
       formatDisplayDate(raw.receivedDate ?? raw.receivedAt) || undefined,
     priority:
@@ -340,7 +347,7 @@ export function normalizeDocumentRequest(
             ? "Normal"
             : undefined,
     notes: pickStr(raw.notes, raw.description, raw.internalNotes) || undefined,
-    items: mapItems(raw.items ?? raw.documents ?? raw.requestedDocuments),
+    items,
     clientName:
       pickStr(raw.clientName, client && client.name, requestedFrom) || undefined,
     clientEmail:
@@ -507,6 +514,28 @@ export function toCreateDocumentRequestBody(
     notifyBy: notifyBy.length ? notifyBy : undefined,
     items: items.length ? items : undefined,
     ...singleParent,
+  });
+}
+
+/** PATCH only accepts request metadata. Create-only fields (items, requestedFromId, parents) 400. */
+export function toUpdateDocumentRequestBody(
+  input: Partial<DocumentRequest>,
+): Record<string, unknown> {
+  const notifyBy = (input.notifyBy ?? [])
+    .map((method) => method.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  const repeat = input.repeat?.trim();
+  return compactBody({
+    title: input.title?.trim(),
+    documentType: input.documentType
+      ? apiDocumentRequestType(input.documentType)
+      : undefined,
+    dueDate: toIsoDateTime(input.dueDate) ?? toIsoDate(input.dueDate),
+    notes: (input.notes ?? input.internalNotes)?.trim(),
+    reminderAt: toIsoDateTime(input.reminderDate),
+    reminderRepeat: repeat && repeat.toLowerCase() !== "off" ? repeat : undefined,
+    notifyBy: notifyBy.length ? notifyBy : undefined,
   });
 }
 

@@ -1,5 +1,6 @@
 import type { SignatureField } from "@/lib/documents/signature/types";
 import { isSignatureCaptureKind } from "@/lib/documents/signature/field-kinds";
+import { SignatureInkImage } from "@/components/documents/signature/SignatureInkImage";
 import { cn } from "@/lib/utils";
 
 export function SignatureFieldValue({
@@ -26,13 +27,11 @@ export function SignatureFieldValue({
     (isSignatureCaptureKind(field.kind) && field.value.startsWith("data:"))
   ) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <SignatureInkImage
         src={field.value}
-        alt=""
         className={cn(
-          "w-full object-contain",
-          ink ? "h-full max-h-full" : "h-full max-h-8 brightness-0 contrast-150",
+          "h-full max-h-full w-full object-contain",
+          ink ? "" : "brightness-0",
         )}
       />
     );

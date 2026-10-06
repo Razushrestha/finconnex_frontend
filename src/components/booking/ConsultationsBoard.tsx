@@ -106,12 +106,10 @@ type SectionFilter = (typeof SECTION_FILTERS)[number];
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
   const remote = await tryCrmBooking(() => listCrmEventTypePages());
   const local = listBookingPages().filter((page) => page.eventType === "Consultation");
-  const merged =
-    remote == null
-      ? local
-      : mergeCrmEventTypePages(local, remote).filter(
-          (page) => page.eventType === "Consultation",
-        );
+  if (remote == null) return local;
+  const merged = mergeCrmEventTypePages(local, remote).filter(
+    (page) => page.eventType === "Consultation",
+  );
   for (const page of merged) upsertBookingPage(page);
   return merged;
 }

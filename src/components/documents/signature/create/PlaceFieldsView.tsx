@@ -14,17 +14,10 @@ import {
   Plus,
   Search,
   Download,
-  ScanLine,
   Maximize2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import dynamic from "next/dynamic";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   StandardFieldsSidebar,
   type StandardFieldType,
@@ -43,6 +36,7 @@ import {
 } from "@/lib/documents/signature/types";
 import { useRouter } from "next/navigation";
 import { fetchSignatureSelf } from "@/lib/documents/signature/current-user";
+import { SignatureInkImage } from "@/components/documents/signature/SignatureInkImage";
 import { toast } from "@/lib/notify/toast";
 import { ConfirmSendDetailsModal } from "./ConfirmSendDetailsModal";
 import { PlaceFieldsPreviewModal } from "./PlaceFieldsPreviewModal";
@@ -759,37 +753,6 @@ export function PlaceFieldsView({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() =>
-              toast.message("Detect fields", {
-                description:
-                  "Automatic field detection is not available yet. Drag fields from the right panel.",
-              })
-            }
-            className="inline-flex h-8 items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ScanLine className="h-3.5 w-3.5" />
-            Detect fields
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50">
-              Actions
-              <ChevronDown className="h-3.5 w-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsPreviewOpen(true)}>
-                Preview
-              </DropdownMenuItem>
-              {isTemplate ? (
-                <DropdownMenuItem
-                  onClick={() => handleSaveTemplate?.()}
-                >
-                  Save template
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            type="button"
             onClick={handleBackToForm}
             className="inline-flex h-8 items-center gap-1 rounded border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
           >
@@ -1029,6 +992,15 @@ export function PlaceFieldsView({
                                   const displayLabel =
                                     field.fieldName || field.label;
                                   const selected = selectedFieldId === field.id;
+                                  const signatureInk =
+                                    Boolean(field.value?.startsWith("data:")) &&
+                                    (field.type === "signature" ||
+                                      field.type === "initials");
+                                  const boxShape =
+                                    field.type === "signature" ||
+                                    field.type === "initials"
+                                      ? "rounded-[2px]"
+                                      : "rounded-md";
 
                                   return (
                                     <div
@@ -1080,7 +1052,13 @@ export function PlaceFieldsView({
                                         height: `${height}px`,
                                         transform: "none",
                                       }}
-                                      className={`absolute text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-sm flex items-center justify-between group border-2 border-dashed ${
+                                      className={`absolute flex items-center group border-2 border-dashed text-[11px] font-semibold ${
+                                        signatureInk ? "shadow-none" : "shadow-sm"
+                                      } ${
+                                        signatureInk
+                                          ? "justify-center p-1"
+                                          : "justify-between px-2.5 py-1"
+                                      } ${boxShape} ${
                                         showEmptyError
                                           ? "z-40 bg-white text-slate-700 border-sky-400 ring-2 ring-sky-300/60"
                                           : color
@@ -1092,12 +1070,12 @@ export function PlaceFieldsView({
                                       (field.type === "signature" ||
                                         field.type === "initials") ? (
                                         field.value?.startsWith("data:") ? (
-                                          // eslint-disable-next-line @next/next/no-img-element
-                                          <img
-                                            src={field.value}
-                                            alt=""
-                                            className="h-full max-h-7 w-full object-contain object-left"
-                                          />
+                                          <div className="pointer-events-none absolute inset-1 overflow-hidden">
+                                            <SignatureInkImage
+                                              src={field.value}
+                                              className="block h-full w-full object-contain"
+                                            />
+                                          </div>
                                         ) : (
                                           <span className="truncate">
                                             {field.value || displayLabel}
@@ -1154,7 +1132,11 @@ export function PlaceFieldsView({
                                           e.stopPropagation();
                                           handleRemovePlacedField(field.id);
                                         }}
-                                        className="text-indigo-400 hover:text-red-600 font-bold ml-1 relative z-20"
+                                        className={
+                                          signatureInk
+                                            ? "absolute -left-1.5 -top-2 z-30 font-bold text-[#2563eb]"
+                                            : "text-indigo-400 hover:text-red-600 font-bold ml-1 relative z-20"
+                                        }
                                       >
                                         ×
                                       </button>

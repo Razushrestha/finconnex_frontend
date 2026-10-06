@@ -1,5 +1,6 @@
 import {
   listDocumentRequests,
+  progressFromItems,
   type DocumentRequest,
   type DocumentRequestStatus,
   type RequestMessage,
@@ -47,6 +48,14 @@ function eventSortKey(at: string) {
 const DERIVED_EVENT =
   /invite sent|invitation sent|request created|opened|submitted|uploaded|approved|accepted|rejected|message from client|reply sent|note from client|does not have/i;
 
+/** True only when the client opened the invitation. Status alone is not an open. */
+export function requestWasOpened(req: DocumentRequest): boolean {
+  if (req.openedAt?.trim()) return true;
+  return (req.timeline ?? []).some((event) =>
+    /^opened$/i.test(event.label.trim()),
+  );
+}
+
 export function interactionTimeline(
   req: DocumentRequest,
 ): RequestTimelineEvent[] {
@@ -61,18 +70,18 @@ export function interactionTimeline(
   ];
 
   const storedOpened = (req.timeline ?? []).find((e) =>
-    /opened/i.test(e.label),
+    /^opened$/i.test(e.label.trim()),
   );
   if (storedOpened) {
     events.push({
       ...storedOpened,
       label: "Opened",
-      at: withTime(storedOpened.at, "10:14 am"),
+      at: storedOpened.at,
     });
-  } else if (req.status !== "Requested") {
+  } else if (req.openedAt?.trim()) {
     events.push({
       id: `${req.id}-opened`,
-      at: withTime(req.requestedDate, "10:14 am"),
+      at: req.openedAt,
       by: req.requestedFrom,
       label: "Opened",
       detail: `${req.requestedFrom} opened the invitation`,
@@ -148,6 +157,16 @@ export function uploadedItems(req: DocumentRequest): RequestedDocLine[] {
   return requestItems(req).filter((item) => Boolean(item.fileName));
 }
 
+/** A client file is on the request, so the pack is in progress. */
+export function requestHasClientUpload(req: DocumentRequest): boolean {
+  return requestItems(req).some(
+    (item) =>
+      Boolean(item.fileName) ||
+      item.status === "Uploaded" ||
+      item.status === "Accepted",
+  );
+}
+
 export const DOC_STATUS_PILL: Record<RequestedDocStatus, string> = {
   Awaiting: "bg-slate-100 text-slate-600",
   Uploaded: "bg-violet-100 text-violet-700",
@@ -164,13 +183,7 @@ export const DOC_STATUS_LABEL: Record<RequestedDocStatus, string> = {
   Unavailable: "Client doesn’t have it",
 };
 
-export function progressFromItems(items: RequestedDocLine[]): number {
-  if (items.length === 0) return 0;
-  const done = items.filter(
-    (item) => item.status === "Accepted" || item.status === "Unavailable",
-  ).length;
-  return Math.round((done / items.length) * 100);
-}
+export { progressFromItems } from "@/lib/documents/requests/types";
 
 export function rollupRequestStatus(
   items: RequestedDocLine[],

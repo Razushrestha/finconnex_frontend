@@ -13,6 +13,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { signaturePenWidth } from "@/lib/documents/signature/signature-pen";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface SignatureModalProps {
@@ -117,10 +118,10 @@ export function SignatureModal({
     canvas.height = rect.height * dpr;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 4;
+    ctx.lineWidth = signaturePenWidth(rect.height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#000000";
+    ctx.strokeStyle = "#111827";
   }
 
   function paintExistingDrawing(dataUrl: string) {
@@ -142,7 +143,7 @@ export function SignatureModal({
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
         ctx.scale(dpr, dpr);
-        ctx.lineWidth = 4;
+        ctx.lineWidth = signaturePenWidth(rect.height);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.strokeStyle = selectedColor;
@@ -226,10 +227,10 @@ export function SignatureModal({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 4;
+    ctx.lineWidth = signaturePenWidth(canvas.getBoundingClientRect().height);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "#000000";
+    ctx.strokeStyle = "#111827";
     setHasInk(false);
   }
 

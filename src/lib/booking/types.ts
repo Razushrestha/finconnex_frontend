@@ -594,14 +594,28 @@ export function deleteBookingPage(id: string) {
   writeStore(list);
 }
 
+const PUBLISH_IGNORE = new Set(["views", "bookingsCount", "cancelRate", "updatedAt"]);
+
+function publishSnapshot(page: BookingPage) {
+  return JSON.stringify(
+    Object.entries(page)
+      .filter(([key]) => !PUBLISH_IGNORE.has(key))
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+}
+
 export function upsertBookingPage(page: BookingPage) {
   const normalized = applyMeetingViaToLegacy(page);
   const list = listBookingPages();
   const i = list.findIndex((p) => p.id === normalized.id);
+  const previous = i >= 0 ? list[i] : null;
   if (i >= 0) list[i] = normalized;
   else list.unshift(normalized);
   writeStore(list);
-  if (normalized.status === "Live") {
+  const shouldPublish =
+    normalized.status === "Live" &&
+    (!previous || publishSnapshot(previous) !== publishSnapshot(normalized));
+  if (shouldPublish) {
     void import("@/lib/booking/publish-public-page").then((mod) =>
       mod.publishPublicBookingPage(normalized).catch(() => undefined),
     );

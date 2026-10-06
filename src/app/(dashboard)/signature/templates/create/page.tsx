@@ -42,6 +42,8 @@ import type {
 import {
   DEFAULT_PLACED_FIELD_HEIGHT,
   DEFAULT_PLACED_FIELD_WIDTH,
+  SIGNATURE_FIELD_HEIGHT,
+  SIGNATURE_FIELD_WIDTH,
 } from "@/lib/documents/signature/field-placement";
 import { toast } from "@/lib/notify/toast";
 import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
@@ -500,6 +502,12 @@ function CreateTemplateForm() {
     setAdditionalFiles((prev) => prev.filter((doc) => doc.id !== id));
   };
 
+  const handleRenameAdditional = (id: string, name: string) => {
+    setAdditionalFiles((prev) =>
+      prev.map((doc) => (doc.id === id ? { ...doc, name } : doc)),
+    );
+  };
+
   const handleResizeField = (id: string, width: number, height: number) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, width, height } : f)),
@@ -763,8 +771,14 @@ function CreateTemplateForm() {
         page,
         xPct,
         yPct,
-        width: DEFAULT_PLACED_FIELD_WIDTH,
-        height: DEFAULT_PLACED_FIELD_HEIGHT,
+        width:
+          current.type === "signature"
+            ? SIGNATURE_FIELD_WIDTH
+            : DEFAULT_PLACED_FIELD_WIDTH,
+        height:
+          current.type === "signature"
+            ? SIGNATURE_FIELD_HEIGHT
+            : DEFAULT_PLACED_FIELD_HEIGHT,
         recipientId: current.recipient?.id,
         colorIndex: current.recipient?.colorIndex,
       },
@@ -847,6 +861,7 @@ function CreateTemplateForm() {
         onIncomingFiles={handleIncomingFiles}
         onRemovePrimary={handleRemovePrimary}
         onRemoveAdditional={handleRemoveAdditional}
+        onRenameAdditional={handleRenameAdditional}
         fileError={fileError}
         recipients={recipients}
         onChangeRecipients={setRecipients}

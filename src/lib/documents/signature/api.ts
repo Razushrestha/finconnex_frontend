@@ -111,6 +111,13 @@ function toIsoDate(raw?: string): string | undefined {
   return raw.trim();
 }
 
+/** Date-only expiry. A display string that is not a calendar date is omitted. */
+function toExpiresAt(raw?: string): string | undefined {
+  const date = toIsoDate(raw);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  return Number.isNaN(Date.parse(`${date}T00:00:00.000Z`)) ? undefined : date;
+}
+
 export function mapSignatureStatus(raw: string): SignatureStatus {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("cancel")) return "Cancelled";
@@ -396,26 +403,30 @@ export function remapFieldsToRemoteRecipients(
   });
 }
 
+/** Nest create/update body. Unknown keys (documentName, emailSubject, phone, deliverVia) 400 the request. */
 export function toCreateSignatureRequestBody(
   input: SignatureRequest,
   documentId?: string,
 ): Record<string, unknown> {
+  const recipients = input.signers.flatMap((signer) => {
+    const name = signer.name.trim();
+    const email = signer.email.trim();
+    if (!name || !email.includes("@")) return [];
+    return [
+      compactBody({
+        name,
+        email,
+        role: crmRecipientRole(signer.role),
+        order: signer.order > 0 ? signer.order : undefined,
+      }),
+    ];
+  });
   return compactBody({
     documentId: documentId && isUuid(documentId) ? documentId : undefined,
     title: input.documentName.trim(),
-    documentName: input.documentName.trim(),
     signingOrder: input.signingOrder === "parallel" ? "PARALLEL" : "SEQUENTIAL",
-    expiresAt: toIsoDate(input.expiryDate),
-    emailSubject: `Please sign: ${input.documentName.trim()}`,
-    recipients: input.signers.map((signer) =>
-      compactBody({
-        name: signer.name.trim(),
-        email: signer.email.trim(),
-        role: crmRecipientRole(signer.role),
-        phone: signer.phone,
-        deliverVia: signer.deliveryMethod === "email_sms" ? "EMAIL_SMS" : "EMAIL",
-      }),
-    ),
+    expiresAt: toExpiresAt(input.expiryDate),
+    recipients,
   });
 }
 

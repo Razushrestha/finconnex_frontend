@@ -8,6 +8,7 @@ import {
   saveSavedSenderProfile,
   type SavedSenderProfile,
 } from "@/lib/documents/signature/saved-sender-profile";
+import { applySignaturePen } from "@/lib/documents/signature/signature-pen";
 import { cn } from "@/lib/utils";
 
 const SCRIPT_STYLES = [
@@ -157,10 +158,7 @@ export function SelectSignatureProfileModal({
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.lineWidth = 2.4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#1f2937";
+      applySignaturePen(ctx, rect.height);
       paintPrevious(canvas, ctx, rect.width, rect.height);
     };
 
@@ -189,10 +187,7 @@ export function SelectSignatureProfileModal({
     ctx.restore();
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#1f2937";
+    applySignaturePen(ctx, canvas.getBoundingClientRect().height);
     drawing.current = false;
     setHasInk(false);
   }

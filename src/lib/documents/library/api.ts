@@ -3,7 +3,7 @@ import {
   isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { partyName, relatedActivityLabel } from "@/lib/activities/party";
+import { relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   type CrmDocumentType,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/documents/library/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { isLocalStorageKey } from "@/lib/storage/api";
+import { ownerDisplayName, type OwnerLike } from "@/lib/users/display-name";
 
 export type CrmDocumentQuery = {
   page?: number;
@@ -157,6 +158,38 @@ export function encodeDocumentDescription(input: {
   return lines.join("\n") || undefined;
 }
 
+function person(value: unknown): OwnerLike {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as Record<string, unknown>;
+  const nested =
+    row.user && typeof row.user === "object"
+      ? (row.user as Record<string, unknown>)
+      : null;
+  return {
+    name: row.name ?? row.fullName ?? row.displayName ?? nested?.name,
+    firstName: row.firstName ?? nested?.firstName,
+    lastName: row.lastName ?? nested?.lastName,
+    email: row.email ?? nested?.email,
+  };
+}
+
+function personId(value: unknown): string {
+  if (typeof value === "string" && isUuid(value)) return value;
+  if (!value || typeof value !== "object") return "";
+  const row = value as Record<string, unknown>;
+  const nested =
+    row.user && typeof row.user === "object"
+      ? (row.user as Record<string, unknown>)
+      : null;
+  return pickStr(row.id, row.userId, nested?.id);
+}
+
+function labeled(kind: string, value: unknown): string {
+  const name = pickStr(value);
+  return name && !isUuid(name) ? `${kind}: ${name}` : "";
+}
+
 function asDocumentType(raw: string): CrmDocumentType | undefined {
   const value = raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
   return CRM_DOCUMENT_TYPES.includes(value as CrmDocumentType)
@@ -209,14 +242,6 @@ export function normalizeLibraryDocument(
   const uploadedAt = formatDate(
     raw.uploadedAt ?? raw.createdAt ?? raw.updatedAt,
   );
-  const owner = pickStr(
-    partyName(raw.uploadedBy),
-    typeof raw.uploadedBy === "string" ? raw.uploadedBy : "",
-    raw.ownerName,
-    partyName(raw.owner),
-    typeof raw.owner === "string" ? raw.owner : "",
-    raw.createdByName,
-  ) || "—";
   const sizeBytes =
     typeof raw.sizeBytes === "number"
       ? raw.sizeBytes
@@ -228,6 +253,25 @@ export function normalizeLibraryDocument(
   const description = pickStr(raw.description, raw.note) || undefined;
   const meta = description ? parseMeta(description) : { folder: "", relatedTo: "", tags: [] };
   const documentType = asDocumentType(pickStr(raw.documentType, raw.type));
+  const ownerId =
+    pickStr(
+      raw.uploadedById,
+      raw.ownerId,
+      raw.createdById,
+      personId(raw.uploadedBy),
+      personId(raw.owner),
+      personId(raw.createdBy),
+      personId(raw.uploader),
+    ) || undefined;
+  const owner =
+    ownerDisplayName(
+      person(raw.uploadedBy),
+      person(raw.owner),
+      person(raw.createdBy),
+      person(raw.uploader),
+      person(raw.creator),
+      pickStr(raw.ownerName, raw.uploadedByName, raw.createdByName),
+    ) || "—";
   const relatedIds = {
     leadId: pickStr(raw.leadId) || undefined,
     contactId: pickStr(raw.contactId) || undefined,
@@ -246,12 +290,18 @@ export function normalizeLibraryDocument(
         meta.folder,
       ) || documentTypeToFolder(documentType, description),
     owner,
+    ownerId,
     relatedTo:
       pickStr(
         typeof raw.relatedTo === "string" ? raw.relatedTo : "",
         raw.relatedLabel,
+        raw.relatedName,
         meta.relatedTo,
         relatedActivityLabel(raw),
+        labeled("Deal", raw.dealName),
+        labeled("Lead", raw.leadName),
+        labeled("Contact", raw.contactName),
+        labeled("Company", raw.companyName),
       ) || undefined,
     version,
     tags: mapTags(raw.tags ?? raw.labels).length

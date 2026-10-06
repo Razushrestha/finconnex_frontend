@@ -315,13 +315,21 @@ async function emailsMutate(suffix: string, init: RequestInit): Promise<unknown>
   });
 }
 
-export type CrmEmailTemplate = { id: string; name: string; subject?: string };
+export type CrmEmailTemplate = {
+  id: string;
+  name: string;
+  subject?: string;
+  body?: string;
+};
 
 function toTemplate(row: Record<string, unknown>): CrmEmailTemplate {
   return {
     id: pickStr(row.id, row.templateId),
     name: pickStr(row.name, row.title, row.subject) || "Untitled template",
     subject: pickStr(row.subject) || undefined,
+    body:
+      pickStr(row.html, row.body, row.content, row.text, row.message) ||
+      undefined,
   };
 }
 
