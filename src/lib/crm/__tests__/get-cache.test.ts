@@ -13,12 +13,14 @@ describe("CRM GET cache", () => {
   beforeEach(async () => {
     vi.stubGlobal("window", fakeWindow);
     memory.clear();
-    const { invalidateCrmGetCache } = await import("@/lib/crm/get-cache");
-    invalidateCrmGetCache();
+    const { setCrmGetCacheForTests } = await import("@/lib/crm/get-cache");
+    setCrmGetCacheForTests(true);
   });
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    const { setCrmGetCacheForTests } = await import("@/lib/crm/get-cache");
+    setCrmGetCacheForTests(null);
   });
 
   it("shares one request between identical GETs and serves repeats from memory", async () => {
@@ -68,6 +70,8 @@ describe("CRM GET cache", () => {
 
   it("never caches on the server, where one process serves many users", async () => {
     vi.unstubAllGlobals();
+    // Whatever leaked into globalThis, a server has no window.
+    vi.stubGlobal("window", undefined);
     const { cachedCrmGet } = await import("@/lib/crm/get-cache");
     const load = vi.fn(async () => "x");
     await cachedCrmGet("bff", "/v1/leads", load);
@@ -108,7 +112,7 @@ describe("route prefetch rules", () => {
     vi.stubGlobal("window", fakeWindow);
     memory.clear();
     const cache = await import("@/lib/crm/get-cache");
-    cache.invalidateCrmGetCache();
+    cache.setCrmGetCacheForTests(true);
     const { startRoutePrefetch } = await import("@/lib/crm/route-prefetch");
     const run = vi.fn(async () => "warm");
     const prefetcher = startRoutePrefetch({ workspaceId: () => WS, run });
@@ -130,6 +134,7 @@ describe("route prefetch rules", () => {
     prefetcher.prefetch("/sales/leads");
     expect(run).toHaveBeenCalledTimes(1);
     prefetcher.stop();
+    cache.setCrmGetCacheForTests(null);
     vi.unstubAllGlobals();
   });
 });

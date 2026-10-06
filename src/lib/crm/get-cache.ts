@@ -23,8 +23,22 @@ const entries = new Map<string, Entry>();
 type GetListener = (transport: string, path: string) => void;
 let onNetworkGet: GetListener | null = null;
 
+/**
+ * Off under test runners: suites call the same GET in consecutive tests and
+ * expect the network each time. The cache's own tests switch it on.
+ */
+let enabledForTests: boolean | null = null;
+
 function inBrowser() {
+  if (enabledForTests !== null) return enabledForTests && typeof window !== "undefined";
+  if (typeof process !== "undefined" && process.env?.NODE_ENV === "test") return false;
   return typeof window !== "undefined";
+}
+
+/** Test hook: true/false forces the cache on/off; null restores the default. */
+export function setCrmGetCacheForTests(enabled: boolean | null): void {
+  enabledForTests = enabled;
+  entries.clear();
 }
 
 export function isCacheableGet(init?: RequestInit): boolean {
