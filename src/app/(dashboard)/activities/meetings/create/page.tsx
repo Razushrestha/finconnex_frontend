@@ -18,7 +18,9 @@ import {
   createCrmMeeting,
   isCrmMeetingId,
   persistRemoteMeeting,
+  updateCrmMeeting,
 } from "@/lib/meetings/api";
+import { readRescheduledBooking } from "@/lib/booking/api";
 import {
   resolveRelatedMeetingInvitees,
   sendRelatedMeetingInvites,
@@ -80,6 +82,10 @@ export type ScheduleMeetingSeed = {
   time?: string;
   duration?: string;
   teamMember?: string;
+  /** Existing appointment. Saving updates this record instead of creating one. */
+  appointmentId?: string;
+  meetingId?: string;
+  recordKind?: "booking" | "meeting";
 };
 
 export default function ScheduleMeetingPage({
@@ -302,7 +308,11 @@ export default function ScheduleMeetingPage({
         }
         invitees.push({ name: guest.name, email });
       }
-      if (!invitees.length) {
+      const existingId = initial?.appointmentId?.trim();
+      const updating =
+        !!existingId &&
+        (initial?.recordKind === "booking" || initial?.recordKind === "meeting");
+      if (!invitees.length && !updating) {
         toast.error(
           `No email on this ${inviteKind.toLowerCase()}. Add an email on the related record, then send invites again.`,
         );
@@ -315,6 +325,71 @@ export default function ScheduleMeetingPage({
           : inviteKind === "Contact" || inviteKind === "Lead"
             ? invitees[0]?.relatedId
             : undefined;
+      if (updating && existingId) {
+        const startDate = starts[0];
+        const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
+        const patch = {
+          title: title.trim(),
+          type: meetingTypeValue,
+          startDateTime: startDate.toISOString(),
+          endDateTime: endDate.toISOString(),
+          location,
+          meetingLink: meetingLinkValue,
+          agenda: agenda.trim() || undefined,
+          notes: note || undefined,
+        };
+        if (initial?.recordKind === "booking") {
+          const fresh = await readRescheduledBooking(existingId, startDate.toISOString());
+          const nextMeetingId = fresh?.meetingId;
+          if (!nextMeetingId) {
+            throw new Error(
+              "The time was moved, but this booking has no meeting to store the title, location, and notes.",
+            );
+          }
+          const updated = await updateCrmMeeting(nextMeetingId, patch);
+          if (!updated) {
+            throw new Error(
+              "The time was moved, but the title, location, and notes could not be saved.",
+            );
+          }
+        } else {
+          const updated = await updateCrmMeeting(existingId, patch);
+          if (!updated) throw new Error("Could not update this meeting");
+        }
+        let emailed = false;
+        if (invitees.length) {
+          try {
+            await sendRelatedMeetingInvites({
+              invitees,
+              title: title.trim(),
+              startLabel: first.startLabel,
+              endLabel: first.endLabel,
+              location,
+              meetingLink: meetingLinkValue,
+              agenda: note,
+              relatedKind: inviteKind,
+              relatedName: inviteName,
+              relatedId: linkId,
+            });
+            emailed = true;
+          } catch {
+            emailed = false;
+          }
+        }
+        toast.success(
+          emailed ? "Appointment updated and invite emailed" : "Appointment updated",
+        );
+        if (onSent) {
+          onSent();
+          return;
+        }
+        router.push(
+          initial?.recordKind === "meeting" && isCrmMeetingId(existingId)
+            ? `/activities/meetings/detail/${existingId}`
+            : "/booking",
+        );
+        return;
+      }
 
       let firstCreatedId = "";
       for (const startDate of starts) {

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   appointmentInitials,
   appointmentPersonName,
+  appointmentChannelFromLocation,
   appointmentMatchesKpi,
+  appointmentRelatedLabel,
   bookingKpiStats,
   meetingToAppointment,
 } from "@/lib/booking/dashboard";
@@ -98,12 +100,55 @@ describe("appointment display name", () => {
       channel: "Video Call" as const,
       avatarClass: "",
     };
-    expect(appointmentMatchesKpi(row, "upcoming", now)).toBe(true);
+    expect(appointmentMatchesKpi(row, "upcoming", now)).toBe(false);
     expect(appointmentMatchesKpi(row, "confirmed", now)).toBe(true);
     expect(appointmentMatchesKpi(row, "month", now)).toBe(true);
     const stats = bookingKpiStats([row], now);
-    expect(stats.upcoming.current).toBe(1);
+    expect(stats.upcoming.current).toBe(0);
     expect(stats.confirmed.current).toBe(1);
     expect(stats.month.current).toBe(1);
+  });
+
+  it("counts only today-or-later appointments as upcoming", () => {
+    const now = new Date(2026, 8, 30, 12, 0, 0);
+    const future = {
+      id: "m2",
+      guestName: "Test2",
+      topic: "Contact",
+      relatedKind: "Contact" as const,
+      relatedId: "—",
+      consultantId: "",
+      start: "2026-10-02T06:00",
+      type: "Consultation" as const,
+      status: "Scheduled" as const,
+      channel: "Video Call" as const,
+      avatarClass: "",
+    };
+    expect(appointmentMatchesKpi(future, "upcoming", now)).toBe(true);
+    expect(bookingKpiStats([future], now).upcoming.current).toBe(1);
+  });
+
+  it("maps phone and in-person locations off Video Call", () => {
+    expect(appointmentChannelFromLocation("PHONE")).toBe("Phone Call");
+    expect(appointmentChannelFromLocation("IN_PERSON")).toBe("In Person");
+    expect(appointmentChannelFromLocation("ZOOM", "Google Meet")).toBe("Video Call");
+    expect(appointmentChannelFromLocation()).toBe("Video Call");
+  });
+
+  it("shows the resolved related name instead of a record id", () => {
+    expect(
+      appointmentRelatedLabel({
+        relatedKind: "Lead",
+        relatedId: "167f444e-33ea-42bc-bde7-028803e0be53",
+        relatedName: "Ada Lovelace",
+        guestName: "Ada Lovelace",
+      }),
+    ).toBe("Lead · Ada Lovelace");
+    expect(
+      appointmentRelatedLabel({
+        relatedKind: "Lead",
+        relatedId: "167f444e-33ea-42bc-bde7-028803e0be53",
+      }),
+    ).toBe("Lead");
   });
 });

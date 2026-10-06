@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -63,6 +63,8 @@ import {
 } from "@/components/booking/ConsultationSetup";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
+import { listCrmEventTypePages } from "@/lib/booking/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 interface BookingPageFormProps {
   layoutId: string;
@@ -158,7 +160,8 @@ export function BookingPageForm({
   pageId: pageIdProp,
 }: BookingPageFormProps) {
   const router = useRouter();
-  const [pageId] = useState(pageIdProp ?? initial?.id ?? nextBookingPageId());
+  const [pageId, setPageId] = useState(pageIdProp ?? initial?.id ?? nextBookingPageId());
+  const loadedCrmId = useRef<string | undefined>(initial?.crmEventTypeId);
   const isEdit = Boolean(initial || pageIdProp);
 
   const [title, setTitle] = useState(initial?.title ?? defaultTitle ?? "");
@@ -259,58 +262,94 @@ export function BookingPageForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [hydrated, setHydrated] = useState(!pageIdProp);
+  const [missingPage, setMissingPage] = useState(false);
+
+  function applyStoredPage(live: BookingPage) {
+    loadedCrmId.current =
+      live.crmEventTypeId ||
+      (isUuid(live.id) ? live.id : loadedCrmId.current);
+    if (live.id && live.id !== pageIdProp) setPageId(live.id);
+    setTitle(live.title);
+    setSlug(normalizeBookingSlug(live.slug));
+    setSlugTouched(true);
+    setOwner(live.owner);
+    setEventType(live.eventType);
+    setConsultationMode(live.consultationMode ?? "");
+    setMeetingMode(live.meetingMode ?? "one_time");
+    setCoverImageUrl(live.coverImageUrl ?? "");
+    setPrice(live.price ?? 0);
+    setCurrency(live.currency ?? "AUD");
+    setIsFree(live.price == null || live.price <= 0);
+    setMeetingVia(live.meetingVia ?? "video");
+    setMeetingViaDetail(
+      live.meetingViaDetail ?? live.videoLink ?? live.location ?? "",
+    );
+    setMaxAttendees(live.maxAttendees ?? 10);
+    setConsultants(
+      live.consultants?.length
+        ? live.consultants
+        : live.owner
+          ? [live.owner]
+          : [],
+    );
+    setConsultantPriorities(live.consultantPriorities ?? {});
+    setDurationMinutes(live.durationMinutes);
+    setBufferMinutes(live.bufferMinutes);
+    setMinNoticeHours(live.minNoticeHours ?? 2);
+    setMaxAdvanceDays(live.maxAdvanceDays ?? 60);
+    setTimezone(live.timezone);
+    setLocation(live.location ?? "");
+    setVideoLink(live.videoLink ?? "");
+    setDescription(live.description);
+    setAvailability(live.availability);
+    setSelectedAvailDay(
+      live.availability.find((r) => r.enabled)?.day ??
+        live.availability[0]?.day ??
+        "Monday",
+    );
+    setQuestions(live.questions);
+    setConfirmationTemplate(live.confirmationTemplate);
+    setReminderTemplate(live.reminderTemplate);
+    setStatus(live.status);
+  }
 
   useEffect(() => {
     if (!pageIdProp) {
       setHydrated(true);
       return;
     }
-    const live = getBookingPageById(pageIdProp);
-    if (live) {
-      setTitle(live.title);
-      setSlug(normalizeBookingSlug(live.slug));
-      setSlugTouched(true);
-      setOwner(live.owner);
-      setEventType(live.eventType);
-      setConsultationMode(live.consultationMode ?? "");
-      setMeetingMode(live.meetingMode ?? "one_time");
-      setCoverImageUrl(live.coverImageUrl ?? "");
-      setPrice(live.price ?? 0);
-      setCurrency(live.currency ?? "AUD");
-      setIsFree(live.price == null || live.price <= 0);
-      setMeetingVia(live.meetingVia ?? "video");
-      setMeetingViaDetail(
-        live.meetingViaDetail ?? live.videoLink ?? live.location ?? "",
-      );
-      setMaxAttendees(live.maxAttendees ?? 10);
-      setConsultants(
-        live.consultants?.length
-          ? live.consultants
-          : live.owner
-            ? [live.owner]
-            : [],
-      );
-      setConsultantPriorities(live.consultantPriorities ?? {});
-      setDurationMinutes(live.durationMinutes);
-      setBufferMinutes(live.bufferMinutes);
-      setMinNoticeHours(live.minNoticeHours ?? 2);
-      setMaxAdvanceDays(live.maxAdvanceDays ?? 60);
-      setTimezone(live.timezone);
-      setLocation(live.location ?? "");
-      setVideoLink(live.videoLink ?? "");
-      setDescription(live.description);
-      setAvailability(live.availability);
-      setSelectedAvailDay(
-        live.availability.find((r) => r.enabled)?.day ??
-          live.availability[0]?.day ??
-          "Monday",
-      );
-      setQuestions(live.questions);
-      setConfirmationTemplate(live.confirmationTemplate);
-      setReminderTemplate(live.reminderTemplate);
-      setStatus(live.status);
+    let alive = true;
+    const local = getBookingPageById(pageIdProp);
+    if (local) {
+      applyStoredPage(local);
+      setMissingPage(false);
+      setHydrated(true);
+      return;
     }
-    setHydrated(true);
+    void listCrmEventTypePages()
+      .then((pages) => {
+        if (!alive) return;
+        const match = pages.find(
+          (page) => page.id === pageIdProp || page.crmEventTypeId === pageIdProp,
+        );
+        if (match) {
+          applyStoredPage(match);
+          setMissingPage(false);
+        } else {
+          setMissingPage(true);
+        }
+      })
+      .catch(() => {
+        if (alive) setMissingPage(true);
+      })
+      .finally(() => {
+        if (alive) setHydrated(true);
+      });
+    return () => {
+      alive = false;
+    };
+    // applyStoredPage closes over the setters for this page id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIdProp]);
 
   const enabledDays = availability.filter((a) => a.enabled).length;
@@ -518,6 +557,7 @@ export function BookingPageForm({
           : undefined,
       consultants: isConsultation ? consultants : undefined,
       consultantPriorities: isConsultation ? consultantPriorities : undefined,
+      crmEventTypeId: loadedCrmId.current,
     };
   }
 
@@ -568,6 +608,23 @@ export function BookingPageForm({
     return (
       <div className="flex min-h-full items-center justify-center text-[13px] text-slate-400">
         Loading…
+      </div>
+    );
+  }
+
+  if (missingPage) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-[15px] font-semibold text-slate-900">Schedule not found</p>
+        <p className="max-w-sm text-[13px] text-slate-500">
+          This booking page is not in the workspace.
+        </p>
+        <Link
+          href="/booking/schedules"
+          className="text-[13px] font-semibold text-[#5A32A3]"
+        >
+          Back to schedules
+        </Link>
       </div>
     );
   }

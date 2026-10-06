@@ -21,6 +21,11 @@ export interface DashboardAppointment {
   topic: string;
   relatedKind: RelatedKind;
   relatedId: string;
+  /** Display name of the linked lead, deal, or company. */
+  relatedName?: string;
+  /** Booking rows reschedule in place; meeting rows update that meeting. */
+  recordKind?: "booking" | "meeting";
+  meetingId?: string;
   consultantId: string;
   consultantName?: string;
   start: string;
@@ -40,6 +45,8 @@ export interface DashboardAppointment {
   type: AppointmentType;
   status: AppointmentStatus;
   channel: AppointmentChannel;
+  /** True when the booking record itself named a location. Event-type defaults must not replace it. */
+  channelFromBooking?: boolean;
   avatarClass: string;
 }
 
@@ -139,7 +146,11 @@ export function appointmentMatchesKpi(
   key: BookingKpiKey,
   now = new Date(),
 ): boolean {
-  if (key === "upcoming") return true;
+  if (key === "upcoming") {
+    const start = parseAppointmentStart(row.start);
+    if (Number.isNaN(start.getTime())) return false;
+    return start.getTime() >= startOfDay(now).getTime();
+  }
   if (key === "confirmed") return row.status === "Confirmed";
   if (key === "pending") return row.status === "Pending";
   const start = parseAppointmentStart(row.start);
@@ -368,10 +379,11 @@ export function appointmentPersonName(...candidates: (string | undefined)[]) {
 export function appointmentRelatedLabel(row: {
   relatedKind: RelatedKind;
   relatedId: string;
+  relatedName?: string;
   guestName?: string;
 }) {
-  const id = appointmentPersonName(row.relatedId);
-  if (id && id !== row.guestName) return `${row.relatedKind} · ${id}`;
+  const name = appointmentPersonName(row.relatedName, row.relatedId);
+  if (name) return `${row.relatedKind} · ${name}`;
   return row.relatedKind;
 }
 
@@ -407,10 +419,37 @@ function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus | null {
   return "Scheduled";
 }
 
-function mapChannel(type: Meeting["type"]): AppointmentChannel {
-  if (type === "Phone Call") return "Phone Call";
-  if (type === "In-person") return "In Person";
+export function appointmentChannelFromLocation(
+  ...hints: Array<string | undefined | null>
+): AppointmentChannel {
+  const value = hints
+    .filter((item): item is string => typeof item === "string" && !!item.trim())
+    .join(" ")
+    .toUpperCase();
+  if (!value) return "Video Call";
+  if (value.includes("PHONE")) return "Phone Call";
+  if (
+    value.includes("PERSON") ||
+    value.includes("OFFLINE") ||
+    value.includes("OFFICE") ||
+    value.includes("ADDRESS")
+  ) {
+    return "In Person";
+  }
   return "Video Call";
+}
+
+export function appointmentChannelFromVia(
+  via?: string,
+): AppointmentChannel | undefined {
+  if (via === "phone") return "Phone Call";
+  if (via === "in_person") return "In Person";
+  if (via === "video" || via === "custom") return "Video Call";
+  return undefined;
+}
+
+function mapChannel(type: Meeting["type"]): AppointmentChannel {
+  return appointmentChannelFromLocation(type);
 }
 
 export function meetingToAppointment(
@@ -461,6 +500,11 @@ export function meetingToAppointment(
         : guest?.email || related.kind,
     relatedKind: related.kind,
     relatedId: related.id,
+    relatedName:
+      related.id && related.id !== "—" && !/^[0-9a-f-]{36}$/i.test(related.id)
+        ? related.id
+        : undefined,
+    recordKind: "meeting",
     consultantId:
       host?.id ||
       meeting.organizerId ||

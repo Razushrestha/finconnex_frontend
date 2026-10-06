@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  appointmentChannelFromLocation,
+  appointmentChannelFromVia,
   appointmentPersonName,
   hostsToConsultants,
   meetingToAppointment,
@@ -164,6 +166,10 @@ function withListDetails(
     end,
     price: amount,
     currency: row.currency || page?.currency,
+    channel:
+      row.recordKind === "meeting" || row.channelFromBooking
+        ? row.channel
+        : appointmentChannelFromVia(page?.meetingVia) ?? row.channel,
     paymentStatus: row.paymentStatus || (amount ? "Due" : "Free"),
     phone: row.phone || local?.guestPhone,
     notes: row.notes,
@@ -207,10 +213,42 @@ function fillCustomerRecord(
     lead?.phone ||
     undefined;
   const notes = row.notes || contact?.notes || lead?.notes || lead?.description || undefined;
+  const leadName = lead ? `${lead.firstName} ${lead.lastName}`.trim() : "";
+  const relatedName =
+    row.relatedName ||
+    contact?.name ||
+    leadName ||
+    (row.guestName && row.guestName !== "Guest" ? row.guestName : "");
   return {
     ...row,
     phone: phone || undefined,
     notes: notes || undefined,
+    relatedName: relatedName || undefined,
+  };
+}
+
+function bookingChannel(row: CrmBookingRecord): {
+  channel: ReturnType<typeof appointmentChannelFromLocation>;
+  channelFromBooking: boolean;
+} {
+  const event =
+    row.raw.eventType && typeof row.raw.eventType === "object"
+      ? (row.raw.eventType as Record<string, unknown>)
+      : {};
+  const own = textField(
+    row.raw,
+    "locationType",
+    "location_type",
+    "meetingType",
+    "channel",
+    "location",
+  );
+  return {
+    channel: appointmentChannelFromLocation(
+      own,
+      textField(event, "locationType", "location_type", "location"),
+    ),
+    channelFromBooking: !!own,
   };
 }
 
@@ -299,7 +337,9 @@ function bookingToAppointment(
     start: toLocalStart(row.startTime),
     type: "Consultation",
     status,
-    channel: "Video Call",
+    recordKind: "booking",
+    meetingId: row.meetingId,
+    ...bookingChannel(row),
     avatarClass: "bg-violet-100 text-violet-800",
   };
 }

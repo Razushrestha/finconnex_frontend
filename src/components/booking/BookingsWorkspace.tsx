@@ -46,6 +46,7 @@ import {
   appointmentDateKey,
   appointmentInitials,
   appointmentMatchesKpi,
+  appointmentPersonName,
   appointmentRelatedLabel,
   bookingKpiStats,
   consultantById,
@@ -64,7 +65,7 @@ import {
 import { useCrmBooking } from "@/lib/booking/use-crm-booking";
 import {
   cancelCrmBooking,
-  rescheduleCrmBooking,
+  readRescheduledBooking,
   tryCrmBooking,
 } from "@/lib/booking/api";
 import {
@@ -294,6 +295,7 @@ function HomeView({
   const [consultantFilter, setConsultantFilter] = useState("all");
   const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(new Date()));
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [month, setMonth] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -317,6 +319,12 @@ function HomeView({
     if (consultantFilter !== "all") {
       data = data.filter((a) => a.consultantId === consultantFilter);
     }
+    if (dateFilter) {
+      data = data.filter((a) => appointmentDateKey(a.start) === dateFilter);
+    }
+    if (kpiFilter) {
+      data = data.filter((a) => appointmentMatchesKpi(a, kpiFilter, now));
+    }
     const today = dateKeyFromDate(now);
     data.sort((a, b) => {
       if (kpiFilter) {
@@ -331,13 +339,11 @@ function HomeView({
       return a.start.localeCompare(b.start);
     });
     return data;
-  }, [appointments, consultantFilter, kpiFilter, now]);
+  }, [appointments, consultantFilter, dateFilter, kpiFilter, now]);
 
-  const pageRows = kpiFilter
-    ? rows
-    : rows.slice((page - 1) * pageSize, page * pageSize);
-  const shownFrom = kpiFilter ? (rows.length ? 1 : 0) : (page - 1) * pageSize + 1;
-  const shownTo = kpiFilter ? rows.length : Math.min(page * pageSize, rows.length);
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const shownFrom = rows.length ? (page - 1) * pageSize + 1 : 0;
+  const shownTo = Math.min(page * pageSize, rows.length);
   // Each day's appointments in start order, for the calendar's hover card.
   const appointmentsByDay = useMemo(() => {
     const byDay = new Map<string, DashboardAppointment[]>();
@@ -447,7 +453,11 @@ function HomeView({
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
-              {kpiFilter ? KPI_TITLES[kpiFilter] : "Upcoming Appointments"}
+              {dateFilter
+                ? `Appointments on ${formatApptDate(`${dateFilter}T00:00`)}`
+                : kpiFilter
+                  ? KPI_TITLES[kpiFilter]
+                  : "Upcoming Appointments"}
             </h2>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <select
@@ -465,6 +475,18 @@ function HomeView({
                   </option>
                 ))}
               </select>
+              {dateFilter ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFilter(null);
+                    setPage(1);
+                  }}
+                  className="h-8 rounded-lg border border-[#E5E7EB] px-2.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  All dates
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -480,7 +502,9 @@ function HomeView({
             ) : null}
             {!loading && pageRows.length === 0 ? (
               <p className="px-4 py-10 text-center text-[13px] text-slate-400">
-                No appointments from CRM meetings yet.
+                {dateFilter
+                  ? "No appointments on this day."
+                  : "No appointments from CRM meetings yet."}
               </p>
             ) : null}
             {pageRows.map((row) => (
@@ -533,7 +557,9 @@ function HomeView({
                 {!loading && pageRows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-12 text-center text-[13px] text-slate-400">
-                      No appointments from CRM meetings yet.
+                      {dateFilter
+                  ? "No appointments on this day."
+                  : "No appointments from CRM meetings yet."}
                     </td>
                   </tr>
                 ) : null}
@@ -563,7 +589,7 @@ function HomeView({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                disabled={kpiFilter != null || page === 1}
+                disabled={page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-slate-500 hover:bg-slate-50 disabled:opacity-40"
               >
@@ -577,7 +603,7 @@ function HomeView({
               </span>
               <button
                 type="button"
-                disabled={kpiFilter != null || page * pageSize >= rows.length}
+                disabled={page * pageSize >= rows.length}
                 onClick={() => setPage((p) => p + 1)}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-slate-500 hover:bg-slate-50 disabled:opacity-40"
               >
@@ -652,7 +678,11 @@ function HomeView({
             onNext={() =>
               setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
             }
-            onSelect={setSelectedDate}
+            onSelect={(iso) => {
+              setSelectedDate(iso);
+              setDateFilter((current) => (current === iso ? null : iso));
+              setPage(1);
+            }}
           />
         </div>
       </div>
@@ -716,12 +746,16 @@ function scheduleSeed(row: DashboardAppointment): ScheduleMeetingSeed {
     row.relatedKind === "Deal" ||
     row.relatedKind === "Company";
   const relatedId = row.relatedId && row.relatedId !== "—" ? row.relatedId : "";
+  const relatedName = appointmentPersonName(row.relatedName, row.guestName);
   return {
     title: row.eventTypeName || row.guestName,
     contactName: row.guestName,
     relatedKind: linked ? row.relatedKind : "",
-    relatedName: linked ? relatedId : "",
+    relatedName: linked ? relatedName : "",
     relatedId: linked ? relatedId : "",
+    appointmentId: row.id,
+    meetingId: row.meetingId,
+    recordKind: row.recordKind,
     date: valid
       ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
       : undefined,
@@ -1413,26 +1447,39 @@ function AppointmentDrawer({
       setError("Choose today or a future date and time.");
       return;
     }
-    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const previousStart = parseAppointmentStart(row.start);
+    const previousEnd = row.end ? parseAppointmentStart(row.end) : null;
+    const minutes =
+      previousEnd &&
+      !Number.isNaN(previousEnd.getTime()) &&
+      !Number.isNaN(previousStart.getTime())
+        ? Math.max(5, Math.round((previousEnd.getTime() - previousStart.getTime()) / 60000))
+        : 30;
+    const end = new Date(start.getTime() + minutes * 60 * 1000);
     setSaving(true);
     setError("");
     try {
-      const meeting = await tryCrmMeeting(() =>
-        updateCrmMeeting(row.id, {
-          startDateTime: start.toISOString(),
-          endDateTime: end.toISOString(),
-        }),
-      );
-      const booking =
-        meeting
-          ? null
-          : await tryCrmBooking(() =>
-              rescheduleCrmBooking(row.id, start.toISOString()),
-            );
-      if (!meeting && !booking) {
-        setError("Could not save this appointment.");
-        setSaving(false);
-        return;
+      const when = {
+        startDateTime: start.toISOString(),
+        endDateTime: end.toISOString(),
+      };
+      if (row.recordKind === "meeting") {
+        const meeting = await tryCrmMeeting(() => updateCrmMeeting(row.id, when));
+        if (!meeting) {
+          setError("Could not save this appointment.");
+          setSaving(false);
+          return;
+        }
+      } else {
+        const fresh = await readRescheduledBooking(row.id, when.startDateTime);
+        if (!fresh) {
+          setError("Could not save this appointment.");
+          setSaving(false);
+          return;
+        }
+        if (fresh.meetingId) {
+          await tryCrmMeeting(() => updateCrmMeeting(fresh.meetingId!, when));
+        }
       }
       toast.success("Appointment updated");
       onSaved();

@@ -1291,21 +1291,49 @@ export async function ensureCrmBookingHost(input: {
   }
 }
 
-export function listCrmBookings(filters?: {
+export async function listCrmBookings(filters?: {
   leadId?: string;
   contactId?: string;
   dealId?: string;
   limit?: number;
+  page?: number;
 }): Promise<CrmBookingRecord[]> {
-  const q = toQuery({
-    leadId: filters?.leadId,
-    contactId: filters?.contactId,
-    dealId: filters?.dealId,
-    limit: filters?.limit ?? 100,
-  });
-  return bookingCall(`/bookings${q}`).then((data) =>
-    extractRecords(data).map(normalizeCrmBooking),
-  );
+  const limit = Math.min(100, Math.max(1, filters?.limit ?? 100));
+  const startPage = filters?.page != null ? Math.max(1, filters.page) : 1;
+  const maxPages = filters?.page != null ? 1 : 20;
+  const all: CrmBookingRecord[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < maxPages; i += 1) {
+    const page = startPage + i;
+    const q = toQuery({
+      leadId: filters?.leadId,
+      contactId: filters?.contactId,
+      dealId: filters?.dealId,
+      limit,
+      page,
+    });
+    let batch: CrmBookingRecord[];
+    try {
+      batch = extractRecords(await bookingCall(`/bookings${q}`)).map(normalizeCrmBooking);
+    } catch {
+      if (page !== 1 || all.length) break;
+      const fallback = toQuery({
+        leadId: filters?.leadId,
+        contactId: filters?.contactId,
+        dealId: filters?.dealId,
+        limit,
+      });
+      return extractRecords(await bookingCall(`/bookings${fallback}`)).map(
+        normalizeCrmBooking,
+      );
+    }
+    const fresh = batch.filter((row) => row.id && !seen.has(row.id));
+    if (!fresh.length) break;
+    for (const row of fresh) seen.add(row.id);
+    all.push(...fresh);
+    if (batch.length < limit) break;
+  }
+  return all;
 }
 
 export async function createCrmBooking(input: {
@@ -1525,6 +1553,29 @@ export function rescheduleCrmBooking(
     `/bookings/${bookingId}/reschedule`,
     jsonInit("POST", { startAt: startTime }),
   );
+}
+
+export function getCrmBooking(bookingId: string): Promise<CrmBookingRecord | null> {
+  return bookingCall(`/bookings/${bookingId}`).then((data) => crmBookingFromResponse(data));
+}
+
+/**
+ * Reschedule, then read the booking the CRM kept. The response meeting id is
+ * the active one. The id from before the call belongs to the replaced meeting.
+ */
+export async function readRescheduledBooking(
+  bookingId: string,
+  startTime: string,
+): Promise<CrmBookingRecord | null> {
+  const parsed = crmBookingFromResponse(await rescheduleCrmBooking(bookingId, startTime));
+  if (parsed?.meetingId) return parsed;
+  const id = parsed?.id || bookingId;
+  try {
+    const fresh = await getCrmBooking(id);
+    return fresh?.meetingId ? fresh : parsed ?? fresh;
+  } catch {
+    return parsed;
+  }
 }
 
 export function cancelCrmBooking(bookingId: string, reason?: string): Promise<unknown> {

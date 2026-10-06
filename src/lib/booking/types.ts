@@ -648,10 +648,8 @@ export function getBookingPageBySlug(slug: string) {
 }
 
 export function getBookingPageById(id: string) {
-  if (typeof window !== "undefined") {
-    return listBookingPages().find((p) => p.id === id);
-  }
-  return bookingPages.find((p) => p.id === id);
+  const list = typeof window !== "undefined" ? listBookingPages() : bookingPages;
+  return list.find((page) => page.id === id || page.crmEventTypeId === id);
 }
 
 const BOOKINGS_STORE_KEY = "booking:appointments:v2";
