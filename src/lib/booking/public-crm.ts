@@ -109,6 +109,52 @@ export function parsePublicSlotDays(data: unknown): PublicSlotDays {
   return out;
 }
 
+/** `YYYY-MM-DD` of an instant on the calendar of `timeZone`. */
+export function dateInZone(iso: string, timeZone: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(at);
+  } catch {
+    return at.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Re-buckets open slots by the guest's calendar day. Slots are instants, so a
+ * time zone change only re-reads them — no request — which is what makes
+ * switching zones instant (5:15 in Sydney shows as 12:00 in Kathmandu).
+ */
+export function slotDaysInZone(
+  days: PublicSlotDays | undefined,
+  timeZone: string,
+): PublicSlotDays | undefined {
+  if (!days) return undefined;
+  const out: PublicSlotDays = new Map();
+  const seen = new Set<string>();
+  for (const slots of days.values()) {
+    for (const slot of slots) {
+      const key = `${slot.startAt}|${slot.hostId ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const date = dateInZone(slot.startAt, timeZone);
+      if (!date) continue;
+      const list = out.get(date);
+      if (list) list.push(slot);
+      else out.set(date, [slot]);
+    }
+  }
+  for (const list of out.values()) {
+    list.sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+  }
+  return out;
+}
+
 /**
  * Zone where `startAt` reads as the consultation's opening hour (09:00), so
  * available slots match Dates and times instead of a guest-zone shift (03:45).

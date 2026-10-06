@@ -31,7 +31,7 @@ import {
 import {
   formatWorkingHoursClock,
   timeInZone,
-  workingHoursDisplayZone,
+  slotDaysInZone,
   type PublicSlot,
   type PublicSlotDays,
 } from "@/lib/booking/public-crm";
@@ -57,7 +57,6 @@ import {
   upsertBookingPage,
   bookingPageMatchesSlug,
   assignedCalendarMembers,
-  availabilityRuleForDate,
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
@@ -257,7 +256,6 @@ function BookFlow({
   const eventTz = ianaTimezoneFromLabel(page.timezone);
   const [guestTz, setGuestTz] = useState(eventTz);
   const [dialCode, setDialCode] = useState(() => dialCodeForTimezone(eventTz));
-  const alignedGuestTz = useRef(false);
 
   // Pages the host connected to the CRM list slots (and take bookings) through
   // the public API, which needs no login. `publicRefresh` re-reads them after a
@@ -277,8 +275,10 @@ function BookFlow({
     days?: PublicSlotDays;
     error?: string;
   } | null>(null);
+  // Slots are instants: they are loaded once per date range and only re-read
+  // when the guest changes time zone, so the key leaves the zone out.
   const publicKey = publicSlug
-    ? `${publicSlug}|${guestTz}|${rangeFrom}|${rangeTo}|${publicRefresh}`
+    ? `${publicSlug}|${rangeFrom}|${rangeTo}|${publicRefresh}`
     : "";
 
   useEffect(() => {
@@ -297,10 +297,12 @@ function BookFlow({
   useEffect(() => {
     if (!publicKey) return;
     let alive = true;
+    // A day either side, so a guest far from the event's zone still gets the
+    // edge days' slots once they are re-read on their own calendar.
     void fetchPublicSlots(publicSlug, {
-      from: rangeFrom,
-      to: rangeTo,
-      timezone: guestTz,
+      from: shiftIsoDate(rangeFrom, -1),
+      to: shiftIsoDate(rangeTo, 1),
+      timezone: eventTz,
     }).then((res) => {
       if (!alive) return;
       setPublicResult(
@@ -312,33 +314,15 @@ function BookFlow({
     return () => {
       alive = false;
     };
-  }, [publicKey, publicSlug, rangeFrom, rangeTo, guestTz]);
+  }, [publicKey, publicSlug, rangeFrom, rangeTo, eventTz]);
 
   const publicCurrent = publicResult?.key === publicKey ? publicResult : null;
-  const publicDays = publicCurrent?.days;
+  const loadedDays = publicCurrent?.days;
+  // The guest's calendar days and clock, worked out here — no round trip.
+  const publicDays = useMemo(() => slotDaysInZone(loadedDays, guestTz), [loadedDays, guestTz]);
   const publicLoading = !!publicKey && !publicCurrent;
   const publicError = publicCurrent?.error;
 
-  // Host hours are a wall clock (09:00–17:00). If the browser zone shifted
-  // those to 03:45 AM, snap the picker to the zone that still reads 09:00 AM.
-  useEffect(() => {
-    if (alignedGuestTz.current || !publicDays?.size) return;
-    const first = [...publicDays.values()].find((rows) => rows[0])?.[0];
-    if (!first) return;
-    const hoursStart =
-      page.availability.find((rule) => rule.enabled)?.start || "09:00";
-    const next = workingHoursDisplayZone(first.startAt, hoursStart, [
-      eventTz,
-      guestTz,
-      "Australia/Sydney",
-      "Asia/Kathmandu",
-    ]);
-    alignedGuestTz.current = true;
-    if (next && next !== guestTz) {
-      setGuestTz(next);
-      setDialCode(dialCodeForTimezone(next));
-    }
-  }, [publicDays, eventTz, guestTz, page.availability]);
 
   useEffect(() => {
     const eventTypeId = crmEventTypeIdOf(page);
@@ -433,30 +417,19 @@ function BookFlow({
     ? slotsForDate(slotPage, selectedDate, slotOpts)
     : [];
 
-  // The CRM's open times for the chosen day. Labels use the same wall clock as
-  // Dates and times (09:00 AM), not a shifted guest-zone reading (03:45 AM).
+  // The CRM's open times for the chosen day, on the guest's own clock.
   const publicSlotList = useMemo(() => {
     if (!publicDays || !selectedDate) return [];
     const rows = publicDays.get(toLocalDateStr(selectedDate)) ?? [];
-    const hoursStart =
-      availabilityRuleForDate(page, toLocalDateStr(selectedDate))?.start || "09:00";
-    const clockTz = rows[0]
-      ? workingHoursDisplayZone(rows[0].startAt, hoursStart, [
-          eventTz,
-          guestTz,
-          "Australia/Sydney",
-          "Asia/Kathmandu",
-        ])
-      : guestTz;
     const byTime = new Map<string, PublicSlot & { start: string }>();
     for (const slot of rows) {
-      const start = timeInZone(slot.startAt, clockTz);
+      const start = timeInZone(slot.startAt, guestTz);
       if (start && !byTime.has(start)) byTime.set(start, { ...slot, start });
     }
     return [...byTime.values()].sort(
       (a, b) => Date.parse(a.startAt) - Date.parse(b.startAt),
     );
-  }, [publicDays, selectedDate, guestTz, eventTz, page]);
+  }, [publicDays, selectedDate, guestTz]);
 
   const slots = (
     page.crmPublic
@@ -3038,6 +3011,13 @@ function GuestQuestion({
 
 function FieldError({ message }: { message: string }) {
   return <p className="mt-1 text-[12px] font-medium text-rose-600">{message}</p>;
+}
+
+/** `YYYY-MM-DD` moved by whole days. */
+function shiftIsoDate(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const at = new Date(Date.UTC(y, m - 1, d + days));
+  return at.toISOString().slice(0, 10);
 }
 
 function dialCodeForTimezone(tz: string) {
