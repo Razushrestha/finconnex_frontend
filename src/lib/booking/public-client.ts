@@ -151,7 +151,14 @@ export async function fetchPublicSlots(
 ): Promise<PublicSlotsResult> {
   const query = new URLSearchParams({ from: range.from, to: range.to });
   if (range.timezone) query.set("timezone", range.timezone);
-  const res = await call(`${endpoint(slug, "slots")}?${query.toString()}`);
+  const url = `${endpoint(slug, "slots")}?${query.toString()}`;
+  let res = await call(url);
+  // "Not connected" can come from a server that has not seen this page yet;
+  // a couple of quick retries usually reach one that has.
+  for (let attempt = 1; !res.ok && res.code === "not_connected" && attempt <= 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    res = await call(url);
+  }
   if (!res.ok) return res;
   return { ok: true, days: parsePublicSlotDays(res.json) };
 }

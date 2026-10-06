@@ -131,9 +131,18 @@ export function PublicBookClient({ slug }: { slug: string }) {
       }
 
       try {
-        const res = await fetch(`/api/book/${encodeURIComponent(slug)}`, {
+        // A 404 can come from a server that has not seen this page yet; a
+        // couple of quick retries usually reach one that has.
+        let res = await fetch(`/api/book/${encodeURIComponent(slug)}`, {
           credentials: "same-origin",
         });
+        for (let attempt = 1; res.status === 404 && attempt <= 3 && alive; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+          res = await fetch(`/api/book/${encodeURIComponent(slug)}`, {
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+        }
         if (!alive) return;
         if (res.ok) {
           const remote = (await res.json()) as BookingPage;
@@ -222,7 +231,8 @@ function BookFlow({
   // Basic walks Event Type → Date, Time & User → Your Info, with a step menu
   // on the left that fills in as the guest goes.
   const basic = pageBranding.layout === "basic";
-  const [basicStage, setBasicStage] = useState<"service" | "schedule">("service");
+  // A /book/:slug link names one event, so the guest starts on its calendar.
+  const [basicStage, setBasicStage] = useState<"service" | "schedule">("schedule");
   const [siteServices, setSiteServices] = useState<PublicSiteService[]>([]);
   // Both page through days a week at a time instead of showing a month.
   const weekly = fresh || basic;
@@ -683,19 +693,22 @@ function BookFlow({
 
   const locationLabel = bookingLocationLabel(page);
 
+  // Match the page's own event by slug; a name is only a fallback, since two
+  // services can share one ("Test" and "Test").
+  const slugMatch = (service: PublicSiteService) =>
+    service.slug === page.slug || service.slug === page.crmPublic?.eventTypeSlug;
+  const matchedService =
+    siteServices.find(slugMatch) ?? siteServices.find((service) => service.name === page.title);
   const isThisService = (service: PublicSiteService) =>
-    service.slug === page.slug ||
-    service.slug === page.crmPublic?.eventTypeSlug ||
-    service.name === page.title;
-  const thisService: PublicSiteService = {
+    matchedService ? service.id === matchedService.id : service.slug === page.slug;
+  const thisService: PublicSiteService = matchedService ?? {
     id: page.id,
     name: page.title,
     slug: page.slug,
     durationMinutes: page.durationMinutes,
   };
-  const basicServices = siteServices.some(isThisService)
-    ? siteServices
-    : [thisService, ...siteServices];
+  // The link is for this event only; other services are not offered here.
+  const basicServices = [thisService];
 
   const basicSteps = [
     {
