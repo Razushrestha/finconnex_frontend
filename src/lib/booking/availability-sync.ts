@@ -196,29 +196,111 @@ export async function syncConsultationAvailability(input: {
     const existing = await listCrmHostSchedules(host!.id);
     const current =
       existing.find((row) => row.isDefault) ?? existing[0] ?? null;
-    const saved = await saveCrmHostSchedule(host!.id, {
-      scheduleId: current?.id,
-      name: "Working hours",
-      timezone: input.timezone
-        ? ianaTimezoneFromLabel(input.timezone)
-        : host!.timezone || current?.timezone || "Australia/Sydney",
-      isDefault: true,
-      rules: weeklyToApiRules(source),
-    });
-    const scheduleId = isUuid(saved.id) ? saved.id : current?.id || "";
-    const fresh = await listCrmHostSchedules(host!.id);
-    const schedule =
-      fresh.find((row) => row.id === scheduleId) ?? fresh[0] ?? null;
-    await replaceLimitOverrides(scheduleId, schedule?.overrides ?? [], input.values);
-    await updateCrmBookingHost(host!.id, {
-      isConsultant: true,
-      dailyBookingLimit: Number.isFinite(dailyBookingLimit)
-        ? dailyBookingLimit
-        : null,
-    });
+    const timezone = input.timezone
+      ? ianaTimezoneFromLabel(input.timezone)
+      : host!.timezone || current?.timezone || "Australia/Sydney";
+    const rules = weeklyToApiRules(source);
+    const scheduleUnchanged =
+      !!current &&
+      isUuid(current.id) &&
+      current.timezone === timezone &&
+      sameRules(current.rules, rules);
+    const scheduleId = scheduleUnchanged
+      ? current!.id
+      : await saveCrmHostSchedule(host!.id, {
+          scheduleId: current?.id,
+          name: "Working hours",
+          timezone,
+          isDefault: true,
+          rules,
+        }).then((saved) => (isUuid(saved.id) ? saved.id : current?.id || ""));
+    await replaceLimitOverrides(
+      scheduleId,
+      current?.id === scheduleId ? (current?.overrides ?? []) : [],
+      input.values,
+    );
+    const nextLimit = Number.isFinite(dailyBookingLimit) ? dailyBookingLimit : null;
+    if (!host!.isConsultant || (host!.dailyBookingLimit ?? null) !== nextLimit) {
+      await updateCrmBookingHost(host!.id, {
+        isConsultant: true,
+        dailyBookingLimit: nextLimit,
+      });
+    }
   }
 
   return hosts.map((host) => host!.id);
+}
+
+type DesiredLimit = {
+  date: string;
+  isUnavailable: false;
+  startMinute: number;
+  endMinute: number;
+  reason: string;
+};
+
+function limitKey(date: string, reason: string, unavailable: boolean) {
+  return `${date}|${reason}|${unavailable ? "1" : "0"}`;
+}
+
+/** Dates already stored with the same limit are left in place. */
+export function planLimitOverrides(
+  overrides: CrmAvailabilitySchedule["overrides"],
+  values: AvailabilityLimitsValues,
+): { removeIds: string[]; add: DesiredLimit[] } {
+  const desired: DesiredLimit[] = [];
+  for (const limit of values.customLimits) {
+    for (const date of eachDate(limit.start, limit.end)) {
+      desired.push({
+        date,
+        isUnavailable: false,
+        startMinute: 9 * 60,
+        endMinute: 17 * 60,
+        reason: `limit:${limit.slotsPerEvent}:${limit.slotsPerCustomer}`,
+      });
+    }
+  }
+  const buckets = new Map<string, CrmAvailabilitySchedule["overrides"]>();
+  for (const override of overrides) {
+    if (!override.reason.startsWith("limit:") || !override.id) continue;
+    const key = limitKey(override.date, override.reason, override.isUnavailable);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(override);
+    buckets.set(key, bucket);
+  }
+  const keep = new Set<string>();
+  const add: DesiredLimit[] = [];
+  for (const row of desired) {
+    const match = buckets.get(limitKey(row.date, row.reason, false))?.shift();
+    if (match?.id) keep.add(match.id);
+    else add.push(row);
+  }
+  const removeIds = overrides
+    .filter((override) => override.reason.startsWith("limit:") && override.id && !keep.has(override.id))
+    .map((override) => override.id);
+  return { removeIds, add };
+}
+
+async function runPool<T>(items: T[], work: (item: T) => Promise<void>) {
+  const size = Math.min(6, items.length);
+  let index = 0;
+  await Promise.all(
+    Array.from({ length: size }, async () => {
+      while (index < items.length) {
+        const current = items[index];
+        index += 1;
+        await work(current);
+      }
+    }),
+  );
+}
+
+function sameRules(left: CrmAvailabilityWindow[], right: CrmAvailabilityWindow[]) {
+  const key = (row: CrmAvailabilityWindow) =>
+    `${row.dayOfWeek}:${row.startMinute}:${row.endMinute}`;
+  const a = left.map(key).sort();
+  const b = right.map(key).sort();
+  return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
 async function replaceLimitOverrides(
@@ -236,21 +318,17 @@ async function replaceLimitOverrides(
       throw new Error("Custom date limits can cover at most 62 days.");
     }
   }
-  for (const override of overrides) {
-    if (!override.reason.startsWith("limit:") || !override.id) continue;
-    await removeCrmScheduleOverride(scheduleId, override.id).catch(() => undefined);
-  }
-  for (const limit of values.customLimits) {
-    for (const date of eachDate(limit.start, limit.end)) {
-      await addCrmScheduleOverride(scheduleId, {
-        date,
-        isUnavailable: false,
-        startMinute: 9 * 60,
-        endMinute: 17 * 60,
-        reason: `limit:${limit.slotsPerEvent}:${limit.slotsPerCustomer}`,
-      });
-    }
-  }
+  const plan = planLimitOverrides(overrides, values);
+  if (!plan.removeIds.length && !plan.add.length) return;
+  await runPool(plan.removeIds, (id) =>
+    removeCrmScheduleOverride(scheduleId, id, true).then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  await runPool(plan.add, (row) =>
+    addCrmScheduleOverride(scheduleId, row, true).then(() => undefined),
+  );
 }
 
 function daysBetween(start: string, end: string) {

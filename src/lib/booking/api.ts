@@ -1205,20 +1205,22 @@ export function addCrmScheduleOverride(
     endMinute?: number;
     reason?: string;
   },
+  silent = false,
 ): Promise<unknown> {
   return bookingCall(
     `/hosts/schedules/${scheduleId}/overrides`,
-    jsonInit("POST", input),
+    jsonInit("POST", input, silent),
   );
 }
 
 export function removeCrmScheduleOverride(
   scheduleId: string,
   overrideId: string,
+  silent = false,
 ): Promise<unknown> {
   return bookingCall(
     `/hosts/schedules/${scheduleId}/overrides/${overrideId}`,
-    jsonInit("DELETE"),
+    jsonInit("DELETE", undefined, silent),
   );
 }
 

@@ -47,7 +47,10 @@ import {
 } from "@/lib/documents/signature/bulk-recipients";
 import { AddDocumentMenu } from "@/components/documents/signature/create/AddDocumentMenu";
 import { SignatureFileCard } from "@/components/documents/signature/create/SignatureFileCard";
-import { DaysToCompleteInput } from "@/components/documents/signature/create/DaysToCompleteInput";
+import {
+  DaysToCompleteInput,
+  ReminderEveryDaysInput,
+} from "@/components/documents/signature/create/DaysToCompleteInput";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES =
@@ -431,14 +434,6 @@ function AgreementValidUntilField({
   );
 }
 
-function FormLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="w-[150px] shrink-0 text-[13px] text-slate-600">
-      {children}
-    </label>
-  );
-}
-
 export function ZohoStyleSendForm({
   mode: _mode,
   variant = "send",
@@ -782,20 +777,6 @@ export function ZohoStyleSendForm({
             {fileError ? (
               <p className="mt-3 text-[12px] text-rose-600">{fileError}</p>
             ) : null}
-
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <FormLabel>Document name</FormLabel>
-              <div className="relative min-w-0 flex-1">
-                <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={documentName}
-                  onChange={(e) => onChangeName(e.target.value)}
-                  placeholder="Enter name"
-                  className={cn(fieldClass, "pl-9")}
-                />
-              </div>
-            </div>
             </div>
 
             <div className="border-t border-slate-100 pt-4">
@@ -1212,24 +1193,12 @@ export function ZohoStyleSendForm({
                         </p>
                         <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
                           <span>Send a reminder every</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={90}
+                          <ReminderEveryDaysInput
                             value={settings.reminderEveryDays}
-                            onChange={(event) =>
-                              onChangeSettings({
-                                reminderEveryDays: Math.max(
-                                  1,
-                                  Number(event.target.value) || 1,
-                                ),
-                              })
+                            onChange={(reminderEveryDays) =>
+                              onChangeSettings({ reminderEveryDays })
                             }
-                            className={cn(
-                              fieldClass,
-                              "w-[72px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-                            )}
-                            aria-label="Reminder interval in days"
+                            className={cn(fieldClass, "w-[72px]")}
                           />
                           <span>day(s)</span>
                         </div>
