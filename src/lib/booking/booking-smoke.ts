@@ -256,8 +256,11 @@ export function smokeBookingWiring() {
   if (!publicBook.includes("/api/book/")) {
     fail("PublicBookClient must resolve published booking pages by slug");
   }
-  if (!publicBook.includes("workingHoursDisplayZone")) {
-    fail("PublicBookClient must label slots in the Dates and times clock");
+  if (
+    !publicBook.includes("slotDaysInZone(") ||
+    !publicBook.includes("timeInZone(slot.startAt, guestTz)")
+  ) {
+    fail("PublicBookClient must show slots on the guest's chosen time zone");
   }
   if (!publicBook.includes("inviteGuestsField")) {
     fail("PublicBookClient must show Invite Guest emails when the field is visible");
