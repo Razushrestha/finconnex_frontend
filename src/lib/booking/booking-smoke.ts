@@ -208,15 +208,15 @@ export function smokeBookingWiring() {
 
   const additional = readSrc("src/components/booking/BookingAdditionalSettingsStep.tsx");
   if (additional.includes("Third-party calendar settings")) {
-    fail("consultation setup must use FinConnex calendar, not third-party calendar as the source");
+    fail("consultation setup must use the in-app calendar, not a third-party calendar as the source");
   }
-  if (!additional.includes("FinConnex calendar")) {
-    fail("consultation additional settings must name the FinConnex calendar");
+  if (!additional.includes("Calendar")) {
+    fail("consultation additional settings must title the section Calendar");
   }
 
   const modal = readSrc("src/components/booking/NewAppointmentModal.tsx");
-  if (!modal.includes("createCrmBooking") || !modal.includes("linkCrmBooking")) {
-    fail("NewAppointmentModal is not wired to CRM create booking + crm-link");
+  if (!modal.includes("ScheduleMeetingPage")) {
+    fail("New Appointment must open the Schedule Meeting form");
   }
 
   const leadMeetings = readSrc(

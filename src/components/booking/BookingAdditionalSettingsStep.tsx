@@ -109,10 +109,12 @@ export function BookingAdditionalSettingsStep({
   initial,
   onBack,
   onFinish,
+  finishLabel = "Finish setup",
 }: {
   initial?: AdditionalSettingsValues;
   onBack: () => void;
   onFinish: (values: AdditionalSettingsValues) => void;
+  finishLabel?: string;
 }) {
   const [values, setValues] = useState<AdditionalSettingsValues>(
     initial ?? DEFAULT_ADDITIONAL_SETTINGS,
@@ -215,11 +217,11 @@ export function BookingAdditionalSettingsStep({
 
       <section className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:px-7">
         <h2 className="text-[18px] font-bold text-slate-900">
-          FinConnex calendar
+          Calendar
         </h2>
         <div className="mt-4">
           <SettingRow
-            title="Add booked consultations to the FinConnex calendar and include invite notes in confirmation emails."
+            title="Add booked consultations to the calendar and include invite notes in confirmation emails."
             info="Events show on the in-app calendar. Confirmation still includes an .ics file guests can add to Google or Outlook if they want."
             on={values.calendarInvites}
             onChange={(calendarInvites) => patch({ calendarInvites })}
@@ -272,7 +274,7 @@ export function BookingAdditionalSettingsStep({
           className="h-10 rounded-lg px-5 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}
         >
-          Finish setup
+          {finishLabel}
         </button>
       </div>
     </div>

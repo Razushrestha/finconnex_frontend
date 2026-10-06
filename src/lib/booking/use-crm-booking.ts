@@ -7,6 +7,7 @@ import {
   meetingToAppointment,
   resolveConsultantMatch,
   toLocalStart,
+  parseAppointmentStart,
   replaceDashboardAppointments,
   replaceDashboardConsultants,
   type AppointmentStatus,
@@ -27,8 +28,191 @@ import {
   tryCrmBooking,
   type CrmBookingRecord,
 } from "@/lib/booking/api";
-import { listBookingPages, type BookingPage } from "@/lib/booking/types";
+import {
+  listBookingPages,
+  listBookings,
+  type BookingPage,
+} from "@/lib/booking/types";
+import { eventTypeInitials } from "@/lib/booking/new-appointment";
+import { loadCrmContacts } from "@/lib/contacts/api";
+import { fetchLeadList } from "@/lib/leads/api/client";
+import type { CrmLead } from "@/lib/leads/api/types";
 import { getRulesActor } from "@/lib/rules/actor";
+
+const BOOKING_CODE_STORE = "booking:list-codes:v1";
+
+function rememberBookingCode(id: string, eventName: string) {
+  if (typeof window === "undefined") return eventTypeInitials(eventName);
+  let store: Record<string, string> = {};
+  try {
+    const raw = window.localStorage.getItem(BOOKING_CODE_STORE);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      store = parsed as Record<string, string>;
+    }
+  } catch {
+    store = {};
+  }
+  if (store[id]) return store[id];
+  const prefix = eventTypeInitials(eventName || "Booking");
+  const taken = new Set(Object.values(store));
+  let n = 1;
+  let code = `${prefix}-${String(n).padStart(5, "0")}`;
+  while (taken.has(code)) {
+    n += 1;
+    code = `${prefix}-${String(n).padStart(5, "0")}`;
+  }
+  store[id] = code;
+  try {
+    window.localStorage.setItem(BOOKING_CODE_STORE, JSON.stringify(store));
+  } catch {
+    /* the code is still shown for this visit */
+  }
+  return code;
+}
+
+function textField(raw: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function numberField(raw: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+    if (typeof value === "string" && value.trim() && Number(value) > 0) return Number(value);
+  }
+  return undefined;
+}
+
+function bookingListFields(raw: Record<string, unknown>) {
+  const event =
+    raw.eventType && typeof raw.eventType === "object"
+      ? (raw.eventType as Record<string, unknown>)
+      : {};
+  const payment = textField(raw, "paymentStatus", "payment_status", "payment");
+  return {
+    bookingCode:
+      textField(raw, "reference", "bookingNumber", "booking_number", "code") ||
+      undefined,
+    eventTypeName:
+      textField(raw, "eventTypeName", "event_type_name") ||
+      textField(event, "name", "title") ||
+      undefined,
+    price:
+      numberField(raw, "price", "amount", "total") ??
+      numberField(event, "price", "amount"),
+    currency: textField(raw, "currency") || textField(event, "currency") || undefined,
+    paymentStatus: payment
+      ? /unpaid|due|pending/i.test(payment)
+        ? "Due"
+        : /paid/i.test(payment)
+          ? "Paid"
+          : payment
+      : undefined,
+    phone:
+      textField(raw, "guestPhone", "guest_phone", "phone", "contactNumber", "contact_number") ||
+      undefined,
+    notes: textField(raw, "notes", "note", "internalNotes") || undefined,
+    bookedOn:
+      textField(raw, "createdAt", "created_at", "bookedAt", "booked_at") || undefined,
+  };
+}
+
+function withListDetails(
+  row: DashboardAppointment,
+  pages: BookingPage[],
+  saved: ReturnType<typeof listBookings>,
+): DashboardAppointment {
+  const local = saved.find(
+    (item) =>
+      item.crmBookingId === row.id ||
+      item.crmMeetingId === row.id ||
+      item.meetingId === row.id ||
+      item.id === row.id,
+  );
+  const page =
+    pages.find(
+      (item) =>
+        item.id === row.eventTypeId || item.crmEventTypeId === row.eventTypeId,
+    ) ||
+    (local ? pages.find((item) => item.id === local.pageId) : undefined) ||
+    (row.eventTypeName
+      ? pages.find((item) => item.title === row.eventTypeName)
+      : undefined);
+  const price = row.price ?? page?.price;
+  const start = parseAppointmentStart(row.start);
+  const durationMs = (page?.durationMinutes || 30) * 60_000;
+  const end =
+    row.end ||
+    (local?.end ? toLocalStart(local.end) : undefined) ||
+    (Number.isNaN(start.getTime())
+      ? undefined
+      : toLocalStart(new Date(start.getTime() + durationMs).toISOString()));
+  const eventName = row.eventTypeName || page?.title || row.type;
+  const amount = price && price > 0 ? price : undefined;
+  return {
+    ...row,
+    bookingCode:
+      row.bookingCode ||
+      local?.reference ||
+      rememberBookingCode(row.id, eventName),
+    eventTypeName: eventName,
+    end,
+    price: amount,
+    currency: row.currency || page?.currency,
+    paymentStatus: row.paymentStatus || (amount ? "Due" : "Free"),
+    phone: row.phone || local?.guestPhone,
+    notes: row.notes,
+    bookedOn: row.bookedOn || local?.createdAt,
+  };
+}
+
+function samePerson(left: string, right: string) {
+  const a = left.trim().toLowerCase();
+  const b = right.trim().toLowerCase();
+  return !!a && a === b;
+}
+
+function fillCustomerRecord(
+  row: DashboardAppointment,
+  contacts: Awaited<ReturnType<typeof loadCrmContacts>>,
+  leads: CrmLead[],
+): DashboardAppointment {
+  const email = row.topic.includes("@") ? row.topic.trim().toLowerCase() : "";
+  const contact = contacts.find((item) => {
+    const person = item.contact;
+    return (
+      person.id === row.relatedId ||
+      (email && person.email.trim().toLowerCase() === email) ||
+      samePerson(person.name, row.guestName)
+    );
+  })?.contact;
+  const lead = leads.find((item) => {
+    const name = `${item.firstName} ${item.lastName}`.trim();
+    return (
+      item.id === row.relatedId ||
+      (email && item.email.trim().toLowerCase() === email) ||
+      samePerson(name, row.guestName)
+    );
+  });
+  const phone =
+    row.phone ||
+    contact?.mobile ||
+    contact?.phone ||
+    lead?.mobilePhone ||
+    lead?.phone ||
+    undefined;
+  const notes = row.notes || contact?.notes || lead?.notes || lead?.description || undefined;
+  return {
+    ...row,
+    phone: phone || undefined,
+    notes: notes || undefined,
+  };
+}
 
 function bookingToAppointment(
   row: CrmBookingRecord,
@@ -81,12 +265,25 @@ function bookingToAppointment(
     ],
     people,
   );
+  const extras = bookingListFields(row.raw);
   return {
     id: row.id,
     guestName,
     topic: row.guestEmail || guestName,
     relatedKind,
     relatedId,
+    eventTypeId: row.eventTypeId || undefined,
+    end: row.endTime ? toLocalStart(row.endTime) : undefined,
+    bookingCode: extras.bookingCode,
+    eventTypeName: extras.eventTypeName,
+    price: extras.price,
+    currency: extras.currency,
+    paymentStatus: extras.paymentStatus,
+    phone: extras.phone,
+    notes: extras.notes,
+    bookedOn: extras.bookedOn,
+    createdBy:
+      matched?.name || bookingHost?.name || row.hostName || undefined,
     consultantId:
       matched?.id ||
       bookingHost?.crmUserId ||
@@ -214,14 +411,22 @@ export function useCrmBooking() {
                 })),
             ]
           : memberPeople;
-      const consultantRows = hostsToConsultants(hostPeople, mapped);
       const eventPages = mergeCrmEventTypePages(
         listBookingPages().filter((page) => page.eventType === "Consultation"),
         crmPages ?? [],
       );
-      replaceDashboardAppointments(mapped);
+      const saved = listBookings();
+      const [contactRows, leadRows] = await Promise.all([
+        loadCrmContacts({ page: 1, limit: 100 }).catch(() => []),
+        fetchLeadList({ page: 1, limit: 100 }).catch(() => [] as CrmLead[]),
+      ]);
+      const listed = mapped
+        .map((row) => withListDetails(row, eventPages, saved))
+        .map((row) => fillCustomerRecord(row, contactRows, leadRows));
+      const consultantRows = hostsToConsultants(hostPeople, listed);
+      replaceDashboardAppointments(listed);
       replaceDashboardConsultants(consultantRows);
-      setAppointments(mapped);
+      setAppointments(listed);
       setConsultants(consultantRows);
       setPages(eventPages);
       setError(null);

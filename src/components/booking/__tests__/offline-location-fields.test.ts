@@ -67,9 +67,9 @@ describe("savedOfflineAddress", () => {
 });
 
 describe("initialOfflineLocation", () => {
-  it("starts on the office address when nothing else was saved", () => {
+  it("starts on None when nothing else was saved", () => {
     expect(initialOfflineLocation("", OFFICE)).toEqual({
-      kind: "office",
+      kind: "none",
       custom: "",
     });
   });
@@ -90,6 +90,10 @@ describe("initialOfflineLocation", () => {
 });
 
 describe("resolveOfflineAddress", () => {
+  it("saves nothing for None", () => {
+    expect(resolveOfflineAddress("none", OFFICE, "something else")).toBe("");
+  });
+
   it("uses the office address for Office address, ignoring typed text", () => {
     expect(resolveOfflineAddress("office", OFFICE, "something else")).toBe(OFFICE);
   });
@@ -104,11 +108,12 @@ describe("resolveOfflineAddress", () => {
 });
 
 describe("OfflineLocationFields markup", () => {
-  it("offers Office address and Custom in the dropdown", () => {
+  it("offers None, Office address, and Custom address in the menu", () => {
     const html = render({});
     expect(html).toContain('aria-label="Location"');
+    expect(html).toContain(">None</option>");
     expect(html).toContain(">Office address</option>");
-    expect(html).toContain(">Custom</option>");
+    expect(html).toContain(">Custom address</option>");
   });
 
   it("shows the office address read-only with a pin, and no typing box", () => {
@@ -122,12 +127,21 @@ describe("OfflineLocationFields markup", () => {
   });
 
   it("selects the matching option for the current kind", () => {
+    expect(render({ kind: "none" })).toMatch(
+      /<option value="none" selected=""|<option selected="" value="none"/,
+    );
     expect(render({ kind: "office" })).toMatch(
       /<option value="office" selected=""|<option selected="" value="office"/,
     );
     expect(render({ kind: "custom" })).toMatch(
       /<option value="custom" selected=""|<option selected="" value="custom"/,
     );
+  });
+
+  it("hides the address line when the location is None", () => {
+    const html = render({ kind: "none" });
+    expect(html).not.toContain('aria-label="Office address"');
+    expect(html).not.toContain('aria-label="Custom address"');
   });
 
   it("lets a custom address be typed and offers the current location", () => {
@@ -150,9 +164,8 @@ describe("OfflineLocationFields markup", () => {
     expect(valid).not.toContain('role="alert"');
   });
 
-  it("puts the dropdown beside the toggle and the address on its own full-width line", () => {
+  it("puts the menu beside the toggle and the address on its own full-width line", () => {
     const html = render({ kind: "office" });
-    // The dropdown grows to fill the toggle's row; the address block wraps below it.
     expect(html).toMatch(/<select[^>]*class="[^"]*\bflex-1\b/);
     expect(html).toMatch(/<div class="w-full space-y-2">/);
   });

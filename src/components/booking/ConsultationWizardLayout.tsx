@@ -8,11 +8,16 @@ import {
   ClipboardList,
   Clock,
   FileCheck,
+  LayoutTemplate,
   Send,
   SlidersHorizontal,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import {
+  NOTIFY_PANELS,
+  type NotifyPanelId,
+} from "@/components/booking/ConsultationNotifyPanel";
 import { cn } from "@/lib/utils";
 
 export const CONSULTATION_SETUP_STEPS = [
@@ -51,6 +56,11 @@ export const CONSULTATION_SETUP_STEPS = [
     title: "Additional settings",
     icon: SlidersHorizontal,
   },
+  {
+    id: "page",
+    title: "Booking Page",
+    icon: LayoutTemplate,
+  },
 ] as const;
 
 export type ConsultationSetupStepId =
@@ -81,6 +91,8 @@ export function ConsultationWizardLayout({
   onSelect,
   availabilityPanel = "dates",
   onAvailabilityPanel,
+  notifyPanel = "email",
+  onNotifyPanel,
   children,
 }: {
   current: ConsultationSetupStepId;
@@ -88,9 +100,12 @@ export function ConsultationWizardLayout({
   onSelect: (id: ConsultationSetupStepId) => void;
   availabilityPanel?: AvailabilityPanelId;
   onAvailabilityPanel?: (id: AvailabilityPanelId) => void;
+  notifyPanel?: NotifyPanelId;
+  onNotifyPanel?: (id: NotifyPanelId) => void;
   children: ReactNode;
 }) {
   const availabilityOpen = current === "availability";
+  const notifyOpen = current === "notify";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden lg:flex-row lg:items-stretch lg:gap-8">
@@ -106,11 +121,12 @@ export function ConsultationWizardLayout({
                   active={step.id === current}
                   reached={reached}
                   trailing={
-                    step.id === "availability" ? (
+                    step.id === "availability" || step.id === "notify" ? (
                       <ChevronDown
                         className={cn(
                           "h-4 w-4 shrink-0 text-slate-400 transition-transform",
-                          availabilityOpen && "rotate-180 text-[#5A32A3]",
+                          (step.id === "availability" ? availabilityOpen : notifyOpen) &&
+                            "rotate-180 text-[#5A32A3]",
                         )}
                       />
                     ) : undefined
@@ -119,8 +135,24 @@ export function ConsultationWizardLayout({
                     if (!reached) return;
                     onSelect(step.id);
                     if (step.id === "availability") onAvailabilityPanel?.("dates");
+                    if (step.id === "notify") onNotifyPanel?.("email");
                   }}
                 />
+                {step.id === "notify" && notifyOpen ? (
+                  <div className="flex flex-col gap-0.5 px-0 pb-1">
+                    {NOTIFY_PANELS.map((panel) => (
+                      <SidebarItem
+                        key={panel.id}
+                        icon={panel.icon}
+                        title={panel.title}
+                        nested
+                        active={notifyPanel === panel.id}
+                        reached
+                        onClick={() => onNotifyPanel?.(panel.id)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
                 {step.id === "availability" && availabilityOpen ? (
                   <div className="flex flex-col gap-0.5 px-0 pb-1">
                     {AVAILABILITY_PANELS.map((panel) => (

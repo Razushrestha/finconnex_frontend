@@ -308,7 +308,6 @@ export function NotificationEditModal({
   const tabs: NotifyChannel[] = channels.length ? channels : ["Email"];
   const [draft, setDraft] = useState(row);
   const [tab, setTab] = useState<NotifyChannel>(tabs[0]);
-  const [testEmail, setTestEmail] = useState("");
   const [testPhone, setTestPhone] = useState("+12345678901");
   const [testNote, setTestNote] = useState("");
   const [testFailed, setTestFailed] = useState(false);
@@ -321,7 +320,6 @@ export function NotificationEditModal({
   const subjectId = useId();
   const bodyId = useId();
   const smsId = useId();
-  const testEmailId = useId();
   const testPhoneId = useId();
   const dateFormat = normalizeDateFormat(draft.dateFormat);
   // Each row previews today's date in that style, e.g. "dd-MMM-yyyy (02-Oct-2026)".
@@ -362,7 +360,7 @@ export function NotificationEditModal({
       await sendNotifyTest({
         channel,
         row: draft,
-        email: testEmail,
+        email: "",
         phone: testPhone,
       });
       setTestNote(`${channel} test sent.`);
@@ -516,19 +514,6 @@ export function NotificationEditModal({
                   hint="Dates in the message follow the format above."
                 />
               </div>
-
-              <TestSend
-                id={testEmailId}
-                label="Test email"
-                value={testEmail}
-                placeholder="Enter the recipient's email address for testing"
-                onChange={setTestEmail}
-                buttonLabel="Send test email"
-                busy={testing}
-                onSend={() => void runTest("Email")}
-                note={testNote}
-                failed={testFailed}
-              />
             </div>
           ) : tab === "SMS" ? (
             <div className="space-y-5">

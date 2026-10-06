@@ -24,6 +24,19 @@ export interface DashboardAppointment {
   consultantId: string;
   consultantName?: string;
   start: string;
+  /** Local end, when the booking or meeting has one. */
+  end?: string;
+  /** Guest-facing number such as TE-00001. */
+  bookingCode?: string;
+  eventTypeId?: string;
+  eventTypeName?: string;
+  price?: number;
+  currency?: string;
+  paymentStatus?: string;
+  phone?: string;
+  notes?: string;
+  bookedOn?: string;
+  createdBy?: string;
   type: AppointmentType;
   status: AppointmentStatus;
   channel: AppointmentChannel;
@@ -455,10 +468,19 @@ export function meetingToAppointment(
       "",
     consultantName,
     start: toLocalStart(meeting.startDateTime),
+    end: meeting.endDateTime ? toLocalStart(meeting.endDateTime) : undefined,
+    eventTypeName:
+      appointmentPersonName(meeting.title) &&
+      appointmentPersonName(meeting.title) !== guestName
+        ? appointmentPersonName(meeting.title)
+        : undefined,
     type: "Consultation",
     status,
     channel: mapChannel(meeting.type),
     avatarClass: AVATARS[(guest?.name || meeting.title).length % AVATARS.length],
+    notes: meeting.notes || meeting.agenda,
+    bookedOn: meeting.createdAt,
+    createdBy: meeting.organizer || consultantName || undefined,
   };
 }
 

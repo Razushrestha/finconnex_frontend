@@ -6,8 +6,8 @@ import { SELECT_BG, SELECT_CLASS } from "@/components/booking/select-styles";
 import type { BookingPage } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
 
-/** "office" uses the company address; "custom" is typed in or read from the browser. */
-export type OfflineKind = "office" | "custom";
+/** "none" has no location. "office" uses the company address. "custom" is typed in. */
+export type OfflineKind = "none" | "office" | "custom";
 
 /**
  * The address saved on an in-person consultation. The setup wizard keeps it in
@@ -24,23 +24,24 @@ export function savedOfflineAddress(
   return location && location !== "In person" ? location : "";
 }
 
-/** Start on the office address unless a different address was saved. */
+/** None when nothing was saved, the office when that address was saved, otherwise custom. */
 export function initialOfflineLocation(
   saved: string,
   officeAddress: string,
 ): { kind: OfflineKind; custom: string } {
   const address = saved.trim();
-  return address && address !== officeAddress.trim()
-    ? { kind: "custom", custom: address }
-    : { kind: "office", custom: "" };
+  if (!address || address === "None") return { kind: "none", custom: "" };
+  if (address === officeAddress.trim()) return { kind: "office", custom: "" };
+  return { kind: "custom", custom: address };
 }
 
-/** The address to save, or "" when "Custom" is chosen but nothing is typed. */
+/** The address to save. None and an empty custom choice save as "". */
 export function resolveOfflineAddress(
   kind: OfflineKind,
   officeAddress: string,
   custom: string,
 ): string {
+  if (kind === "none") return "";
   return (kind === "office" ? officeAddress : custom).trim();
 }
 
@@ -63,11 +64,8 @@ export async function addressFromPosition(
 }
 
 /**
- * What "Offline" shows for a meeting's location, like the setup wizard: an
- * "Office address" / "Custom" dropdown, then the address on its own line.
- *
- * Meant to sit inside a wrapping flex row after the Online/Offline toggle. The
- * dropdown fills the rest of that row and the address drops to the next line.
+ * What "Offline" shows: a location menu (None, Office address, Custom address).
+ * None has no address line. Office and Custom show the address underneath.
  */
 export function OfflineLocationFields({
   kind,
@@ -120,13 +118,15 @@ export function OfflineLocationFields({
           setGeoError("");
           onKindChange(event.target.value as OfflineKind);
         }}
-        className={cn(SELECT_CLASS, "w-auto min-w-[9.5rem] flex-1")}
+        className={cn(SELECT_CLASS, "w-auto min-w-[9.5rem] max-w-[14rem] flex-1")}
         style={{ backgroundImage: SELECT_BG }}
       >
+        <option value="none">None</option>
         <option value="office">Office address</option>
-        <option value="custom">Custom</option>
+        <option value="custom">Custom address</option>
       </select>
 
+      {kind === "none" ? null : (
       <div className="w-full space-y-2">
         {kind === "office" ? (
           <div className="relative">
@@ -177,6 +177,7 @@ export function OfflineLocationFields({
           </>
         )}
       </div>
+      )}
     </>
   );
 }

@@ -285,7 +285,7 @@ function AddFieldDrawer({
       type: picked,
       label: nextLabel,
       required: mandatory,
-      ephi,
+      ephi: picked === "address" ? false : ephi,
       options: fieldHasOptions(picked)
         ? nextOptions.length
           ? nextOptions
@@ -464,15 +464,17 @@ function AddFieldDrawer({
                 />
                 Mandatory
               </label>
-              <label className="mt-3 flex items-center gap-2 text-[13px] text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={ephi}
-                  onChange={(e) => setEphi(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
-                />
-                Mark as ePHI/PII
-              </label>
+              {picked === "address" ? null : (
+                <label className="mt-3 flex items-center gap-2 text-[13px] text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={ephi}
+                    onChange={(e) => setEphi(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                  />
+                  Mark as ePHI/PII
+                </label>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-2 border-t border-[#E5E7EB] bg-white px-5 py-4">
               <button

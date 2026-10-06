@@ -22,7 +22,8 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import type { ConsultationMode } from "@/lib/booking/types";
+import type { BookingPage, ConsultationMode } from "@/lib/booking/types";
+import type { EmailNotifyConfig } from "@/lib/booking/email-config";
 import { AssignConsultantsStep } from "@/components/booking/AssignConsultantsStep";
 import {
   AvailabilityLimitsStep,
@@ -37,9 +38,10 @@ import {
   type BookingFormValues,
 } from "@/components/booking/BookingFormStep";
 import {
-  BookingNotificationsStep,
-  type NotificationRow,
-} from "@/components/booking/BookingNotificationsStep";
+  ConsultationNotifyPanel,
+  type NotifyPanelId,
+} from "@/components/booking/ConsultationNotifyPanel";
+import type { NotificationRow } from "@/components/booking/BookingNotificationsStep";
 import {
   BookingRulesStep,
   rulesToPageFields,
@@ -57,6 +59,7 @@ import {
   type ConsultationSetupStepId,
 } from "@/components/booking/ConsultationWizardLayout";
 import { ConsultationOverview } from "@/components/booking/ConsultationOverview";
+import { BookingPageDesigner } from "@/components/booking/BookingPageDesigner";
 import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
@@ -64,6 +67,7 @@ import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   createCrmEventType,
+  saveBookingEventTypePage,
   listCrmEventTypePages,
   mergeCrmEventTypePages,
   removeConsultationPage,
@@ -71,6 +75,10 @@ import {
 } from "@/lib/booking/api";
 import { toast } from "@/lib/notify/toast";
 import { mergeNotificationPrefs } from "@/lib/booking/notify-prefs";
+import {
+  readLocalBookingPageBranding,
+  writeLocalBookingPageBranding,
+} from "@/lib/booking/page-branding";
 import { FINANCE_PRIMARY_BUTTON } from "@/components/finance/buttonStyles";
 import {
   consultationModeLabel,
@@ -79,7 +87,6 @@ import {
   upsertBookingPage,
   WEEKDAYS,
   listBookingPages,
-  type BookingPage,
   type ConsultantPriority,
 } from "@/lib/booking/types";
 
@@ -167,15 +174,31 @@ export function ConsultationsBoard() {
   const [formStep, setFormStep] = useState(false);
   const [formValues, setFormValues] = useState<BookingFormValues | null>(null);
   const [notifyStep, setNotifyStep] = useState(false);
+  const [notifyPanel, setNotifyPanel] = useState<NotifyPanelId>("email");
   const [notifyValues, setNotifyValues] = useState<NotificationRow[] | null>(
     null,
   );
+  const [notifyReminders, setNotifyReminders] = useState<
+    BookingPage["notifyReminders"]
+  >(undefined);
+  const [emailNotifyConfig, setEmailNotifyConfig] = useState<
+    EmailNotifyConfig | undefined
+  >(undefined);
+  const [whatsappNotifyConfig, setWhatsappNotifyConfig] = useState<
+    BookingPage["whatsappNotifyConfig"]
+  >(undefined);
+  const [calendarInvite, setCalendarInvite] = useState<
+    BookingPage["calendarInvite"]
+  >(undefined);
   const [settingsStep, setSettingsStep] = useState(false);
+  const [pageStep, setPageStep] = useState(false);
+  const draftPageId = useRef(`wizard-page-${Date.now()}`).current;
   const [additionalValues, setAdditionalValues] =
     useState<AdditionalSettingsValues | null>(null);
   const [wizardFurthest, setWizardFurthest] = useState(0);
 
   function currentSetupStep(): ConsultationSetupStepId {
+    if (pageStep) return "page";
     if (settingsStep) return "settings";
     if (notifyStep) return "notify";
     if (formStep) return "form";
@@ -195,6 +218,7 @@ export function ConsultationsBoard() {
     setFormStep(index >= 4);
     setNotifyStep(index >= 5);
     setSettingsStep(index >= 6);
+    setPageStep(index >= 7);
   }
 
   function reachSetupStep(id: ConsultationSetupStepId) {
@@ -217,6 +241,13 @@ export function ConsultationsBoard() {
               goToSetupStep("availability");
             }
           }}
+          notifyPanel={notifyPanel}
+          onNotifyPanel={(panel) => {
+            setNotifyPanel(panel);
+            if (currentSetupStep() !== "notify") {
+              goToSetupStep("notify");
+            }
+          }}
         >
           {node}
         </ConsultationWizardLayout>
@@ -225,8 +256,10 @@ export function ConsultationsBoard() {
   }
 
   function resetWizard() {
+    setPageStep(false);
     setSettingsStep(false);
     setNotifyStep(false);
+    setNotifyPanel("email");
     setFormStep(false);
     setRulesStep(false);
     setAssignStep(false);
@@ -240,6 +273,10 @@ export function ConsultationsBoard() {
     setRulesValues(null);
     setFormValues(null);
     setNotifyValues(null);
+    setNotifyReminders(undefined);
+    setEmailNotifyConfig(undefined);
+    setWhatsappNotifyConfig(undefined);
+    setCalendarInvite(undefined);
     setAdditionalValues(null);
     setDetailsValues(null);
     setDetailsChoice(null);
@@ -345,7 +382,12 @@ export function ConsultationsBoard() {
       inviteNotes,
       allowReschedule: additional?.allowReschedule !== false,
       allowCancel: additional?.allowCancel !== false,
+      additionalSettings: additional,
       notifyPrefs: mergeNotificationPrefs(notifyValues),
+      notifyReminders,
+      emailNotifyConfig,
+      whatsappNotifyConfig,
+      calendarInvite,
     };
     const created = await tryCrmBooking(() =>
       createCrmEventType({
@@ -370,6 +412,14 @@ export function ConsultationsBoard() {
         maxDaysInFuture: page.maxAdvanceDays,
       }),
     );
+    const savedId = created?.id || page.id;
+    const branding = readLocalBookingPageBranding(draftPageId);
+    if (savedId !== draftPageId) {
+      writeLocalBookingPageBranding(savedId, branding);
+    }
+    if (created?.id) {
+      void tryCrmBooking(() => saveBookingEventTypePage(created.id, branding));
+    }
     upsertBookingPage(
       created?.id
         ? {
@@ -420,29 +470,123 @@ export function ConsultationsBoard() {
     });
   }, [pages, query, sectionFilter]);
 
+  if (detailsChoice && pageStep && detailsValues) {
+    const designerPage: BookingPage = {
+      id: draftPageId,
+      title: detailsValues.name,
+      slug: "wizard-page",
+      owner: assignedConsultants[0] ?? "Admin",
+      eventType: "Consultation",
+      durationMinutes: detailsValues.durationMinutes,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: [],
+      questions: [],
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Draft",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      consultants: assignedConsultants,
+    };
+    return wrapSetup(
+      <div className="flex min-h-[640px] flex-col pb-8">
+        <BookingPageDesigner page={designerPage} />
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => goToSetupStep("settings")}
+            className="h-10 min-w-[96px] rounded-lg border border-[#E5E7EB] bg-white px-6 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => void finishConsultation(formValues, additionalValues ?? undefined)}
+            className="h-10 min-w-[96px] rounded-lg bg-[#5A32A3] px-6 text-[13px] font-semibold text-white hover:brightness-110"
+          >
+            Finish setup
+          </button>
+        </div>
+      </div>,
+    );
+  }
+
   if (detailsChoice && settingsStep && detailsValues) {
     return wrapSetup(
       <BookingAdditionalSettingsStep
         initial={additionalValues ?? undefined}
         onBack={() => goToSetupStep("notify")}
+        finishLabel="Next"
         onFinish={(values) => {
           setAdditionalValues(values);
-          void finishConsultation(formValues, values);
+          reachSetupStep("page");
         }}
       />,
     );
   }
 
   if (detailsChoice && notifyStep && detailsValues) {
+    const notifyPage: BookingPage = {
+      id: "wizard-notify",
+      title: detailsValues.name,
+      slug: "wizard-notify",
+      owner: assignedConsultants[0] ?? "Admin",
+      eventType: "Consultation",
+      durationMinutes: detailsValues.durationMinutes,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: [],
+      questions: [],
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Draft",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      notifyPrefs: notifyValues ?? undefined,
+      notifyReminders,
+      emailNotifyConfig,
+      whatsappNotifyConfig,
+      calendarInvite,
+    };
     return wrapSetup(
-      <BookingNotificationsStep
-        initial={notifyValues ?? undefined}
-        onBack={() => goToSetupStep("form")}
-        onNext={(rows) => {
-          setNotifyValues(rows);
-          reachSetupStep("settings");
-        }}
-      />,
+      <div className="pb-8">
+        <ConsultationNotifyPanel
+          panel={notifyPanel}
+          page={notifyPage}
+          onSaved={(next) => {
+            setNotifyValues(
+              (next.notifyPrefs as NotificationRow[] | undefined) ?? null,
+            );
+            setNotifyReminders(next.notifyReminders);
+            setEmailNotifyConfig(next.emailNotifyConfig);
+            setWhatsappNotifyConfig(next.whatsappNotifyConfig);
+            setCalendarInvite(next.calendarInvite);
+          }}
+        />
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => goToSetupStep("form")}
+            className="h-10 min-w-[96px] rounded-lg border border-[#E5E7EB] bg-white px-6 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => reachSetupStep("settings")}
+            className="h-10 min-w-[96px] rounded-lg bg-[#5A32A3] px-6 text-[13px] font-semibold text-white hover:brightness-110"
+          >
+            Next
+          </button>
+        </div>
+      </div>,
     );
   }
 
@@ -713,6 +857,7 @@ export function ConsultationsBoard() {
             setFormStep(false);
             setNotifyStep(false);
             setSettingsStep(false);
+            setPageStep(false);
             setWizardFurthest(0);
             setDetailsChoice(choice);
           }}

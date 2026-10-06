@@ -39,8 +39,8 @@ describe("NotificationEditModal tabs", () => {
     expect(html).toContain("Edit Appointment booked (Status: Confirmed)");
     expect(html).toContain("Subject");
     expect(html).toContain("Email body");
-    expect(html).toContain("Test email");
-    expect(html).toContain("Send test email");
+    expect(html).not.toContain("Test email");
+    expect(html).not.toContain("Send test email");
     expect(html).toContain("Enabled");
     expect(html).toContain(">Save<");
     expect(html).toContain(">Cancel<");
@@ -168,7 +168,7 @@ describe("NotificationEditModal layout", () => {
   it("shows Save first and Cancel after it at the bottom", () => {
     const save = html.lastIndexOf(">Save<");
     const cancel = html.lastIndexOf(">Cancel<");
-    expect(save).toBeGreaterThan(html.indexOf("Send test email"));
+    expect(save).toBeGreaterThan(html.indexOf("Email body"));
     expect(cancel).toBeGreaterThan(save);
   });
 
@@ -218,7 +218,7 @@ describe("NotificationEditModal recipients", () => {
     for (const who of everyone) {
       const html = renderFor(who);
       expect(html).toContain("Email body");
-      expect(html).toContain("Send test email");
+      expect(html).not.toContain("Send test email");
       expect(html).not.toContain("above to write this message");
     }
   });

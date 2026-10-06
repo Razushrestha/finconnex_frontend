@@ -70,7 +70,29 @@ function meetingTypeFromPage(page: BookingPage): MeetingType {
   return "Video Call";
 }
 
-export default function ScheduleMeetingPage() {
+export type ScheduleMeetingSeed = {
+  title?: string;
+  contactName?: string;
+  relatedKind?: RelatedEntityKind | "";
+  relatedName?: string;
+  relatedId?: string;
+  date?: string;
+  time?: string;
+  duration?: string;
+  teamMember?: string;
+};
+
+export default function ScheduleMeetingPage({
+  onCancel,
+  onSent,
+  embedded = false,
+  initial,
+}: {
+  onCancel?: () => void;
+  onSent?: () => void;
+  embedded?: boolean;
+  initial?: ScheduleMeetingSeed;
+} = {}) {
   const params = useSearchParams();
   const router = useRouter();
   const [calendars, setCalendars] = useState<BookingPage[]>([]);
@@ -97,23 +119,30 @@ export default function ScheduleMeetingPage() {
   const relatedKindParam = asRelatedKind(params.get("relatedKind") ?? undefined);
   const relatedNameParam = params.get("relatedName") ?? "";
   const [contactName, setContactName] = useState(
-    relatedKindParam === "Contact" ? relatedNameParam : "",
+    initial?.contactName ||
+      (relatedKindParam === "Contact" ? relatedNameParam : ""),
   );
+  const seededKind = initial?.relatedKind;
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">(
-    relatedKindParam === "Lead" ||
-      relatedKindParam === "Deal" ||
-      relatedKindParam === "Company"
-      ? relatedKindParam
-      : "",
+    seededKind === "Lead" || seededKind === "Deal" || seededKind === "Company"
+      ? seededKind
+      : relatedKindParam === "Lead" ||
+          relatedKindParam === "Deal" ||
+          relatedKindParam === "Company"
+        ? relatedKindParam
+        : "",
   );
   const [relatedName, setRelatedName] = useState(
-    relatedKindParam === "Lead" ||
+    initial?.relatedName ||
+      (relatedKindParam === "Lead" ||
       relatedKindParam === "Deal" ||
       relatedKindParam === "Company"
-      ? relatedNameParam
-      : "",
+        ? relatedNameParam
+        : ""),
   );
-  const [relatedId, setRelatedId] = useState(params.get("relatedId") ?? "");
+  const [relatedId, setRelatedId] = useState(
+    initial?.relatedId || params.get("relatedId") || "",
+  );
   const [guests, setGuests] = useState<MeetingGuest[]>([]);
   const [attempted, setAttempted] = useState(false);
   const [sending, setSending] = useState(false);
@@ -132,14 +161,30 @@ export default function ScheduleMeetingPage() {
     setCalendars(live);
     const first = live[0];
     if (!first) return;
-    const requested = params.get("title")?.trim();
+    const requested = (initial?.title || params.get("title") || "").trim();
     const match =
       live.find((page) => page.title === requested) ?? first;
-    applyCalendar(match, { keepCustomTitle: Boolean(requested && requested !== match.title) });
+    applyCalendar(match, {
+      keepCustomTitle: Boolean(requested && requested !== match.title),
+    });
+    if (initial?.date) setDate(initial.date);
+    if (initial?.duration) setDuration(initial.duration);
+    if (initial?.teamMember) setTeamMember(initial.teamMember);
+    if (initial?.contactName) setContactName(initial.contactName);
+    if (initial?.title) setTitle(initial.title);
+    if (initial?.time) {
+      const slots = internalSlotsForDate(match, initial.date || date);
+      if (slots.includes(initial.time)) setTime(initial.time);
+      else {
+        setWhenMode("custom");
+        setTime(initial.time);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (initial?.time) return;
     if (whenMode === "custom") {
       if (!time) setTime(nowHHmm());
       return;
@@ -320,6 +365,10 @@ export default function ScheduleMeetingPage() {
           ? `Invites emailed to ${invitees.map((item) => item.email).join(", ")} for ${starts.length} occurrences`
           : `Invite emailed to ${invitees.map((item) => item.email).join(", ")}`,
       );
+      if (onSent) {
+        onSent();
+        return;
+      }
       router.push(
         isCrmMeetingId(firstCreatedId)
           ? `/activities/meetings/detail/${firstCreatedId}`
@@ -340,12 +389,28 @@ export default function ScheduleMeetingPage() {
   );
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background">
-      <MeetingHeader
-        onCancel={() => router.push("/activities/meetings")}
-        onSendInvites={() => void handleSendInvites()}
-        sending={sending}
-      />
+    <div
+      className={
+        embedded
+          ? "flex w-full flex-col bg-background"
+          : "flex min-h-screen w-full flex-col bg-background"
+      }
+    >
+      <div
+        className={
+          embedded
+            ? "sticky top-0 z-10 border-b border-border bg-background"
+            : undefined
+        }
+      >
+        <MeetingHeader
+          onCancel={() =>
+            onCancel ? onCancel() : router.push("/activities/meetings")
+          }
+          onSendInvites={() => void handleSendInvites()}
+          sending={sending}
+        />
+      </div>
 
       <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-3 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
         <div>

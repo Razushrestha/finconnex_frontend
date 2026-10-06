@@ -5,11 +5,13 @@ import {
   Briefcase,
   CalendarClock,
   ChevronDown,
+  Search,
   ClipboardList,
   Clock,
   FileCheck,
   Info,
   LayoutTemplate,
+  SlidersHorizontal,
   Pencil,
   Send,
   Copy,
@@ -28,6 +30,11 @@ import {
 } from "@/lib/booking/description-html";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { BookingPageDesigner } from "@/components/booking/BookingPageDesigner";
+import {
+  BookingAdditionalSettingsStep,
+  DEFAULT_ADDITIONAL_SETTINGS,
+  type AdditionalSettingsValues,
+} from "@/components/booking/BookingAdditionalSettingsStep";
 import {
   BookingFormStep,
   bookingFormFromQuestions,
@@ -85,8 +92,10 @@ import {
   upsertBookingPage,
   type AppointmentDistribution,
   type AssignmentPriority,
+  PAYMENT_TYPES,
   type BookingCurrency,
   type BookingPage,
+  type PaymentType,
   type ConsultantPriority,
   type MeetingVia,
 } from "@/lib/booking/types";
@@ -149,6 +158,12 @@ const SECTIONS = [
     icon: FileCheck,
   },
   {
+    id: "settings",
+    title: "Additional settings",
+    hint: "Assignment, cancellation, and calendar invites.",
+    icon: SlidersHorizontal,
+  },
+  {
     id: "page",
     title: "Booking Page",
     hint: "Design the public booking site.",
@@ -195,6 +210,26 @@ function NestedNavLinks<T extends string>({
 
 const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
+function additionalSettingsFromPage(page: BookingPage): AdditionalSettingsValues {
+  const stored = page.additionalSettings;
+  return {
+    ...DEFAULT_ADDITIONAL_SETTINGS,
+    assignOnBook: stored?.assignOnBook ?? DEFAULT_ADDITIONAL_SETTINGS.assignOnBook,
+    skipIfAssigned: stored?.skipIfAssigned ?? DEFAULT_ADDITIONAL_SETTINGS.skipIfAssigned,
+    allowReschedule: page.allowReschedule ?? stored?.allowReschedule ?? true,
+    rescheduleExpire: stored?.rescheduleExpire ?? 0,
+    rescheduleUnit: stored?.rescheduleUnit ?? "Minutes",
+    allowCancel: page.allowCancel ?? stored?.allowCancel ?? true,
+    cancelExpire: stored?.cancelExpire ?? 0,
+    cancelUnit: stored?.cancelUnit ?? "Minutes",
+    calendarInvites: page.calendarInvites ?? stored?.calendarInvites ?? true,
+    inviteNotes:
+      page.inviteNotes ??
+      stored?.inviteNotes ??
+      DEFAULT_ADDITIONAL_SETTINGS.inviteNotes,
+  };
+}
+
 function availabilityFromPage(page: BookingPage): AvailabilityLimitsValues {
   const limits = page.appointmentLimits;
   const fallback = defaultAvailabilityLimits();
@@ -221,11 +256,23 @@ function formatDuration(minutes: number) {
   return `${mins} mins`;
 }
 
-function paymentMode(page: BookingPage) {
+export function paymentMode(page: BookingPage) {
   if (page.meetingVia === "in_person") return "Offline";
-  if (page.meetingVia === "phone") return "Phone";
-  if (page.meetingVia === "video") return "Online";
-  return page.videoLink ? "Online" : page.location ? "Offline" : "—";
+  if (page.meetingVia === "phone" || page.meetingVia === "video" || page.videoLink) {
+    return "Online";
+  }
+  if (page.location) return "Offline";
+  return "—";
+}
+
+/** Location choice shown as Meeting Mode. None is a dash, matching the summary. */
+export function meetingModeLabel(page: BookingPage) {
+  if (page.meetingVia === "in_person" || (!page.meetingVia && page.location)) {
+    return savedOfflineAddress(page) || "—";
+  }
+  const detail = page.meetingViaDetail?.trim();
+  if (!detail || detail === "None") return "—";
+  return detail;
 }
 
 function currencyPrefix(currency: BookingCurrency = "AUD") {
@@ -306,7 +353,92 @@ function Segment({
   );
 }
 
-function EventTypeEditForm({
+function PaymentTypeField({
+  value,
+  onChange,
+}: {
+  value: PaymentType;
+  onChange: (value: PaymentType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const options = PAYMENT_TYPES.filter((item) =>
+    item.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(event: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <p className="mb-1.5 text-[12px] font-medium text-slate-500">Payment Type</p>
+      <button
+        type="button"
+        aria-label="Payment Type"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(SELECT_CLASS, "text-left")}
+        style={{ backgroundImage: SELECT_BG }}
+      >
+        {value}
+      </button>
+      {open ? (
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-lg">
+          <div className="relative border-b border-slate-100">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search"
+              aria-label="Search payment types"
+              className="h-10 w-full pr-3 pl-8 text-[13px] outline-none"
+            />
+          </div>
+          <ul role="listbox" className="py-1">
+            {options.map((item) => (
+              <li key={item}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={item === value}
+                  onClick={() => {
+                    onChange(item);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={cn(
+                    "flex w-full px-3 py-2 text-left text-[13px]",
+                    item === value
+                      ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                      : "text-slate-700 hover:bg-slate-50",
+                  )}
+                >
+                  {item}
+                </button>
+              </li>
+            ))}
+            {options.length === 0 ? (
+              <li className="px-3 py-3 text-[12px] text-slate-400">No matches</li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function EventTypeEditForm({
   page,
   onCancel,
   onSaved,
@@ -319,6 +451,9 @@ function EventTypeEditForm({
   const [name, setName] = useState(page.title);
   const [hours, setHours] = useState(Math.floor(duration / 60));
   const [minutes, setMinutes] = useState(duration % 60);
+  const [paymentType, setPaymentType] = useState<PaymentType>(
+    page.paymentType ?? "Optional",
+  );
   const [isFree, setIsFree] = useState(!(page.price && page.price > 0));
   const [priceDraft, setPriceDraft] = useState(
     page.price && page.price > 0 ? String(page.price) : "0",
@@ -374,10 +509,13 @@ function EventTypeEditForm({
       meetingPlace === "offline"
         ? resolveOfflineAddress(offlineKind, officeAddress, customAddress)
         : "";
-    if (meetingPlace === "offline" && !offlineAddress) {
-      // The field shows its own message; this error line sits at the form's bottom.
+    if (meetingPlace === "offline" && offlineKind === "custom" && !offlineAddress) {
       setAddressMissing(true);
       setError("");
+      return;
+    }
+    if (meetingPlace === "offline" && offlineKind === "office" && !offlineAddress) {
+      setError("Default office address is missing");
       return;
     }
     const meetingVia: MeetingVia =
@@ -393,17 +531,19 @@ function EventTypeEditForm({
       title: trimmed,
       durationMinutes,
       price: isFree ? 0 : paidAmount,
+      paymentType,
       description: savedDescription,
       status: isActive ? "Live" : "Draft",
       isPublic,
       meetingVia,
       meetingViaDetail:
         meetingPlace === "offline"
-          ? offlineAddress
+          ? offlineAddress || undefined
           : platform === "None"
             ? undefined
             : platform,
-      location: meetingPlace === "offline" ? offlineAddress : undefined,
+      location:
+        meetingPlace === "offline" && offlineAddress ? offlineAddress : undefined,
     };
     setSaving(true);
     setError("");
@@ -470,7 +610,8 @@ function EventTypeEditForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-x-10 gap-y-5 sm:grid-cols-2">
+        <div className="space-y-5">
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-medium text-slate-500">
             Event Type Name <span className="text-rose-500">*</span>
@@ -481,6 +622,66 @@ function EventTypeEditForm({
             className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/45"
           />
         </label>
+
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-slate-500">Price</p>
+          <div className="flex items-center gap-2">
+            <Segment
+              value={isFree ? "Free" : "Paid"}
+              options={["Paid", "Free"]}
+              onChange={(value) => {
+                const nextFree = value === "Free";
+                setIsFree(nextFree);
+                if (nextFree) setPriceDraft("0");
+              }}
+            />
+            <span className="text-[13px] font-medium text-slate-500">
+              {currencyPrefix(page.currency)}
+            </span>
+            <input
+              value={priceDraft}
+              disabled={isFree}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d.]/g, "");
+                setPriceDraft(raw);
+                if (raw && Number(raw) > 0) setIsFree(false);
+              }}
+              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] text-slate-800 outline-none disabled:bg-slate-50"
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-slate-500">
+            Payment Mode
+          </p>
+          <p className="flex h-10 items-center text-[14px] font-semibold text-slate-900">
+            {place}
+          </p>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-slate-500">Visibility</p>
+          <Segment
+            value={isPublic ? "Public" : "Private"}
+            options={["Public", "Private"]}
+            onChange={(value) => setIsPublic(value === "Public")}
+          />
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-slate-500">
+            Description
+          </p>
+          <DescriptionEditor
+            key={page.id}
+            value={description}
+            onChange={setDescription}
+          />
+        </div>
+        </div>
+
+        <div className="space-y-5">
         <div>
           <p className="mb-1.5 text-[12px] font-medium text-slate-500">Duration</p>
           <div className="grid grid-cols-2 gap-2">
@@ -511,33 +712,7 @@ function EventTypeEditForm({
           </div>
         </div>
 
-        <div>
-          <p className="mb-1.5 text-[12px] font-medium text-slate-500">Price</p>
-          <div className="flex items-center gap-2">
-            <Segment
-              value={isFree ? "Free" : "Paid"}
-              options={["Paid", "Free"]}
-              onChange={(value) => {
-                const nextFree = value === "Free";
-                setIsFree(nextFree);
-                if (nextFree) setPriceDraft("0");
-              }}
-            />
-            <span className="text-[13px] font-medium text-slate-500">
-              {currencyPrefix(page.currency)}
-            </span>
-            <input
-              value={priceDraft}
-              disabled={isFree}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/[^\d.]/g, "");
-                setPriceDraft(raw);
-                if (raw && Number(raw) > 0) setIsFree(false);
-              }}
-              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] text-slate-800 outline-none disabled:bg-slate-50"
-            />
-          </div>
-        </div>
+        <PaymentTypeField value={paymentType} onChange={setPaymentType} />
 
         <div>
           <p className="mb-1.5 text-[12px] font-medium text-slate-500">
@@ -587,14 +762,6 @@ function EventTypeEditForm({
         </div>
 
         <div>
-          <p className="mb-1.5 text-[12px] font-medium text-slate-500">Visibility</p>
-          <Segment
-            value={isPublic ? "Public" : "Private"}
-            options={["Public", "Private"]}
-            onChange={(value) => setIsPublic(value === "Public")}
-          />
-        </div>
-        <div>
           <p className="mb-1.5 text-[12px] font-medium text-slate-500">Status</p>
           <Segment
             value={isActive ? "Active" : "Inactive"}
@@ -603,16 +770,6 @@ function EventTypeEditForm({
           />
         </div>
 
-        <div>
-          <p className="mb-1.5 text-[12px] font-medium text-slate-500">
-            Description
-          </p>
-          <DescriptionEditor
-            key={page.id}
-            value={description}
-            onChange={setDescription}
-          />
-        </div>
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-medium text-slate-500">
             Integration
@@ -623,6 +780,7 @@ function EventTypeEditForm({
             className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-slate-50 px-3 text-[13px] text-slate-500"
           />
         </label>
+        </div>
       </div>
       {error ? <p className="mt-4 text-[13px] text-rose-600">{error}</p> : null}
     </div>
@@ -985,7 +1143,6 @@ export function ConsultationOverview({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
   const people = page.consultants?.length ? page.consultants : [page.owner];
-  const paid = (page.price ?? 0) > 0;
   const current = SECTIONS.find((item) => item.id === section) ?? SECTIONS[0];
   const publicLabel = page.isPublic ?? page.status === "Live";
   const pageRef = useRef(page);
@@ -1335,14 +1492,9 @@ export function ConsultationOverview({
                 <Field label="Price">
                   {formatBookingPrice(page.price, page.currency ?? "AUD")}
                 </Field>
-                <Field label="Payment Type">{paid ? "Paid" : "Free"}</Field>
+                <Field label="Payment Type">{page.paymentType ?? "Optional"}</Field>
                 <Field label="Payment Mode">{paymentMode(page)}</Field>
-                <Field label="Meeting Mode">{paymentMode(page)}</Field>
-                {savedOfflineAddress(page) ? (
-                  <Field label="Location">
-                    <span className="break-words">{savedOfflineAddress(page)}</span>
-                  </Field>
-                ) : null}
+                <Field label="Meeting Mode">{meetingModeLabel(page)}</Field>
                 <Field label="Visibility">
                   {publicLabel ? "Public" : "Private"}
                 </Field>
@@ -1371,7 +1523,7 @@ export function ConsultationOverview({
                   )}
                 </Field>
                 <Field label="Integration">
-                  {page.calendlyEventTypeId ? "Calendly" : "Not integrated"}
+                  {page.calendlyEventTypeId ? "Calendly" : "Not Integrated"}
                 </Field>
               </div>
             </div>
@@ -1462,6 +1614,25 @@ export function ConsultationOverview({
               panel={notifyPanel}
               page={page}
               onSaved={onSaved}
+            />
+          ) : null}
+
+          {section === "settings" ? (
+            <BookingAdditionalSettingsStep
+              key={page.id}
+              initial={additionalSettingsFromPage(page)}
+              onBack={() => setSection("form")}
+              finishLabel="Save"
+              onFinish={(values) => {
+                onSaved({
+                  ...page,
+                  allowReschedule: values.allowReschedule,
+                  allowCancel: values.allowCancel,
+                  calendarInvites: values.calendarInvites,
+                  inviteNotes: values.inviteNotes,
+                  additionalSettings: values,
+                });
+              }}
             />
           ) : null}
 

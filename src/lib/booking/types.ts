@@ -96,6 +96,9 @@ export const MEETING_VIA_OPTIONS: MeetingVia[] = [
   "custom",
 ];
 
+export const PAYMENT_TYPES = ["Optional", "Full Payment", "Deposit"] as const;
+export type PaymentType = (typeof PAYMENT_TYPES)[number];
+
 export const BOOKING_CURRENCIES = ["AUD", "USD", "NPR", "INR", "GBP"] as const;
 export type BookingCurrency = (typeof BOOKING_CURRENCIES)[number];
 
@@ -174,6 +177,8 @@ export interface BookingPage {
   meetingMode?: MeetingMode;
   coverImageUrl?: string;
   price?: number;
+  /** How a paid booking is collected. Independent of the free/paid price toggle. */
+  paymentType?: PaymentType;
   currency?: BookingCurrency;
   meetingVia?: MeetingVia;
   meetingViaDetail?: string;
@@ -214,6 +219,19 @@ export interface BookingPage {
   };
   allowReschedule?: boolean;
   allowCancel?: boolean;
+  /** Create-wizard Additional settings, including expiry and assignment toggles. */
+  additionalSettings?: {
+    assignOnBook?: boolean;
+    skipIfAssigned?: boolean;
+    allowReschedule?: boolean;
+    rescheduleExpire?: number;
+    rescheduleUnit?: "Minutes" | "Hours" | "Days";
+    allowCancel?: boolean;
+    cancelExpire?: number;
+    cancelUnit?: "Minutes" | "Hours" | "Days";
+    calendarInvites?: boolean;
+    inviteNotes?: string;
+  };
   /**
    * Scheduling Rules settings the page's own fields cannot hold. The pre-buffer
    * (`bufferMinutes`), minimum notice (`minNoticeHours`) and how far ahead guests

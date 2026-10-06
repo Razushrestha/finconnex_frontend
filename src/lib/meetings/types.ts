@@ -59,6 +59,7 @@ export interface Meeting {
   status: MeetingStatus;
   agenda?: string;
   notes?: string;
+  createdAt?: string;
 }
 
 export interface MeetingColumn {

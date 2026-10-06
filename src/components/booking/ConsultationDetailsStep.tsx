@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, LocateFixed, MapPin, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  OfflineLocationFields,
+  initialOfflineLocation,
+  resolveOfflineAddress,
+  type OfflineKind,
+} from "@/components/booking/OfflineLocationFields";
 import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverPicker";
 import type { ConsultationMode } from "@/lib/booking/types";
 import {
@@ -32,8 +38,6 @@ export type ConsultationDetailsValues = {
   phoneDetail: string;
   coverImageUrl?: string;
 };
-
-type OfflineKind = "office" | "custom";
 
 export function modeSubtitle(choice: CalendarTypeChoice) {
   if (choice.mode === "group") return "Class booking";
@@ -85,13 +89,12 @@ export function ConsultationDetailsStep({
     }
     return list[0] ?? "Zoom";
   });
-  const [locationDetail, setLocationDetail] = useState(
-    initial?.locationDetail ?? "",
-  );
-  const [offlineKind, setOfflineKind] = useState<OfflineKind>("office");
-  const [locating, setLocating] = useState(false);
-  const [geoError, setGeoError] = useState("");
   const officeAddress = defaultOfficeAddress();
+  const [offlineStart] = useState(() =>
+    initialOfflineLocation(initial?.locationDetail ?? "", officeAddress),
+  );
+  const [offlineKind, setOfflineKind] = useState<OfflineKind>(offlineStart.kind);
+  const [customAddress, setCustomAddress] = useState(offlineStart.custom);
   const [phoneDetail, setPhoneDetail] = useState(initial?.phoneDetail ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(
     initial?.coverImageUrl ?? "",
@@ -126,51 +129,6 @@ export function ConsultationDetailsStep({
   const heading = name.trim() || "Consultation title";
   const subtitle = modeSubtitle(choice);
 
-  function applyOfflineKind(kind: OfflineKind) {
-    setOfflineKind(kind);
-    setGeoError("");
-    if (kind === "office") {
-      setLocationDetail(officeAddress);
-    } else if (!locationDetail || locationDetail === officeAddress) {
-      setLocationDetail("");
-    }
-  }
-
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setGeoError("Geolocation is not supported in this browser");
-      return;
-    }
-    setLocating(true);
-    setGeoError("");
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-          );
-          if (!response.ok) throw new Error("lookup failed");
-          const data = (await response.json()) as { display_name?: string };
-          setLocationDetail(
-            data.display_name ||
-              `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-          );
-        } catch {
-          setLocationDetail(
-            `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-          );
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocating(false);
-        setGeoError("Could not read your location. Allow access and try again.");
-      },
-    );
-  }
-
   function submit() {
     if (!name.trim()) {
       setError("Consultation name is required");
@@ -193,17 +151,17 @@ export function ConsultationDetailsStep({
       setError("Choose Zoom or Google Meet");
       return;
     }
-    if (meetingPlace === "offline") {
-      const address =
-        offlineKind === "office" ? officeAddress : locationDetail.trim();
-      if (!address) {
-        setError(
-          offlineKind === "custom"
-            ? "Enter a custom address or use your current location"
-            : "Default office address is missing",
-        );
-        return;
-      }
+    const offlineAddress =
+      meetingPlace === "offline"
+        ? resolveOfflineAddress(offlineKind, officeAddress, customAddress)
+        : "";
+    if (meetingPlace === "offline" && offlineKind !== "none" && !offlineAddress) {
+      setError(
+        offlineKind === "custom"
+          ? "Enter a custom address or use your current location"
+          : "Default office address is missing",
+      );
+      return;
     }
     onNext({
       name: name.trim(),
@@ -213,10 +171,7 @@ export function ConsultationDetailsStep({
       online: meetingPlace === "online",
       meetingPlace,
       platform,
-      locationDetail:
-        meetingPlace === "offline" && offlineKind === "office"
-          ? officeAddress
-          : locationDetail.trim(),
+      locationDetail: meetingPlace === "offline" ? offlineAddress : "",
       phoneDetail: phoneDetail.trim(),
       coverImageUrl: coverImageUrl || undefined,
     });
@@ -386,7 +341,7 @@ export function ConsultationDetailsStep({
             <p className="mb-1.5 text-[13px] font-semibold text-slate-700">
               Meeting Mode
             </p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
               <div className="inline-flex overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
                 {(
                   [
@@ -401,9 +356,6 @@ export function ConsultationDetailsStep({
                       setMeetingPlace(value);
                       setPlatformOpen(false);
                       if (value === "online") refreshConnectedPlatforms();
-                      if (value === "offline" && offlineKind === "office") {
-                        setLocationDetail(officeAddress);
-                      }
                       if (error) setError("");
                     }}
                     className={cn(
@@ -488,59 +440,19 @@ export function ConsultationDetailsStep({
                   </div>
                 )
               ) : (
-                <div className="min-w-0 flex-1 space-y-2">
-                  <select
-                    value={offlineKind}
-                    onChange={(e) =>
-                      applyOfflineKind(e.target.value as OfflineKind)
-                    }
-                    className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] font-medium text-slate-700 outline-none focus:border-[#5A32A3]/45"
-                  >
-                    <option value="office">Office address</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                  {offlineKind === "office" ? (
-                    <div className="relative">
-                      <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        readOnly
-                        value={officeAddress}
-                        className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-slate-50 pr-3 pl-9 text-[13px] text-slate-600"
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
-                          value={locationDetail}
-                          onChange={(e) => {
-                            setLocationDetail(e.target.value);
-                            if (error) setError("");
-                          }}
-                          placeholder="Search or enter an address"
-                          className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={useCurrentLocation}
-                        disabled={locating}
-                        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3] hover:underline disabled:opacity-60"
-                      >
-                        <LocateFixed className="h-3.5 w-3.5" />
-                        {locating
-                          ? "Finding location…"
-                          : "Use current location"}
-                      </button>
-                      {geoError ? (
-                        <p className="text-[12px] font-medium text-rose-600">
-                          {geoError}
-                        </p>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
+                <OfflineLocationFields
+                  kind={offlineKind}
+                  onKindChange={(kind) => {
+                    setOfflineKind(kind);
+                    if (error) setError("");
+                  }}
+                  officeAddress={officeAddress}
+                  address={customAddress}
+                  onAddressChange={(address) => {
+                    setCustomAddress(address);
+                    if (error) setError("");
+                  }}
+                />
               )}
             </div>
           </div>

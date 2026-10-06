@@ -34,6 +34,21 @@ function pickStr(...values: unknown[]): string {
   return "";
 }
 
+function pickInstant(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return new Date(value).toISOString();
+    }
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      const nested = pickStr(record.iso, record.date, record.value);
+      if (nested) return nested;
+    }
+  }
+  return "";
+}
+
 function toQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -291,6 +306,18 @@ export function normalizeMeeting(
     status: mapMeetingStatus(pickStr(raw.status, raw.state, "SCHEDULED")),
     agenda: pickStr(raw.agenda, raw.description) || undefined,
     notes: pickStr(raw.notes) || undefined,
+    createdAt:
+      pickInstant(
+        raw.createdAt,
+        raw.created_at,
+        raw.bookedAt,
+        raw.booked_at,
+        raw.createdOn,
+        raw.created_on,
+        raw.insertedAt,
+        raw.inserted_at,
+        raw.dateCreated,
+      ) || undefined,
   };
   if (!meeting.organizer) {
     const host = meeting.attendees.find((row) => row.role === "Host");

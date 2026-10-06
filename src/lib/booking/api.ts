@@ -724,6 +724,8 @@ export function mergeCrmEventTypePages(
             questions: page.questions?.length ? page.questions : existing.questions,
             termsEnabled: page.termsEnabled ?? existing.termsEnabled,
             termsHtml: page.termsHtml ?? existing.termsHtml,
+            paymentType: existing.paymentType ?? page.paymentType,
+            additionalSettings: existing.additionalSettings ?? page.additionalSettings,
           }
         : {
             ...page,
@@ -743,6 +745,8 @@ export function mergeCrmEventTypePages(
             questions: page.questions?.length ? page.questions : existing.questions,
             termsEnabled: page.termsEnabled ?? existing.termsEnabled,
             termsHtml: page.termsHtml ?? existing.termsHtml,
+            paymentType: page.paymentType ?? existing.paymentType,
+            additionalSettings: page.additionalSettings ?? existing.additionalSettings,
           };
       byKey.set(keyOf(merged), merged);
       byKey.set(merged.id, merged);
