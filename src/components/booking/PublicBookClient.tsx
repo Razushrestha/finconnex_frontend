@@ -88,6 +88,11 @@ import {
   searchPhoneCountries,
   type PhoneCountry,
 } from "@/lib/phone/countries";
+import {
+  allTimezoneOptions,
+  currentZoneName,
+  timezoneOptionLabel,
+} from "@/lib/booking/all-timezones";
 import { cn } from "@/lib/utils";
 
 type Step = "date" | "details" | "done";
@@ -668,21 +673,13 @@ function BookFlow({
         ? confirmed.start
         : "";
 
-  const tzOptions = Array.from(
-    new Set(
-      [
-        guestTz,
-        page.timezone,
-        typeof Intl !== "undefined"
-          ? Intl.DateTimeFormat().resolvedOptions().timeZone
-          : "",
-        "Asia/Kathmandu",
-        "Australia/Sydney",
-        "America/New_York",
-        "Europe/London",
-      ].filter(Boolean),
-    ),
-  );
+  // Every time zone, by UTC offset; the guest's and the page's are kept even
+  // if this browser spells them differently.
+  const tzOptions = allTimezoneOptions([
+    guestTz,
+    page.timezone,
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
+  ]);
 
   const locationLabel = bookingLocationLabel(page);
 
@@ -1079,13 +1076,13 @@ function BookFlow({
                   <h3 className="text-[16px] font-semibold text-slate-800">Slot Availability</h3>
                   <select
                     aria-label="Time zone"
-                    value={guestTz}
+                    value={currentZoneName(guestTz)}
                     onChange={(e) => changeGuestTz(e.target.value)}
                     className="mt-3 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)]"
                   >
                     {tzOptions.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {publicTimezoneLabel(tz)}
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
                       </option>
                     ))}
                   </select>
@@ -1258,13 +1255,13 @@ function BookFlow({
               <ModernTile icon={Globe} label="Time zone">
                 <select
                   aria-label="Time zone"
-                  value={guestTz}
+                  value={currentZoneName(guestTz)}
                   onChange={(e) => changeGuestTz(e.target.value)}
                   className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
                 >
                   {tzOptions.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {publicTimezoneLabel(tz)}
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
                     </option>
                   ))}
                 </select>
@@ -1479,13 +1476,13 @@ function BookFlow({
                       </p>
                       <select
                         aria-label="Time zone"
-                        value={guestTz}
+                        value={currentZoneName(guestTz)}
                         onChange={(e) => changeGuestTz(e.target.value)}
                         className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[260px]"
                       >
                         {tzOptions.map((tz) => (
-                          <option key={tz} value={tz}>
-                            {publicTimezoneLabel(tz)}
+                          <option key={tz.value} value={tz.value}>
+                            {tz.label}
                           </option>
                         ))}
                       </select>
@@ -1659,13 +1656,13 @@ function BookFlow({
               </label>
               <select
                 id="fresh-tz"
-                value={guestTz}
+                value={currentZoneName(guestTz)}
                 onChange={(e) => changeGuestTz(e.target.value)}
                 className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[280px]"
               >
                 {tzOptions.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {publicTimezoneLabel(tz)}
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
                   </option>
                 ))}
               </select>
@@ -1985,7 +1982,7 @@ function BookFlow({
                 Time Zone
               </label>
               <select
-                value={guestTz}
+                value={currentZoneName(guestTz)}
                 onChange={(e) => {
                   setGuestTz(e.target.value);
                   setDialCode(dialCodeForTimezone(e.target.value));
@@ -1995,8 +1992,8 @@ function BookFlow({
                 className="mt-1 w-full appearance-none border-0 bg-transparent py-1 text-[13px] text-slate-500 outline-none"
               >
                 {tzOptions.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {publicTimezoneLabel(tz)}
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
                   </option>
                 ))}
               </select>
@@ -2417,26 +2414,9 @@ function ConfirmedCalendarMark() {
   );
 }
 
+/** "UTC+11:00 · Australia/Sydney": the offset first, so it survives truncation. */
 function publicTimezoneLabel(tz: string) {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      timeZoneName: "longOffset",
-    }).formatToParts(new Date());
-    const offset =
-      parts.find((part) => part.type === "timeZoneName")?.value.replace(
-        "GMT",
-        "",
-      ) || "";
-    const pretty = offset.startsWith("+") || offset.startsWith("-")
-      ? offset
-      : offset
-        ? `+${offset}`
-        : "";
-    return pretty ? `${tz} (${pretty})` : tz;
-  } catch {
-    return tz;
-  }
+  return timezoneOptionLabel(tz);
 }
 
 function Field({
