@@ -153,16 +153,22 @@ function dataRecord(envelope: Record<string, unknown>): Record<string, unknown> 
   return envelope;
 }
 
+/**
+ * Puts `catalog` on a settings response. By default the local pages replace
+ * the response's (used when the CRM refused a save); with `crmWins` the
+ * response's pages are kept and local ones only fill pages it lacks.
+ */
 export function withCatalogOnSettings(
   text: string,
   catalog: SettingsCatalog,
   extraPage?: { key: string; values: SettingsPageValues },
+  opts: { crmWins?: boolean } = {},
 ): string {
   const envelope = parseEnvelope(text) ?? { statusCode: 200, data: {} };
   const data = dataRecord(envelope);
+  const fromCrm = asCatalog(data.catalog);
   const merged = {
-    ...asCatalog(data.catalog),
-    ...catalog,
+    ...(opts.crmWins ? { ...catalog, ...fromCrm } : { ...fromCrm, ...catalog }),
     ...(extraPage ? { [extraPage.key]: extraPage.values } : {}),
   };
   if (envelope.data && typeof envelope.data === "object") {
