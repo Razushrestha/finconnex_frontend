@@ -34,6 +34,7 @@ import {
   type BookingPageService,
 } from "@/lib/booking/page-branding";
 import { toast } from "@/lib/notify/toast";
+import { fitImageDataUrl } from "@/lib/booking/image-fit";
 import {
   assignedCalendarMembers,
   calendarDefaultHost,
@@ -95,14 +96,32 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
   }, [eventTypeId, page.id]);
 
   async function save(partial: Partial<BookingPageBranding>, panel: PanelId) {
-    const next = { ...branding, ...partial };
-    setBranding(next);
-    writeLocalBookingPageBranding(page.id, next);
     setSaving(panel);
     try {
-      const saved = eventTypeId
-        ? await tryCrmBooking(() => saveBookingEventTypePage(eventTypeId, next))
-        : null;
+      // Images travel inside the branding, which the CRM caps per image; an
+      // oversized one (saved before images were shrunk) is shrunk here too.
+      const merged = { ...branding, ...partial };
+      const next: BookingPageBranding = {
+        ...merged,
+        backgroundImageUrl: merged.backgroundImageUrl
+          ? await fitImageDataUrl(merged.backgroundImageUrl)
+          : merged.backgroundImageUrl,
+        header: {
+          ...merged.header,
+          logoUrl: merged.header.logoUrl
+            ? await fitImageDataUrl(merged.header.logoUrl)
+            : merged.header.logoUrl,
+        },
+      };
+      setBranding(next);
+      writeLocalBookingPageBranding(page.id, next);
+      if (!eventTypeId) {
+        toast("Booking page saved");
+        return;
+      }
+      // Not tryCrmBooking: a refused save must not read as "saved", or the
+      // design only lives in this browser and guests never see it.
+      const saved = await saveBookingEventTypePage(eventTypeId, next);
       if (saved?.branding) {
         const normalized = normalizeBookingPageBranding(saved.branding);
         setBranding(normalized);
@@ -110,7 +129,11 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
       }
       toast("Booking page saved");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not save the booking page");
+      toast.error(
+        err instanceof Error
+          ? `The booking page was not saved: ${err.message}`
+          : "The booking page was not saved.",
+      );
     } finally {
       setSaving(null);
     }
@@ -1694,7 +1717,13 @@ function ImageField({
           if (!file) return;
           const reader = new FileReader();
           reader.onload = () => {
-            if (typeof reader.result === "string") onChange(reader.result);
+            if (typeof reader.result !== "string") return;
+            // Shrunk to fit the CRM's per-image limit before it is used.
+            void fitImageDataUrl(reader.result)
+              .then(onChange)
+              .catch((err: unknown) =>
+                toast.error(err instanceof Error ? err.message : "This image could not be used."),
+              );
           };
           reader.readAsDataURL(file);
         }}
