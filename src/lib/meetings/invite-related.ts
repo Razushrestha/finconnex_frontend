@@ -12,6 +12,7 @@ import { fetchLeadById } from "@/lib/leads/api";
 import { findLeadById, listLeadColumns } from "@/lib/leads/store";
 import { findDealById, listAllDeals } from "@/lib/deals/store";
 import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
+import { appointmentConfirmedEmail } from "@/lib/meetings/appointment-email";
 
 export type MeetingInvitee = {
   name: string;
@@ -200,20 +201,82 @@ export function buildMeetingInviteMessage(input: {
   return lines.join("\n");
 }
 
+/** Sends the designed HTML. The CRM mailbox only stores plain text, which is why the inbox showed stacked lines and a raw checkmark code. */
+async function deliverStyledAppointment(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}) {
+  const res = await fetch("/api/auth/mail/deliver", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: [input.to],
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+    }),
+  });
+  if (res.ok) return;
+  let message = "Could not send the appointment email";
+  try {
+    const json = (await res.json()) as { error?: string };
+    if (json.error?.trim()) message = json.error.trim();
+  } catch {
+    /* keep the generic message */
+  }
+  throw new Error(message);
+}
+
+async function appointmentActionLinks(input: {
+  meetingId?: string;
+  title: string;
+  guestName: string;
+  hostName: string;
+  dateIso: string;
+  startHHmm: string;
+  durationMinutes: number;
+  timeZoneLabel?: string;
+}) {
+  const res = await fetch("/api/appointment/manage", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    rescheduleUrl?: string;
+    cancelUrl?: string;
+  };
+  if (!res.ok || !json.rescheduleUrl || !json.cancelUrl) {
+    throw new Error(json.error || "Could not prepare the reschedule and cancel links.");
+  }
+  return { rescheduleUrl: json.rescheduleUrl, cancelUrl: json.cancelUrl };
+}
+
 export async function sendRelatedMeetingInvites(input: {
   invitees: MeetingInvitee[];
   title: string;
   startLabel: string;
   endLabel: string;
+  dateIso: string;
+  startHHmm: string;
+  durationMinutes: number;
+  timeZoneLabel?: string;
+  hostName: string;
+  meetingType?: string;
   location?: string;
   meetingLink?: string;
   agenda?: string;
+  meetingId?: string;
   relatedKind: RelatedEntityKind;
   relatedName: string;
   relatedId?: string;
 }) {
-  const to = input.invitees.map((item) => item.email);
-  if (!to.length) {
+  if (!input.invitees.length) {
     throw new Error(
       `No email on this ${input.relatedKind.toLowerCase()}. Add an email on the related record, then send invites again.`,
     );
@@ -222,20 +285,47 @@ export async function sendRelatedMeetingInvites(input: {
     (input.relatedId && isUuid(input.relatedId) ? input.relatedId : undefined) ??
     input.invitees.find((item) => item.relatedId && isUuid(item.relatedId))
       ?.relatedId;
-  return sendCrmActivityEmail({
-    to,
-    subject: `Meeting invitation: ${input.title}`,
-    body: buildMeetingInviteMessage({
+  for (const invitee of input.invitees) {
+    const links = await appointmentActionLinks({
+      meetingId: input.meetingId,
       title: input.title,
-      startLabel: input.startLabel,
-      endLabel: input.endLabel,
+      guestName: invitee.name,
+      hostName: input.hostName,
+      dateIso: input.dateIso,
+      startHHmm: input.startHHmm,
+      durationMinutes: input.durationMinutes,
+      timeZoneLabel: input.timeZoneLabel,
+    });
+    const copy = appointmentConfirmedEmail({
+      guestName: invitee.name,
+      hostName: input.hostName,
+      title: input.title,
+      dateIso: input.dateIso,
+      startHHmm: input.startHHmm,
+      durationMinutes: input.durationMinutes,
+      timeZoneLabel: input.timeZoneLabel,
+      meetingType: input.meetingType,
       location: input.location,
-      meetingLink: input.meetingLink,
-      agenda: input.agenda,
-      relatedLabel: `${input.relatedKind}: ${input.relatedName}`,
-    }),
-    relatedType: input.relatedKind,
-    relatedId,
-    relatedTo: `${input.relatedKind}: ${input.relatedName}`,
-  });
+      joinUrl: input.meetingLink,
+      rescheduleUrl: links?.rescheduleUrl,
+      cancelUrl: links?.cancelUrl,
+    });
+    try {
+      await deliverStyledAppointment({
+        to: invitee.email,
+        subject: copy.subject,
+        text: copy.text,
+        html: copy.html,
+      });
+    } catch {
+      await sendCrmActivityEmail({
+        to: [invitee.email],
+        subject: copy.subject,
+        body: copy.text,
+        relatedType: input.relatedKind,
+        relatedId,
+        relatedTo: `${input.relatedKind}: ${input.relatedName}`,
+      });
+    }
+  }
 }

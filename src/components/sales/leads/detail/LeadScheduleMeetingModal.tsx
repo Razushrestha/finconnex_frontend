@@ -23,7 +23,7 @@ import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { nowHHmm, parseStartHHmm } from "@/components/booking/CustomTimePicker";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
-import { isPastBookingStart } from "@/lib/booking/timezones";
+import { dateInTimezone, isPastBookingStart } from "@/lib/booking/timezones";
 import {
   assignedCalendarMembers,
   bookingLocationLabel,
@@ -82,10 +82,15 @@ function meetingTypeFromPage(page: BookingPage): MeetingType {
   return "Video Call";
 }
 
-function formatSlot(date: string, time: string, duration: string) {
+function formatSlot(
+  date: string,
+  time: string,
+  duration: string,
+  timeZoneLabel?: string,
+) {
   const startTime =
     parseStartHHmm(time) || time.split(" - ")[0]?.trim() || "10:00";
-  const start = new Date(`${date}T${startTime}`);
+  const start = dateInTimezone(date, startTime.slice(0, 5), timeZoneLabel);
   const minutes = Number.parseInt(duration, 10) || 30;
   return { start, minutes };
 }
@@ -272,7 +277,7 @@ export function LeadScheduleMeetingModal({
       teamMember !== "Calendar Default"
         ? teamMember
         : calendarDefaultHost(selectedCalendar);
-    const first = formatSlot(date, time, duration);
+    const first = formatSlot(date, time, duration, timezone);
     if (Number.isNaN(first.start.getTime())) {
       setError("Enter a valid date and time");
       return;

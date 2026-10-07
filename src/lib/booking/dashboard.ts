@@ -1,8 +1,13 @@
 /** Live booking home — CRM meetings + workspace consultants. */
 
+import {
+  guestAppointmentNotes,
+  guestClockRange,
+  type GuestClock,
+} from "@/lib/meetings/appointment-manage";
 import type { Meeting } from "@/lib/meetings/types";
 
-export type AppointmentStatus = "Confirmed" | "Pending" | "Scheduled";
+export type AppointmentStatus = "Confirmed" | "Pending" | "Scheduled" | "Cancelled";
 export type AppointmentType = "Consultation" | "Strategy Call" | "Review";
 export type AppointmentChannel = "In Person" | "Phone Call" | "Video Call";
 export type RelatedKind = "Lead" | "Contact" | "Deal" | "Company";
@@ -185,14 +190,18 @@ export function parseAppointmentStart(iso: string) {
     );
   }
   const dmy = raw.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2}))?/,
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?:\s*([ap]m))?)?/i,
   );
   if (dmy) {
+    let hour = Number(dmy[4] ?? 0);
+    const meridiem = dmy[6]?.toLowerCase();
+    if (meridiem === "pm" && hour < 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
     return new Date(
       Number(dmy[3]),
       Number(dmy[2]) - 1,
       Number(dmy[1]),
-      Number(dmy[4] ?? 0),
+      hour,
       Number(dmy[5] ?? 0),
     );
   }
@@ -230,6 +239,7 @@ export function appointmentMatchesKpi(
   now = bookingNow(),
 ): boolean {
   if (key === "upcoming") {
+    if (row.status === "Cancelled") return false;
     const start = parseAppointmentStart(row.start);
     if (Number.isNaN(start.getTime())) return false;
     return start.getTime() >= startOfDay(now).getTime();
@@ -496,7 +506,8 @@ function parseRelated(raw?: string): { kind: RelatedKind; id: string } {
 }
 
 function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus | null {
-  if (status === "Cancelled" || status === "Completed") return null;
+  if (status === "Completed") return null;
+  if (status === "Cancelled") return "Cancelled";
   if (status === "In Progress") return "Confirmed";
   if (status === "Rescheduled") return "Pending";
   return "Scheduled";
@@ -533,6 +544,35 @@ export function appointmentChannelFromVia(
 
 function mapChannel(type: Meeting["type"]): AppointmentChannel {
   return appointmentChannelFromLocation(type);
+}
+
+/** Rows the booking dashboard can show from the local appointment store when the CRM is down. */
+export function appointmentsFromGuestClocks(clocks: GuestClock[]): DashboardAppointment[] {
+  return clocks
+    .filter((clock) => clock.status !== "deleted")
+    .map((clock) => {
+      const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+      const cancelled = clock.status === "cancelled";
+      return {
+        id: clock.meetingId || clock.token || `title:${clock.title.trim().toLowerCase()}`,
+        guestName: clock.guestName?.trim() || "Guest",
+        topic: clock.title,
+        relatedKind: "Contact",
+        relatedId: "—",
+        recordKind: "meeting",
+        consultantId: clock.hostName?.trim() || "",
+        consultantName: clock.hostName?.trim() || undefined,
+        start: range.start,
+        end: range.end,
+        bookingCode: clock.reference,
+        eventTypeName: clock.title,
+        notes: guestAppointmentNotes(undefined, clock.remarks),
+        type: "Consultation",
+        status: cancelled ? "Cancelled" : "Scheduled",
+        channel: "Video Call",
+        avatarClass: "bg-violet-100 text-violet-800",
+      };
+    });
 }
 
 export function meetingToAppointment(

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   appointmentChannelFromLocation,
   appointmentChannelFromVia,
   appointmentPersonName,
   hostsToConsultants,
+  appointmentsFromGuestClocks,
   meetingToAppointment,
   resolveConsultantMatch,
   toLocalStart,
@@ -19,6 +20,12 @@ import {
   setBookingDisplayZone,
 } from "@/lib/booking/dashboard";
 import { listCrmMeetings } from "@/lib/meetings/api";
+import {
+  assignGuestClocks,
+  guestAppointmentNotes,
+  guestClockRange,
+  type GuestClock,
+} from "@/lib/meetings/appointment-manage";
 import { loadWorkspaceConsultants } from "@/lib/users/assignable";
 import { listCrmUsers } from "@/lib/settings/users-store";
 import {
@@ -178,6 +185,88 @@ function withListDetails(
   };
 }
 
+const HIDDEN_APPOINTMENTS_KEY = "booking:hidden-appointments:v1";
+
+export function hiddenAppointmentIds() {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(HIDDEN_APPOINTMENTS_KEY) || "[]");
+    return new Set(
+      Array.isArray(raw) ? raw.filter((item): item is string => typeof item === "string" && !!item) : [],
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export function hideAppointments(ids: Array<string | undefined>) {
+  const next = hiddenAppointmentIds();
+  for (const id of ids) {
+    if (id) next.add(id);
+  }
+  window.localStorage.setItem(HIDDEN_APPOINTMENTS_KEY, JSON.stringify([...next]));
+}
+
+function revealFreshCancellations(clocks: GuestClock[]) {
+  if (typeof window === "undefined") return;
+  const hidden = hiddenAppointmentIds();
+  let changed = false;
+  for (const clock of clocks) {
+    if (clock.status !== "cancelled") continue;
+    for (const id of [clock.meetingId, clock.token]) {
+      if (id && hidden.delete(id)) changed = true;
+    }
+  }
+  if (changed) {
+    window.localStorage.setItem(HIDDEN_APPOINTMENTS_KEY, JSON.stringify([...hidden]));
+  }
+}
+
+function visibleAppointments(rows: DashboardAppointment[]) {
+  const hidden = hiddenAppointmentIds();
+  if (!hidden.size) return rows;
+  return rows.filter(
+    (row) => !hidden.has(row.id) && !(row.meetingId && hidden.has(row.meetingId)),
+  );
+}
+
+function rowsWithGuestClocks(rows: DashboardAppointment[], clocks: GuestClock[]) {
+  const { assigned, unused } = assignGuestClocks(
+    rows.map((row) => ({
+      id: row.id,
+      meetingId: row.meetingId,
+      title: row.eventTypeName || row.topic,
+      guestName: row.guestName,
+      hostName: row.consultantName,
+      start: row.start,
+    })),
+    clocks,
+  );
+  const next = rows.flatMap((row, index) => {
+    const clock = assigned[index];
+    if (!clock) return [row];
+    if (clock.status === "deleted") return [];
+    const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+    const notes = guestAppointmentNotes(row.notes, clock.remarks);
+    return [
+      {
+        ...row,
+        start: range.start,
+        end: range.end,
+        notes,
+        status:
+          clock.status === "cancelled"
+            ? ("Cancelled" as const)
+            : clock.status === "scheduled"
+              ? ("Scheduled" as const)
+              : row.status,
+      },
+    ];
+  });
+  const added = appointmentsFromGuestClocks(unused.filter((clock) => clock.status === "cancelled"));
+  return [...next, ...added];
+}
+
 function samePerson(left: string, right: string) {
   const a = left.trim().toLowerCase();
   const b = right.trim().toLowerCase();
@@ -260,14 +349,12 @@ function bookingToAppointment(
 ): DashboardAppointment | null {
   const statusRaw = row.status.toLowerCase();
   // RESCHEDULED is the superseded booking; its replacement is listed separately.
-  if (
-    statusRaw.includes("cancel") ||
-    statusRaw.includes("complete") ||
-    statusRaw.includes("resched")
-  ) {
+  if (statusRaw.includes("complete") || statusRaw.includes("resched")) {
     return null;
   }
-  const status: AppointmentStatus = statusRaw.includes("confirm")
+  const status: AppointmentStatus = statusRaw.includes("cancel")
+    ? "Cancelled"
+    : statusRaw.includes("confirm")
     ? "Confirmed"
     : statusRaw.includes("no-show") || statusRaw.includes("noshow")
       ? "Pending"
@@ -354,17 +441,21 @@ export function useCrmBooking() {
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
+  const appointmentsRef = useRef(appointments);
+  appointmentsRef.current = appointments;
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError(null);
     void (async () => {
+      let meetingsUnavailable = false;
       const [meetingsResult, owners, crmBookings, crmHosts, crmConsultants, crmPages] =
         await Promise.all([
-          listCrmMeetings().catch(
-            () => [] as Awaited<ReturnType<typeof listCrmMeetings>>,
-          ),
+          listCrmMeetings().catch(() => {
+            meetingsUnavailable = true;
+            return [] as Awaited<ReturnType<typeof listCrmMeetings>>;
+          }),
           loadWorkspaceConsultants().catch(() => []),
           tryCrmBooking(() => listCrmBookings()),
           tryCrmBooking(() => listCrmBookingHosts()),
@@ -469,9 +560,26 @@ export function useCrmBooking() {
         loadCrmContacts({ page: 1, limit: 100 }).catch(() => []),
         fetchLeadList({ page: 1, limit: 100 }).catch(() => [] as CrmLead[]),
       ]);
-      const listed = mapped
-        .map((row) => withListDetails(row, eventPages, saved))
-        .map((row) => fillCustomerRecord(row, contactRows, leadRows));
+      const clocks = await fetch("/api/appointment/manage", {
+        credentials: "include",
+        cache: "no-store",
+      })
+        .then(async (res) => (res.ok ? ((await res.json()) as GuestClock[]) : []))
+        .catch(() => [] as GuestClock[]);
+      revealFreshCancellations(clocks);
+      const listed = visibleAppointments(
+        (
+          meetingsUnavailable ? appointmentsFromGuestClocks(clocks) : rowsWithGuestClocks(mapped, clocks)
+        )
+          .map((row) => withListDetails(row, eventPages, saved))
+          .map((row) => fillCustomerRecord(row, contactRows, leadRows)),
+      );
+      if (!meetingsUnavailable) {
+        void fetch("/api/appointment/manage/apply", {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => undefined);
+      }
       const consultantRows = hostsToConsultants(hostPeople, listed);
       replaceDashboardAppointments(listed);
       replaceDashboardConsultants(consultantRows);
@@ -494,6 +602,44 @@ export function useCrmBooking() {
       alive = false;
     };
   }, [tick]);
+
+  useEffect(() => {
+    let stopped = false;
+    let pulling = false;
+    async function pullInternal() {
+      if (stopped || pulling || document.visibilityState === "hidden") return;
+      pulling = true;
+      try {
+        const clocks = await fetch("/api/appointment/manage", {
+          credentials: "include",
+          cache: "no-store",
+        })
+          .then(async (res) => (res.ok ? ((await res.json()) as GuestClock[]) : []))
+          .catch(() => [] as GuestClock[]);
+        const current = appointmentsRef.current;
+        if (stopped || !current.length || !clocks.length) return;
+        revealFreshCancellations(clocks);
+        const next = visibleAppointments(rowsWithGuestClocks(current, clocks));
+        const stamp = (rows: DashboardAppointment[]) =>
+          rows
+            .map((row) => `${row.id}|${row.start}|${row.end ?? ""}|${row.status}|${row.notes ?? ""}`)
+            .join("\n");
+        if (stamp(next) === stamp(current)) return;
+        replaceDashboardAppointments(next);
+        setAppointments(next);
+      } finally {
+        pulling = false;
+      }
+    }
+    void pullInternal();
+    const timer = window.setInterval(() => void pullInternal(), 200);
+    document.addEventListener("visibilitychange", pullInternal);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", pullInternal);
+    };
+  }, []);
 
   return {
     loading,

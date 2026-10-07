@@ -17,6 +17,7 @@ interface RelatedRecordComboboxProps {
   options: RelatedRecordOption[];
   disabled?: boolean;
   placeholder?: string;
+  loading?: boolean;
   allowCustom?: boolean;
   createLabel?: (name: string) => string;
   onCreateOption?: (name: string) => void;
@@ -31,6 +32,7 @@ export default function RelatedRecordCombobox({
   options,
   disabled = false,
   placeholder = "Search record…",
+  loading = false,
   allowCustom = false,
   createLabel,
   onCreateOption,
@@ -254,9 +256,11 @@ export default function RelatedRecordCombobox({
 
       {open && !disabled && query.trim() === "" && options.length === 0 ? (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg">
-          {allowCustom
-            ? "Type a name to add a new record"
-            : "No related records available"}
+          {loading
+            ? "Loading records…"
+            : allowCustom
+              ? "Type a name to add a new record"
+              : "No related records available"}
         </div>
       ) : null}
     </div>

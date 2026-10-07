@@ -147,6 +147,9 @@ export async function sendViaSendGrid(input: DeliverInput): Promise<void> {
     /* keep */
   }
 
+  if (/maximum credits|credits exceeded/i.test(detail)) {
+    throw new Error("SendGrid has no email credits left.");
+  }
   if (res.status === 401 || /authorization|api key/i.test(detail)) {
     throw new Error(
       "SendGrid API key was rejected. Create a new Mail Send key and set SENDGRID_API_KEY in .env.local, then restart npm run dev.",
@@ -166,19 +169,7 @@ export async function sendViaSendGrid(input: DeliverInput): Promise<void> {
  */
 export type CrmMailAuth = { accessToken?: string | null; bookingToken?: string | null };
 
-/**
- * Sends through this app's own SendGrid key when one is set, otherwise
- * through the CRM's configured mail account — the one that already sends
- * sign-up mail — so every module's email works without a second key here.
- */
-export async function deliverMail(
-  input: DeliverInput,
-  auth: CrmMailAuth = {},
-): Promise<"sendgrid" | "crm"> {
-  if (sendgridConfigured()) {
-    await sendViaSendGrid(input);
-    return "sendgrid";
-  }
+async function deliverViaCrm(input: DeliverInput, auth: CrmMailAuth): Promise<"crm"> {
   const base = crmBaseUrl();
   const bookingToken = auth.bookingToken?.trim();
   const accessToken = auth.accessToken?.trim();
@@ -236,4 +227,27 @@ export async function deliverMail(
     throw new Error(message);
   }
   return "crm";
+}
+
+/**
+ * Sends through this app's own SendGrid key when one is set. When that account
+ * cannot send (for example it is out of credits), the same HTML goes through
+ * the CRM mailbox instead of being dropped for a plain-text copy.
+ */
+export async function deliverMail(
+  input: DeliverInput,
+  auth: CrmMailAuth = {},
+): Promise<"sendgrid" | "crm"> {
+  if (sendgridConfigured()) {
+    try {
+      await sendViaSendGrid(input);
+      return "sendgrid";
+    } catch (error) {
+      const canUseCrm = Boolean(auth.accessToken?.trim() || auth.bookingToken?.trim());
+      if (!canUseCrm) throw error;
+      const reason = error instanceof Error ? error.message : "SendGrid rejected the message";
+      console.error(`[mail] SendGrid did not send (${reason}). Sending the HTML through the CRM mailbox.`);
+    }
+  }
+  return deliverViaCrm(input, auth);
 }

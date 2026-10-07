@@ -50,6 +50,7 @@ next-env.d.ts
 /data/settings-catalog/
 /data/public-sign/
 /data/email-signatures/
+/data/appointment-manage/
 
 # Nested Nest CRM clone — own repo: kachhuwagroup/multi-crm-backend
 /multi-crm-backend-main/

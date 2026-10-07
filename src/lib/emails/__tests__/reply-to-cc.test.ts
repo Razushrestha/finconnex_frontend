@@ -239,6 +239,40 @@ describe("deliverMail without a SendGrid key", () => {
     ).rejects.toThrow(/only go to its guest/);
   });
 
+  it("sends the HTML through the CRM mailbox when SendGrid is out of credits", async () => {
+    vi.stubEnv("SENDGRID_API_KEY", "SG.test-key");
+    vi.stubEnv("SENDGRID_FROM_EMAIL", "from@example.com");
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).includes("api.sendgrid.com")) {
+        return new Response(
+          JSON.stringify({ errors: [{ message: "Maximum credits exceeded" }] }),
+          { status: 401 },
+        );
+      }
+      return new Response(JSON.stringify({ data: { delivered: "crm" } }), { status: 200 });
+    });
+    const deliver = await real();
+    await expect(
+      deliver(
+        {
+          to: ["ada@example.com"],
+          subject: "Your appointment is confirmed",
+          text: "Hi",
+          html: "<table><tr><td>Your Appointment is Confirmed!</td></tr></table>",
+        },
+        { accessToken: "jwt-user" },
+      ),
+    ).resolves.toBe("crm");
+    const relay = fetchMock.mock.calls.find((call) => String(call[0]).includes("/v1/mail/relay"));
+    expect(relay).toBeTruthy();
+    expect(JSON.parse(String(relay?.[1].body))).toEqual(
+      expect.objectContaining({
+        html: "<table><tr><td>Your Appointment is Confirmed!</td></tr></table>",
+        text: "Hi",
+      }),
+    );
+  });
+
   it("explains that mail is not configured when there is no way to send", async () => {
     const deliver = await real();
     await expect(deliver({ to: ["x@y.co"], subject: "S", text: "T" })).rejects.toThrow(

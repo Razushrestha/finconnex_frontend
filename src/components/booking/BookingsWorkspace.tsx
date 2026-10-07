@@ -66,7 +66,7 @@ import {
   bookingDisplayZone,
   instantFromBookingWallClock,
 } from "@/lib/booking/dashboard";
-import { useCrmBooking } from "@/lib/booking/use-crm-booking";
+import { hideAppointments, useCrmBooking } from "@/lib/booking/use-crm-booking";
 import {
   cancelCrmBooking,
   readRescheduledBooking,
@@ -117,6 +117,7 @@ const STATUS_STYLE: Record<AppointmentStatus, string> = {
   Confirmed: "bg-[#D1FAE5] text-[#059669]",
   Pending: "bg-[#FEF3C7] text-[#D97706]",
   Scheduled: "bg-[#DBEAFE] text-[#2563EB]",
+  Cancelled: "border-red-200 bg-white text-red-600",
 };
 
 const RELATED_ICON: Record<RelatedKind, typeof User> = {
@@ -374,18 +375,27 @@ function HomeView({
   }
 
   async function removeAppointment(row: DashboardAppointment) {
-    if (!window.confirm(`Delete appointment “${row.guestName}”?`)) return;
-    const meeting = await tryCrmMeeting(() => deleteCrmMeeting(row.id));
-    const booking = await tryCrmBooking(() =>
-      cancelCrmBooking(row.id, "Deleted from upcoming appointments"),
-    );
-    if (meeting === null && booking === null) {
-      toast.error("Could not delete this appointment.");
-      return;
-    }
-    toast.success("Appointment deleted");
+    if (!window.confirm(`Delete appointment “${row.guestName}”? This also removes it for the client.`)) return;
+    hideAppointments([row.id, row.meetingId]);
     if (detail?.id === row.id) setDetail(null);
     onRefresh();
+    await fetch("/api/appointment/manage/remove", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        meetingId: row.meetingId || row.id,
+        title: row.eventTypeName || row.topic,
+      }),
+    }).catch(() => undefined);
+    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    if (meetingId) await tryCrmMeeting(() => deleteCrmMeeting(meetingId));
+    if (row.recordKind !== "meeting" && row.status !== "Cancelled") {
+      await tryCrmBooking(() =>
+        cancelCrmBooking(row.id, "Deleted from upcoming appointments"),
+      );
+    }
+    toast.success("Appointment deleted");
   }
 
   return (
@@ -761,6 +771,7 @@ function scheduleSeed(row: DashboardAppointment): ScheduleMeetingSeed {
     appointmentId: row.id,
     meetingId: row.meetingId,
     recordKind: row.recordKind,
+    status: row.status,
     date: valid
       ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
       : undefined,
@@ -835,16 +846,19 @@ function consultantLabel(row: DashboardAppointment) {
 }
 
 function BookingStatusMenu({
+  status,
   onEdit,
   onReschedule,
-  onCancel,
+  onDelete,
   tone = "neutral",
 }: {
+  status?: AppointmentStatus;
   onEdit: () => void;
   onReschedule: () => void;
-  onCancel: () => void;
+  onDelete: () => void;
   tone?: "neutral" | "blue";
 }) {
+  const cancelled = status === "Cancelled";
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
@@ -879,14 +893,16 @@ function BookingStatusMenu({
         onClick={toggle}
         className={cn(
           "inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-[11px] font-medium shadow-sm",
-          tone === "blue"
-            ? "border-blue-200 text-blue-600 hover:bg-blue-50"
-            : "border-[#E5E7EB] text-slate-700 hover:bg-slate-50",
+          cancelled
+            ? "border-red-200 text-red-600 hover:bg-red-50"
+            : tone === "blue"
+              ? "border-blue-200 text-blue-600 hover:bg-blue-50"
+              : "border-[#E5E7EB] text-slate-700 hover:bg-slate-50",
         )}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        Upcoming
+        {cancelled ? "Cancelled" : "Upcoming"}
         {open ? (
           <ChevronUp className="h-3 w-3 text-slate-400" />
         ) : (
@@ -928,15 +944,37 @@ function BookingStatusMenu({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onCancel();
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+                aria-pressed={cancelled}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px]",
+                  cancelled
+                    ? "bg-red-50 font-medium text-red-600"
+                    : "text-slate-400",
+                )}
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
-                Cancel
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    cancelled ? "bg-red-500" : "bg-slate-300",
+                  )}
+                />
+                Cancelled
               </button>
+              {cancelled ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onDelete();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-600 hover:bg-red-50"
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                  Delete
+                </button>
+              ) : null}
             </div>,
             document.body,
           )
@@ -1045,9 +1083,10 @@ function AppointmentCard({
               onKeyDown={(e) => e.stopPropagation()}
             >
               <BookingStatusMenu
+                status={row.status}
                 onEdit={onEdit}
                 onReschedule={onReschedule}
-                onCancel={onDelete}
+                onDelete={onDelete}
               />
             </div>
           </div>
@@ -1184,9 +1223,10 @@ function AppointmentRow({
       </td>
       <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
         <BookingStatusMenu
+          status={row.status}
           onEdit={onEdit}
           onReschedule={onReschedule}
-          onCancel={onDelete}
+          onDelete={onDelete}
         />
       </td>
     </tr>
@@ -1469,9 +1509,24 @@ function AppointmentDrawer({
         startDateTime: instantFromBookingWallClock(start).toISOString(),
         endDateTime: instantFromBookingWallClock(end).toISOString(),
       };
-      if (row.recordKind === "meeting") {
-        const meeting = await tryCrmMeeting(() => updateCrmMeeting(row.id, when));
-        if (!meeting) {
+      if (row.recordKind === "meeting" || row.status === "Cancelled") {
+        const meetingId = row.meetingId || row.id;
+        const meeting = await tryCrmMeeting(() => updateCrmMeeting(meetingId, when));
+        if (row.status === "Cancelled") {
+          await fetch("/api/appointment/manage/reopen", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              meetingId,
+              guestName: row.guestName,
+              title: row.eventTypeName || row.topic,
+              dateIso: date,
+              startHHmm: time,
+              durationMinutes: minutes,
+            }),
+          }).catch(() => undefined);
+        } else if (!meeting) {
           setError("Could not save this appointment.");
           setSaving(false);
           return;
@@ -1723,10 +1778,11 @@ function AppointmentSummary({
             <div className="flex items-start justify-between gap-3">
               <p className="text-[15px] font-semibold leading-snug text-slate-900">{whenLabel}</p>
               <BookingStatusMenu
+                status={row.status}
                 tone="blue"
                 onEdit={onEdit}
                 onReschedule={onReschedule}
-                onCancel={onCancel}
+                onDelete={onCancel}
               />
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-500">
@@ -1858,7 +1914,9 @@ function CustomerInfoTab({
           <SummaryRow label="Booking ID">{row.bookingCode || "—"}</SummaryRow>
           <SummaryRow label="Booked On">{formatBookedOn(row.bookedOn)}</SummaryRow>
           <SummaryRow label="Contact Number">{row.phone || "—"}</SummaryRow>
-          <SummaryRow label="Notes">{row.notes || "—"}</SummaryRow>
+          <SummaryRow label="Notes">
+            <span className="whitespace-pre-line">{row.notes || "—"}</span>
+          </SummaryRow>
         </div>
       ) : null}
       {section === "questions" ? (

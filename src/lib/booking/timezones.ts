@@ -172,6 +172,14 @@ const ZONE_ALIASES: Record<string, string> = {
   "Asia/Katmandu": "Asia/Kathmandu",
 };
 
+/** Dropdown labels such as `Asia/Kathmandu (+05:45)`. */
+export function timezoneChoiceList() {
+  return Object.entries(IANA_TO_LABEL).map(([id, label]) => {
+    const offset = label.match(/GMT([+-]\d{2}:\d{2})/)?.[1] ?? "";
+    return { id, label: offset ? `${id} (${offset})` : id };
+  });
+}
+
 /** CRM APIs want IANA ids, not the GMT display labels. */
 export function ianaTimezoneFromLabel(label?: string): string {
   const raw = ZONE_ALIASES[label?.trim() || ""] || label?.trim() || "";
