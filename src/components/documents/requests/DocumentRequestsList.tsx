@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CalendarDays, Clock3, Eye, FileText, MoreVertical, User, Info } from "lucide-react";
@@ -202,6 +203,14 @@ function RowActions({
   const [notifyCancel, setNotifyCancel] = useState(false);
   const [editingReminders, setEditingReminders] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuBox, setMenuBox] = useState({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    maxHeight: 320,
+    openUp: false,
+  });
   const router = useRouter();
   const closed =
     request.status === "Approved" ||
@@ -211,16 +220,43 @@ function RowActions({
 
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setConfirmCancel(false);
-        setConfirmDelete(false);
-        setNotifyCancel(false);
-      }
+    function place() {
+      const anchor = ref.current?.querySelector<HTMLElement>(
+        "button[aria-label='Actions']",
+      );
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const width = 208;
+      const gap = 6;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
+      const spaceAbove = rect.top - gap - 8;
+      const openUp = spaceBelow < 220 && spaceAbove > spaceBelow;
+      const maxHeight = Math.min(320, Math.max(96, openUp ? spaceAbove : spaceBelow));
+      setMenuBox({
+        top: rect.bottom + gap,
+        bottom: window.innerHeight - rect.top + gap,
+        left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+        maxHeight,
+        openUp,
+      });
     }
+    function onDoc(e: MouseEvent) {
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+      setConfirmCancel(false);
+      setConfirmDelete(false);
+      setNotifyCancel(false);
+    }
+    place();
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
   }, [open]);
 
   function downloadDocs() {
@@ -388,8 +424,17 @@ function RowActions({
           }}
         />
       ) : null}
-      {open ? (
-        <div className="absolute right-0 z-30 mt-1 max-h-80 w-52 overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+      {open
+        ? createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[80] w-52 overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
+          style={{
+            left: menuBox.left,
+            maxHeight: menuBox.maxHeight,
+            ...(menuBox.openUp ? { bottom: menuBox.bottom } : { top: menuBox.top }),
+          }}
+        >
           {confirmDelete ? (
             <div className="px-3 py-2">
               <p className="text-[12px] leading-snug text-slate-600">
@@ -523,8 +568,10 @@ function RowActions({
               </button>
             </>
           )}
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
