@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  ArrowDown,
-  Check,
-  ChevronDown,
-  Paperclip,
-  X,
-} from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowDown, Paperclip, X } from "lucide-react";
 import { TaskDescriptionEditor } from "@/components/activities/tasks/TaskDescriptionEditor";
 import { cn } from "@/lib/utils";
 import type { EmailImportance } from "@/lib/emails/types";
 import { emailHasDraftContent, type EmailTone } from "@/lib/emails/ai-compose";
-import { enlargeUploadedSignatureImages, stripAllSignatures } from "@/lib/emails/signature";
+import { stripAllSignatures } from "@/lib/emails/signature";
 import { EmailAiActions } from "./EmailAiActions";
 
 interface AttachmentChip {
@@ -53,40 +47,20 @@ export function EmailEditor({
   onChange,
   error,
   submitted,
-  recipientName,
-  subject,
   importance,
   onImportanceChange,
   attachments,
+  onAttachClick,
   onRemoveAttachment,
   onDropFiles,
   aiBusy,
-  onAskMeTo,
   onAiTone,
   onAiShorten,
   onAiClarity,
   onAiRegenerate,
 }: EmailEditorProps) {
   const [dragging, setDragging] = useState(false);
-  const [importanceOpen, setImportanceOpen] = useState(false);
   const dragCount = useRef(0);
-  const importanceRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const next = enlargeUploadedSignatureImages(body);
-    if (next !== body) onChange(next);
-  }, [body, onChange]);
-
-  useEffect(() => {
-    if (!importanceOpen) return;
-    function onPointerDown(event: MouseEvent) {
-      if (!importanceRef.current?.contains(event.target as Node)) {
-        setImportanceOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [importanceOpen]);
 
   return (
     <div
@@ -117,78 +91,69 @@ export function EmailEditor({
         onChange={onChange}
         placeholder="Write your email…"
         fillHeight
+        compactToolbar
         className="min-h-0 flex-1"
+        toolbarAfterLink={
+          <button
+            type="button"
+            title="Attach files"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={onAttachClick}
+            className={cn(
+              "relative inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 hover:border-slate-200 hover:bg-white",
+              attachments.length
+                ? "border-violet-300 bg-violet-50 text-[#5A32A3]"
+                : "border-transparent",
+            )}
+          >
+            <Paperclip className="h-4 w-4" />
+            {attachments.length ? (
+              <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#5A32A3] px-0.5 text-[8px] font-bold text-white">
+                {attachments.length}
+              </span>
+            ) : null}
+          </button>
+        }
         toolbarTrailing={
-          <div className="relative" ref={importanceRef}>
+          <div
+            className="inline-flex h-8 overflow-hidden rounded-md border border-slate-200"
+            role="group"
+            aria-label="Importance"
+          >
             <button
               type="button"
-              title="Importance"
-              onClick={() => setImportanceOpen((v) => !v)}
+              title="High importance"
+              aria-pressed={importance === "high"}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() =>
+                onImportanceChange(importance === "high" ? "normal" : "high")
+              }
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium hover:bg-white",
+                "inline-flex h-8 min-w-9 items-center justify-center border-r border-slate-200 px-2.5 text-[14px] font-bold transition-colors",
                 importance === "high"
-                  ? "text-red-600"
-                  : importance === "low"
-                    ? "text-blue-600"
-                    : "text-slate-600",
+                  ? "bg-red-50 text-red-600"
+                  : "bg-white text-slate-500 hover:bg-slate-50 hover:text-red-500",
               )}
             >
-              Importance
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              !
             </button>
-            {importanceOpen ? (
-              <div className="absolute top-8 right-0 z-30 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onImportanceChange("high");
-                    setImportanceOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50"
-                >
-                  <span className="flex w-4 justify-center">
-                    {importance === "high" ? (
-                      <Check className="h-3.5 w-3.5 text-slate-800" />
-                    ) : (
-                      <span className="text-[15px] font-bold text-red-500">!</span>
-                    )}
-                  </span>
-                  High
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onImportanceChange("normal");
-                    setImportanceOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50"
-                >
-                  <span className="flex w-4 justify-center">
-                    {importance === "normal" ? (
-                      <Check className="h-3.5 w-3.5 text-slate-800" />
-                    ) : null}
-                  </span>
-                  Normal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onImportanceChange("low");
-                    setImportanceOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50"
-                >
-                  <span className="flex w-4 justify-center">
-                    {importance === "low" ? (
-                      <Check className="h-3.5 w-3.5 text-slate-800" />
-                    ) : (
-                      <ArrowDown className="h-3.5 w-3.5 text-blue-500" />
-                    )}
-                  </span>
-                  Low
-                </button>
-              </div>
-            ) : null}
+            <button
+              type="button"
+              title="Low importance"
+              aria-pressed={importance === "low"}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() =>
+                onImportanceChange(importance === "low" ? "normal" : "low")
+              }
+              className={cn(
+                "inline-flex h-8 min-w-9 items-center justify-center px-2.5 transition-colors",
+                importance === "low"
+                  ? "bg-blue-50 text-blue-600"
+                  : "bg-white text-slate-500 hover:bg-slate-50 hover:text-blue-500",
+              )}
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+            </button>
           </div>
         }
         belowEditor={
@@ -236,8 +201,8 @@ export function EmailEditor({
       ) : null}
 
       {dragging ? (
-        <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--brand-primary)] bg-[var(--brand-primary)]/8">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[var(--brand-primary)] shadow-sm">
+        <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-[#5A32A3] bg-[#5A32A3]/8">
+          <p className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#5A32A3] shadow-sm">
             <Paperclip className="h-4 w-4" />
             Drop files to attach
           </p>

@@ -19,7 +19,12 @@ import {
   MeetingGuestPicker,
   type MeetingGuest,
 } from "@/components/activities/meetings/create/MeetingGuestPicker";
-import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import {
+  emptyInlineTaskNote,
+  formatInlineTaskNote,
+  InlineTaskNoteComposer,
+  type InlineTaskNoteValue,
+} from "@/components/shared/InlineTaskNoteComposer";
 import { nowHHmm, parseStartHHmm } from "@/components/booking/CustomTimePicker";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
@@ -36,6 +41,7 @@ import {
 } from "@/lib/booking/types";
 import { parseFlexibleDate } from "@/lib/leads/activity-dates";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import type { LeadCardData } from "@/lib/leads/types";
 import {
   createMeeting,
@@ -130,8 +136,10 @@ export function LeadScheduleMeetingModal({
   const [locationKind, setLocationKind] =
     useState<MeetingLocationKind>("Office address");
   const [locationDetail, setLocationDetail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [contactName, setContactName] = useState("");
+  const [note, setNote] = useState<InlineTaskNoteValue>(() => emptyInlineTaskNote());
+  const [contactName, setContactName] = useState(
+    () => leadApplicants(card)[0]?.name || card.name,
+  );
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("Lead");
   const [relatedName, setRelatedName] = useState(card.name);
   const [guests, setGuests] = useState<MeetingGuest[]>([]);
@@ -189,11 +197,11 @@ export function LeadScheduleMeetingModal({
     setWhenMode("default");
     setRecurring(false);
     setRepeatRule({ ...defaultReminderRepeatRule });
-    setContactName("");
+    setContactName(leadApplicants(card)[0]?.name || card.name);
     setRelatedKind("Lead");
     setRelatedName(card.name);
     setGuests([]);
-    setNotes("");
+    setNote(emptyInlineTaskNote());
 
     const live = listActiveConsultations();
     setCalendars(live);
@@ -206,7 +214,11 @@ export function LeadScheduleMeetingModal({
         const at = parseFlexibleDate(meeting.startDateTime);
         const ends = parseFlexibleDate(meeting.endDateTime);
         setTitle(meeting.title);
-        setNotes(meeting.notes ?? "");
+        setNote({
+          title: "",
+          body: meeting.notes ?? "",
+          attachments: [],
+        });
         if (at) {
           setDate(toDateIso(at));
           setTime(toHHmm(at));
@@ -311,7 +323,9 @@ export function LeadScheduleMeetingModal({
         ? formatTaskRepeatSummary(repeatRule)
         : "";
     const relatedTo = `${relatedKind}: ${relatedName.trim()}`;
-    const note = [notes.trim(), repeatNote].filter(Boolean).join("\n");
+    const noteText = [formatInlineTaskNote(note), repeatNote]
+      .filter(Boolean)
+      .join("\n");
     const meetingLinkValue =
       locationMode === "default"
         ? selectedCalendar?.meetingViaDetail ||
@@ -359,7 +373,7 @@ export function LeadScheduleMeetingModal({
           organizer: host,
           location,
           meetingLink: meetingLinkValue,
-          notes: note || undefined,
+          notes: noteText || undefined,
           attendees,
         });
       } else {
@@ -375,7 +389,7 @@ export function LeadScheduleMeetingModal({
             location,
             meetingLink: meetingLinkValue,
             attendees,
-            notes: note || undefined,
+            notes: noteText || undefined,
           });
         });
       }
@@ -399,7 +413,7 @@ export function LeadScheduleMeetingModal({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3.5">
           <DialogTitle className="text-[16px] font-semibold text-slate-900">
@@ -498,17 +512,11 @@ export function LeadScheduleMeetingModal({
                 onRelatedNameChange={setRelatedName}
               />
               <MeetingGuestPicker guests={guests} onChange={setGuests} />
-              <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                  Internal note
-                </label>
-                <MentionNotesTextarea
-                  rows={5}
-                  value={notes}
-                  onChange={setNotes}
-                  placeholder="Internal notes… Type @ to mention someone."
-                />
-              </div>
+              <InlineTaskNoteComposer
+                label="Internal note"
+                value={note}
+                onChange={setNote}
+              />
             </div>
           </div>
         </div>

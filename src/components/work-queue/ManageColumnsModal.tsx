@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, GripVertical, Pin, Search } from "lucide-react";
+import { GripVertical, Pin, Search } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -12,6 +12,41 @@ export type ManageColumn = {
   required?: boolean;
   pinned?: boolean;
 };
+
+/** Required columns stay first; pinned columns follow at the top. */
+export function orderManageColumnsByPin(columns: ManageColumn[]): ManageColumn[] {
+  const required = columns.filter((c) => c.required);
+  const pinned = columns.filter((c) => Boolean(c.pinned) && !c.required);
+  const rest = columns.filter((c) => !c.required && !c.pinned);
+  return [...required, ...pinned, ...rest];
+}
+
+export function visibleManageColumns(columns: ManageColumn[]): ManageColumn[] {
+  return orderManageColumnsByPin(columns).filter((c) => c.checked);
+}
+
+/** Pin moves a column to the top (after required). Unpin parks it just below pinned. */
+export function toggleManageColumnPinned(
+  columns: ManageColumn[],
+  id: string,
+): ManageColumn[] {
+  const current = columns.find((c) => c.id === id);
+  if (!current || current.required) return columns;
+  const pinning = !current.pinned;
+  const next = columns.map((c) =>
+    c.id === id
+      ? { ...c, pinned: pinning, checked: pinning ? true : c.checked }
+      : c,
+  );
+  const required = next.filter((c) => c.required);
+  const otherPinned = next.filter((c) => c.pinned && !c.required && c.id !== id);
+  const rest = next.filter((c) => !c.required && !c.pinned && c.id !== id);
+  const item = next.find((c) => c.id === id)!;
+  if (pinning) {
+    return [...required, item, ...otherPinned, ...rest];
+  }
+  return [...required, ...otherPinned, item, ...rest];
+}
 
 export const DEFAULT_MANAGE_COLUMNS: ManageColumn[] = [
   { id: "subject", label: "Subject", checked: true, required: true },
@@ -54,7 +89,7 @@ export function ManageColumnsModal({
 
   useEffect(() => {
     if (open) {
-      setWorking(columns);
+      setWorking(orderManageColumnsByPin(columns));
       setSearch("");
     }
   }, [open, columns]);
@@ -83,21 +118,7 @@ export function ManageColumnsModal({
   }
 
   function togglePinned(id: string) {
-    setWorking((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)),
-    );
-  }
-
-  function move(id: string, direction: -1 | 1) {
-    setWorking((prev) => {
-      const fromIndex = prev.findIndex((c) => c.id === id);
-      const toIndex = fromIndex + direction;
-      if (fromIndex === -1 || toIndex < 0 || toIndex >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
+    setWorking((prev) => toggleManageColumnPinned(prev, id));
   }
 
   function reorder(fromId: string, toId: string) {
@@ -170,7 +191,7 @@ export function ManageColumnsModal({
               }}
               className={cn(
                 "group flex items-center gap-2 rounded-md py-1.5",
-                col.pinned && "bg-[var(--brand-primary-faint)]",
+                col.pinned && "bg-blue-50/70",
                 dragIndex !== null &&
                   working[dragIndex]?.id === col.id &&
                   "opacity-50",
@@ -192,7 +213,7 @@ export function ManageColumnsModal({
                 className={cn(
                   "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                   col.checked
-                    ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]"
+                    ? "border-blue-600 bg-blue-600"
                     : "border-gray-300 bg-white",
                   col.required && "cursor-not-allowed opacity-90",
                 )}
@@ -218,43 +239,23 @@ export function ManageColumnsModal({
                 ) : null}
               </span>
 
-              <div className="flex shrink-0 items-center gap-0.5">
+              {!col.required ? (
                 <button
                   type="button"
-                  disabled={working[0]?.id === col.id}
-                  onClick={() => move(col.id, -1)}
-                  aria-label={`Move ${col.label} up`}
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+                  onClick={() => togglePinned(col.id)}
+                  aria-label={`${col.pinned ? "Unpin" : "Pin"} ${col.label}`}
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600",
+                    col.pinned ? "text-gray-600" : "",
+                  )}
                 >
-                  <ChevronUp className="h-3.5 w-3.5" />
+                  <Pin
+                    className={cn("h-3.5 w-3.5", col.pinned && "fill-current")}
+                  />
                 </button>
-                <button
-                  type="button"
-                  disabled={working[working.length - 1]?.id === col.id}
-                  onClick={() => move(col.id, 1)}
-                  aria-label={`Move ${col.label} down`}
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-                {!col.required ? (
-                  <button
-                    type="button"
-                    onClick={() => togglePinned(col.id)}
-                    aria-label={`${col.pinned ? "Unpin" : "Pin"} ${col.label}`}
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600",
-                      col.pinned ? "text-gray-600" : "",
-                    )}
-                  >
-                    <Pin
-                      className={cn("h-3.5 w-3.5", col.pinned && "fill-current")}
-                    />
-                  </button>
-                ) : (
-                  <span className="h-6 w-6" />
-                )}
-              </div>
+              ) : (
+                <span className="h-6 w-6 shrink-0" />
+              )}
             </div>
           ))}
 
@@ -275,8 +276,8 @@ export function ManageColumnsModal({
           </button>
           <button
             type="button"
-            onClick={() => onSave(working)}
-            className="rounded-lg bg-[var(--brand-primary)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--brand-primary-strong)]"
+            onClick={() => onSave(orderManageColumnsByPin(working))}
+            className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700"
           >
             Save
           </button>

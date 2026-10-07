@@ -1,6 +1,11 @@
 /** SRS §7.8 Calendar: aggregated events */
 
-export type CalendarItemType = "Event" | "Task" | "Meeting" | "Reminder";
+export type CalendarItemType =
+  | "Event"
+  | "Task"
+  | "Meeting"
+  | "Call"
+  | "Reminder";
 
 export interface CalendarItem {
   id: string;

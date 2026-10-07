@@ -24,7 +24,26 @@ export function listAttachments(): Attachment[] {
 }
 
 export function saveAttachments(items: Attachment[]) {
-  store.save(items);
+  const compact = items.map((item) => {
+    const url = item.storageUrl;
+    // Persist only compact URLs; huge data: URLs blow session storage quota (PDFs).
+    if (url?.startsWith("data:") && url.length > 120_000) {
+      return { ...item, storageUrl: undefined };
+    }
+    return item;
+  });
+  try {
+    store.save(compact);
+  } catch {
+    // Last resort: drop all data URLs so the new row can still be saved.
+    store.save(
+      compact.map((item) =>
+        item.storageUrl?.startsWith("data:")
+          ? { ...item, storageUrl: undefined }
+          : item,
+      ),
+    );
+  }
 }
 
 export function createAttachment(input: {
@@ -62,4 +81,13 @@ export function createAttachment(input: {
 
 export function getAttachment(id: string): Attachment | undefined {
   return listAttachments().find((a) => a.id === id);
+}
+
+export function deleteAttachment(id: string): boolean {
+  const list = listAttachments();
+  const next = list.filter((item) => item.id !== id);
+  if (next.length === list.length) return false;
+  saveAttachments(next);
+  emitLeadActivityChange();
+  return true;
 }

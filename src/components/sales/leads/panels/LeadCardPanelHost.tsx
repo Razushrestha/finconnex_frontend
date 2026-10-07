@@ -36,18 +36,17 @@ interface LeadCardPanelHostProps {
   onQuickActionSuccess?: (message: string) => void;
 }
 
-// Kinds handled by the lightweight single-action dialog (call/sms/email need
-// the "open on this device" intent buttons that LeadEditDialog doesn't have).
-const QUICK_DIALOG_KINDS: QuickActionKind[] = ["call", "sms", "email"];
-
-// Remaining kinds route into LeadEditDialog's sidebar sections.
 const EDIT_DIALOG_SECTION: Partial<
-  Record<QuickActionKind, "appointment" | "tasks" | "notes" | "associated">
+  Record<
+    QuickActionKind,
+    "appointment" | "tasks" | "notes" | "associated" | "sms"
+  >
 > = {
   meeting: "appointment",
   task: "tasks",
   note: "notes",
   attachment: "associated",
+  sms: "sms",
 };
 
 export function LeadCardPanelHost({
@@ -72,10 +71,13 @@ export function LeadCardPanelHost({
     );
   }
 
-  if (QUICK_DIALOG_KINDS.includes(panel.kind)) {
+  const { kind, leadId, leadName, email, phone } = panel;
+
+  // Call stays on softphone from the card; if host still receives it, keep log dialog.
+  if (kind === "call") {
     return (
       <LeadQuickActionDialog
-        key={`${panel.kind}-${panel.leadId}`}
+        key={`${kind}-${leadId}`}
         open
         onOpenChange={(open) => {
           if (!open) onClose();
@@ -86,23 +88,53 @@ export function LeadCardPanelHost({
         leadPhone={panel.phone}
         leadId={panel.leadId}
         onSuccess={onQuickActionSuccess}
+        presentation="drawer"
       />
     );
   }
 
-  return (
-    <LeadEditDialog
-      key={`${panel.kind}-${panel.leadId}`}
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      leadId={panel.leadId}
-      leadName={panel.leadName}
-      leadEmail={panel.email}
-      leadPhone={panel.phone}
-      initialSection={EDIT_DIALOG_SECTION[panel.kind]}
-      onSuccess={onQuickActionSuccess}
-    />
-  );
+  if (kind === "email") {
+    return (
+      <LeadQuickActionDialog
+        key={`${kind}-${leadId}`}
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        kind={kind}
+        leadName={leadName}
+        leadEmail={email}
+        leadPhone={phone}
+        onSuccess={onQuickActionSuccess}
+        presentation="drawer"
+      />
+    );
+  }
+
+  if (
+    kind === "meeting" ||
+    kind === "task" ||
+    kind === "note" ||
+    kind === "attachment" ||
+    kind === "sms"
+  ) {
+    return (
+      <LeadEditDialog
+        key={`${kind}-${leadId}`}
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        leadId={leadId}
+        leadName={leadName}
+        leadEmail={email}
+        leadPhone={phone}
+        initialSection={EDIT_DIALOG_SECTION[kind]}
+        onSuccess={onQuickActionSuccess}
+        presentation="drawer"
+      />
+    );
+  }
+
+  return null;
 }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/contacts/api";
 import { listCrmDeals, normalizeCrmDeals } from "@/lib/deals/api";
 import { listCrmEmails, listRelatedCrmEmails, tryCrmEmail } from "@/lib/emails/api";
+import { listEmails } from "@/lib/emails/store";
 import type { RelatedRecord } from "@/lib/emails/related-records";
 import { fetchLeadList } from "@/lib/leads/api";
 import {
@@ -40,6 +41,26 @@ export interface ComposeContextSnapshot {
   profile: ComposeContactProfile | null;
   related: RelatedRecord[];
   comms: RecentCommItem[];
+}
+
+export interface EmailTimelineEvent {
+  id: string;
+  emailId: string;
+  title: string;
+  detail: string;
+  timestamp: string;
+  href: string;
+}
+
+export interface ComposeCrmFacts {
+  contactName: string;
+  contactEmail: string;
+  tags: string[];
+  dealTitle?: string;
+  dealStage?: string;
+  documentsReceived: string[];
+  documentsOutstanding: string[];
+  lastActivity?: string;
 }
 
 function norm(value?: string) {
@@ -268,4 +289,83 @@ export async function loadComposeContext(
     related: [...relatedDeals, ...relatedLeads],
     comms: comms.slice(0, 8),
   };
+}
+
+function parseSortableDate(raw?: string) {
+  if (!raw?.trim()) return 0;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+  // en-AU style: 31/08/2026 08:16 AM
+  const match = raw.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(AM|PM))?/i,
+  );
+  if (!match) return 0;
+  const day = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const year = Number(match[3]);
+  let hour = Number(match[4] ?? 0);
+  const minute = Number(match[5] ?? 0);
+  const ap = (match[6] ?? "").toUpperCase();
+  if (ap === "PM" && hour < 12) hour += 12;
+  if (ap === "AM" && hour === 12) hour = 0;
+  return new Date(year, month, day, hour, minute).getTime();
+}
+
+/** Email-only timeline for the compose contact (newest first). */
+export function emailTimelineForPerson(
+  name?: string,
+  email?: string,
+): EmailTimelineEvent[] {
+  const n = name?.trim().toLowerCase() ?? "";
+  const e = email?.trim().toLowerCase() ?? "";
+  const events: EmailTimelineEvent[] = [];
+
+  for (const mail of listEmails()) {
+    if (mail.status === "Draft") continue;
+    const addresses = [mail.from, ...mail.to, ...(mail.cc ?? [])].map((a) =>
+      a.toLowerCase(),
+    );
+    const hit =
+      (e && addresses.some((addr) => addr === e)) ||
+      (n &&
+        (mail.relatedTo?.toLowerCase().includes(n) ||
+          mail.subject.toLowerCase().includes(n) ||
+          mail.from.toLowerCase().includes(n)));
+    if (!hit) continue;
+
+    if (mail.sentDate) {
+      events.push({
+        id: `${mail.id}-sent`,
+        emailId: mail.id,
+        title: mail.subject || "(no subject)",
+        detail: `Email ${mail.status === "Scheduled" ? "scheduled" : "sent"}`,
+        timestamp: mail.sentDate,
+        href: `/activities/emails/detail/${mail.id}`,
+      });
+    }
+    if (mail.openedDate) {
+      events.push({
+        id: `${mail.id}-opened`,
+        emailId: mail.id,
+        title: mail.subject || "(no subject)",
+        detail: "Email opened",
+        timestamp: mail.openedDate,
+        href: `/activities/emails/detail/${mail.id}`,
+      });
+    }
+    if (!mail.sentDate && !mail.openedDate) {
+      events.push({
+        id: `${mail.id}-status`,
+        emailId: mail.id,
+        title: mail.subject || "(no subject)",
+        detail: mail.status,
+        timestamp: "",
+        href: `/activities/emails/detail/${mail.id}`,
+      });
+    }
+  }
+
+  return events
+    .sort((a, b) => parseSortableDate(b.timestamp) - parseSortableDate(a.timestamp))
+    .slice(0, 12);
 }

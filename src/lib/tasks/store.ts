@@ -532,6 +532,7 @@ export function patchTask(
       | "notifyBy"
       | "attachments"
       | "attachmentsCount"
+      | "repeatRule"
     >
   >,
 ): Task | null {

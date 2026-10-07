@@ -41,7 +41,7 @@ const QUICK_ADD_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "New Contact", href: "/sales/contacts/create", icon: Users },
   { label: "New Deal", href: "/sales/deals/create", icon: Briefcase },
   { label: "New Task", href: "/activities/tasks/create", icon: ClipboardList },
-  { label: "New Appointment", href: "/activities/meetings/create", icon: Calendar },
+  { label: "New Meeting", href: "/activities/meetings/create", icon: Calendar },
   {
     label: "Document Request",
     href: "/documents/requests/create?layoutid=standard&redirect=false",

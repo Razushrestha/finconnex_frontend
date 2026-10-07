@@ -20,16 +20,12 @@ import { cn } from "@/lib/utils";
 import { menuEnter } from "@/lib/motion";
 import { logAuth } from "@/lib/rules";
 import { clearCrmTokens } from "@/lib/activity-timeline/auth";
-import { clearAllSignatureCreateDraftsForTenant } from "@/lib/documents/signature/create-draft-storage";
-import { listInboxConversations } from "@/lib/marketing/inbox/types";
+import { chatChannels } from "@/lib/chat/types";
+import { getCrmChatUnreadCount, tryCrmChat } from "@/lib/chat/api";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getModuleTitle } from "@/lib/module-title";
-import { useNavbarModuleLive } from "@/lib/layout/use-navbar-module-live";
 import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
-import { useCrmPayments } from "@/lib/finance/payments/use-crm-payments";
-import { useCrmDeals } from "@/lib/deals/use-crm-deals";
-import { useCrmCalls } from "@/lib/calls/use-crm-calls";
 import {
   isPlatformAdminRole,
   platformRoleLabel,
@@ -58,8 +54,16 @@ function userInitials(name: string) {
     .join("");
 }
 
-function countInboxUnread() {
-  return listInboxConversations().reduce((n, c) => n + (c.unreadCount ?? 0), 0);
+/** Unread messages across people (DMs) and groups — excludes archived. */
+function countDemoChatUnread() {
+  return chatChannels
+    .filter((channel) => !channel.archived)
+    .reduce((total, channel) => total + (channel.unread ?? 0), 0);
+}
+
+function formatUnreadBadge(count: number) {
+  if (count > 99) return "99+";
+  return String(count);
 }
 
 export function Navbar({
@@ -81,7 +85,7 @@ export function Navbar({
       ? workspaceRoleLabel(user.workspaceRole)
       : user.role;
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [inboxUnread, setInboxUnread] = useState(0);
+  const [messageUnread, setMessageUnread] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,6 +97,34 @@ export function Navbar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshUnread() {
+      const remote = await tryCrmChat(() => getCrmChatUnreadCount());
+      if (cancelled) return;
+      if (typeof remote === "number") {
+        setMessageUnread(Math.max(0, remote));
+        return;
+      }
+      setMessageUnread(countDemoChatUnread());
+    }
+
+    void refreshUnread();
+    const timer = window.setInterval(() => {
+      void refreshUnread();
+    }, 30_000);
+    const onFocus = () => {
+      void refreshUnread();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [pathname]);
 
   // ⌘K / Ctrl+K opens global search
   useEffect(() => {
@@ -112,7 +144,6 @@ export function Navbar({
       logAuth("logout", user?.name || user?.email || "user");
       await fetch("/api/auth/logout", { method: "POST" });
       clearCrmTokens();
-      clearAllSignatureCreateDraftsForTenant();
       window.location.assign("/login");
     } catch {
       setIsLoggingOut(false);
@@ -122,33 +153,9 @@ export function Navbar({
 
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
   const moduleTitle = getModuleTitle(pathname, searchParams.toString());
-  const isInbox = pathname.startsWith("/marketing/inbox");
+  const isTeamChat = pathname.startsWith("/activities/team-chat");
   const isCalendar = pathname.startsWith("/activities/calendar");
   const isWorkQueue = pathname.startsWith("/work-queue");
-  const paymentsCrm = useCrmPayments();
-  const dealsCrm = useCrmDeals();
-  const callsCrm = useCrmCalls();
-  const showFinanceDot = pathname.startsWith("/finance");
-  const showSalesDot = pathname.startsWith("/sales");
-  const showActivitiesDot = pathname.startsWith("/activities");
-  const showAnalyticsDot = pathname.startsWith("/analytics");
-  const paymentsLive = paymentsCrm.source === "api";
-  const salesLive = dealsCrm.source === "api";
-  const activitiesLive = callsCrm.source === "api";
-  const moduleCrm = useNavbarModuleLive(pathname);
-  const showModuleDot =
-    showFinanceDot ||
-    showSalesDot ||
-    showActivitiesDot ||
-    showAnalyticsDot ||
-    moduleCrm.show;
-  const moduleLive = showFinanceDot
-    ? paymentsLive
-    : showSalesDot || showAnalyticsDot
-      ? salesLive
-      : showActivitiesDot
-        ? activitiesLive
-        : moduleCrm.live;
 
   return (
     <header className="sticky top-0 z-30 flex w-full flex-col border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -163,18 +170,7 @@ export function Navbar({
       </button>
 
       <h1 className="min-w-0 truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-slate-100">
-        <span className="inline-flex items-center gap-2">
-          <span className="truncate">{moduleTitle}</span>
-          {showModuleDot ? (
-            <span
-              aria-label={moduleLive ? "CRM live" : "CRM offline"}
-              className={cn(
-                "inline-flex h-2.5 w-2.5 shrink-0 rounded-full",
-                moduleLive ? "bg-emerald-500" : "bg-rose-500",
-              )}
-            />
-          ) : null}
-        </span>
+        {moduleTitle}
       </h1>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
@@ -200,19 +196,21 @@ export function Navbar({
         <Link
           href="/activities/team-chat"
           aria-label={
-            inboxUnread > 0 ? `Messages, ${inboxUnread} unread` : "Messages"
+            messageUnread > 0
+              ? `Messages, ${messageUnread} unread`
+              : "Messages"
           }
           className={cn(
             "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:h-10 sm:w-10",
-            isInbox
+            isTeamChat
               ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
               : "text-muted-foreground hover:bg-muted",
           )}
         >
           <MessageSquare className="h-[18px] w-[18px]" />
-          {inboxUnread > 0 ? (
-            <span className="absolute top-2 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[9px] font-bold text-white">
-              {inboxUnread > 9 ? "9+" : inboxUnread}
+          {messageUnread > 0 ? (
+            <span className="absolute top-1 right-1 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-[#5A32A3] px-1 text-[9px] font-bold leading-none text-white tabular-nums shadow-sm ring-2 ring-background">
+              {formatUnreadBadge(messageUnread)}
             </span>
           ) : null}
         </Link>

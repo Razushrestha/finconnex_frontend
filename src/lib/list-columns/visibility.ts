@@ -1,5 +1,6 @@
 const STORE_PREFIX = "finconnex.list-col-hidden.v1:";
 const ORDER_PREFIX = "finconnex.list-col-order.v1:";
+const PIN_PREFIX = "finconnex.list-col-pinned.v1:";
 
 export function readHiddenColumnIds(storageKey: string): string[] {
   if (typeof window === "undefined") return [];
@@ -40,6 +41,28 @@ export function writeColumnOrder(storageKey: string, ids: string[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(ORDER_PREFIX + storageKey, JSON.stringify(ids));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function readPinnedColumnIds(storageKey: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PIN_PREFIX + storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string" && id.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function writePinnedColumnIds(storageKey: string, ids: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PIN_PREFIX + storageKey, JSON.stringify(ids));
   } catch {
     /* ignore quota / private mode */
   }

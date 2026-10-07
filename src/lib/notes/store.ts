@@ -62,6 +62,7 @@ export function createNote(input: {
   createdBy: string;
   isPrivate?: boolean;
   isPinned?: boolean;
+  attachments?: Note["attachments"];
 }): Note {
   const note: Note = {
     id: newRulesId("note"),
@@ -75,6 +76,7 @@ export function createNote(input: {
     isPrivate: input.isPrivate ?? false,
     isPinned: input.isPinned ?? false,
     createdAt: formatRulesAt(new Date()),
+    attachments: input.attachments?.length ? input.attachments : undefined,
   };
   saveNotes([note, ...listNotes()]);
   emitLeadActivityChange();
@@ -108,6 +110,7 @@ export function updateNote(
     body?: string;
     isPinned?: boolean;
     isPrivate?: boolean;
+    attachments?: Note["attachments"];
   },
 ): Note | null {
   const items = listNotes();
@@ -115,12 +118,19 @@ export function updateNote(
   if (index === -1) return null;
   const current = items[index];
   const actor = getRulesActor().name || current.createdBy;
+  const nextAttachments =
+    patch.attachments !== undefined
+      ? patch.attachments.length
+        ? patch.attachments
+        : undefined
+      : current.attachments;
   const next: Note = {
     ...current,
     title: patch.title !== undefined ? patch.title.trim() : current.title,
     body: patch.body !== undefined ? patch.body : current.body,
     isPinned: patch.isPinned !== undefined ? patch.isPinned : current.isPinned,
     isPrivate: patch.isPrivate !== undefined ? patch.isPrivate : current.isPrivate,
+    attachments: nextAttachments,
     updatedAt: formatRulesAt(new Date()),
     updatedBy: actor,
   };
@@ -130,12 +140,14 @@ export function updateNote(
       body: current.body,
       isPinned: String(current.isPinned),
       isPrivate: String(current.isPrivate),
+      attachments: JSON.stringify(current.attachments ?? []),
     },
     {
       title: next.title,
       body: next.body,
       isPinned: String(next.isPinned),
       isPrivate: String(next.isPrivate),
+      attachments: JSON.stringify(next.attachments ?? []),
     },
   );
   if (!changes.length) return current;

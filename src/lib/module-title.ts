@@ -15,7 +15,6 @@ const MODULE_TITLES: { href: string; label: string }[] = [
   { href: "/activities/emails", label: "Emails" },
   { href: "/activities/meetings", label: "Meetings" },
   { href: "/activities/notes", label: "Notes" },
-  { href: "/activities/attachments", label: "Attachments" },
   { href: "/activities/reminders", label: "Reminders" },
   { href: "/activities/team-chat", label: "Team Chat" },
   { href: "/activities/calendar", label: "Calendar" },

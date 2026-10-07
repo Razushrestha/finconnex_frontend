@@ -94,6 +94,7 @@ export function globalCalendarPath(suffix: CalendarSuffix = ""): string {
 function colorForType(type: CalendarItemType): string {
   if (type === "Task") return "bg-amber-500";
   if (type === "Meeting") return "bg-sky-500";
+  if (type === "Call") return "bg-emerald-500";
   if (type === "Reminder") return "bg-rose-500";
   return "bg-violet-500";
 }
@@ -101,13 +102,8 @@ function colorForType(type: CalendarItemType): string {
 function mapType(raw: string): CalendarItemType {
   const value = raw.trim().toLowerCase();
   if (value.includes("task")) return "Task";
-  if (
-    value.includes("meet") ||
-    value.includes("call") ||
-    value.includes("video")
-  ) {
-    return "Meeting";
-  }
+  if (value.includes("call") || value.includes("phone")) return "Call";
+  if (value.includes("meet") || value.includes("video")) return "Meeting";
   if (value.includes("remind") || value.includes("follow")) return "Reminder";
   return "Event";
 }

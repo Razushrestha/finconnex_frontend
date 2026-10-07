@@ -163,6 +163,8 @@ export function TaskSidebarParticipants({
   function addCollaborator(name: string) {
     const trimmed = name.trim();
     if (!trimmed || taken.has(trimmed.toLowerCase())) return;
+    const collaboratorCount = draft.filter((p) => p.role === "Collaborator").length;
+    if (collaboratorCount >= 3) return;
     const names = directoryNames(owners);
     const exists = names.some(
       (person) => person.toLowerCase() === trimmed.toLowerCase(),
@@ -183,6 +185,16 @@ export function TaskSidebarParticipants({
   }
 
   const rows = editing ? draft : people;
+  const collaboratorCount = rows.filter((p) => p.role === "Collaborator").length;
+  const canAddCollaborator = collaboratorCount < 3;
+  const addCollaboratorLabel =
+    collaboratorCount === 0
+      ? "Add 1st collaborator"
+      : collaboratorCount === 1
+        ? "Add 2nd collaborator"
+        : collaboratorCount === 2
+          ? "Add 3rd collaborator"
+          : "Collaborator limit reached";
 
   return (
     <section className="border-b border-slate-100 py-6">
@@ -190,9 +202,10 @@ export function TaskSidebarParticipants({
         <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Participants
         </h2>
-        {editing ? (
+        {editing && canAddCollaborator ? (
           <button
             type="button"
+            title={addCollaboratorLabel}
             onClick={() => {
               setSearchOpen((open) => !open);
               setQuery("");
@@ -201,7 +214,7 @@ export function TaskSidebarParticipants({
               "text-slate-400 hover:text-slate-700",
               searchOpen && "text-[var(--brand-primary)]",
             )}
-            aria-label="Add participant"
+            aria-label={addCollaboratorLabel}
             aria-expanded={searchOpen}
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -234,7 +247,7 @@ export function TaskSidebarParticipants({
           </div>
         ))}
 
-        {editing && searchOpen ? (
+        {editing && searchOpen && canAddCollaborator ? (
           <div ref={searchRef} className="relative">
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-xs font-bold text-[var(--brand-primary)]">

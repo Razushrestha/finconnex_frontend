@@ -12,6 +12,7 @@ import {
 } from "@/lib/activities/shared";
 import { liveRelatedRecords } from "@/lib/activities/related-records";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
+import { ContactNameCombobox } from "@/components/shared/ContactNameCombobox";
 import { ScheduleCallForm } from "@/components/activities/calls/ScheduleCallForm";
 import {
   assignedCallerIds,
@@ -26,6 +27,7 @@ interface CreateCallFormProps {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
     contact?: string;
+    startTime?: string;
   };
 }
 
@@ -40,15 +42,6 @@ interface FormState {
   subject: string;
   agenda: string;
   purpose: string;
-}
-
-function contactOptions(extraName?: string) {
-  return liveRelatedRecords(
-    "Contact",
-    extraName?.trim()
-      ? { kind: "Contact", name: extraName.trim() }
-      : undefined,
-  ).map((record) => ({ kind: "Contact" as const, name: record.name }));
 }
 
 const inputClass =
@@ -182,11 +175,12 @@ function LogCallForm({
               <label className={labelClass}>
                 Call To <span className="text-red-500">*</span>
               </label>
-              <RelatedRecordCombobox
+              <ContactNameCombobox
                 value={form.callFor}
                 onChange={(v) => update("callFor", v)}
-                options={contactOptions(form.callFor)}
-                placeholder="Select contact…"
+                placeholder="Add contact"
+                addLabel="Add contact"
+                error={Boolean(submitted && errors.callFor)}
               />
               {submitted && errors.callFor ? (
                 <p className="mt-1 text-xs text-red-500">{errors.callFor}</p>

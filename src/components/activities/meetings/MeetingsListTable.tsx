@@ -19,6 +19,13 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  recordSortValue,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 const STATUS_META: Record<MeetingStatus, { soft: string; text: string }> = {
   Scheduled: { soft: "bg-sky-100", text: "text-sky-800" },
@@ -60,17 +67,27 @@ export function MeetingsListTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const selectedIds = controlledSelectedIds ?? localSelectedIds;
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   function setSelectedIds(ids: string[]) {
     if (onSelectedIdsChange) onSelectedIdsChange(ids);
     else setLocalSelectedIds(ids);
   }
 
-  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  const sorted = useMemo(
+    () =>
+      sortRows(data, columnSort, (meeting, field) => {
+        if (field === "start") return meeting.startDateTime;
+        if (field === "end") return meeting.endDateTime;
+        return recordSortValue(meeting, field);
+      }),
+    [data, columnSort],
+  );
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginated = useMemo(
-    () => data.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [data, safePage],
+    () => sorted.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [sorted, safePage],
   );
 
   const isAllSelected =
@@ -159,25 +176,74 @@ export function MeetingsListTable({
                 />
               </th>
               <th data-col-id="title" className="px-4 py-2.5">
-                Title
+                <SortableColumnHeader
+                  label="Title"
+                  field="title"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="relatedTo" className="px-4 py-2.5">
-                Related To
+                <SortableColumnHeader
+                  label="Related To"
+                  field="relatedTo"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="type" className="px-4 py-2.5">
-                Type
+                <SortableColumnHeader
+                  label="Type"
+                  field="type"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="organizer" className="px-4 py-2.5">
-                Organizer
+                <SortableColumnHeader
+                  label="Organizer"
+                  field="organizer"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="start" className="px-4 py-2.5">
-                Start
+                <SortableColumnHeader
+                  label="Start"
+                  field="start"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="end" className="px-4 py-2.5">
-                End
+                <SortableColumnHeader
+                  label="End"
+                  field="end"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="status" className="px-4 py-2.5">
-                Status
+                <SortableColumnHeader
+                  label="Status"
+                  field="status"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
             </tr>
           </thead>

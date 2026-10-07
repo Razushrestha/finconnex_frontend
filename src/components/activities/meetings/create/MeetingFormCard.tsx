@@ -5,6 +5,7 @@ import { ChevronDown, Link2, MapPin, LocateFixed } from "lucide-react";
 import type { MeetingType } from "@/lib/meetings/types";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
+import { ContactNameCombobox } from "@/components/shared/ContactNameCombobox";
 import { TaskRepeatBlock } from "@/components/activities/tasks/ReminderSettingsCard";
 import {
   defaultReminderRepeatRule,
@@ -17,8 +18,7 @@ import {
   liveRelatedRecords,
   rankRelatedRecordsByContact,
 } from "@/lib/activities/related-records";
-import { type RelatedEntityKind, type RelatedTo } from "@/lib/activities/shared";
-import { QuickAddContactForm } from "@/components/shared/QuickAddContactForm";
+import { type RelatedEntityKind } from "@/lib/activities/shared";
 import {
   availableCustomLocationKinds,
   isOnlineLocationKind,
@@ -127,20 +127,10 @@ export function MeetingRelatedFields({
     relatedKind,
     extra,
   );
-  const { options: contactRemote, loading: contactsLoading } =
-    useCrmRelatedRecords("Contact");
-  const contactOptions = useMemo(() => {
-    const local = liveRelatedRecords("Contact");
-    const seen = new Set<string>();
-    const rows: RelatedTo[] = [];
-    for (const row of [...contactRemote, ...local]) {
-      const key = (row.id || row.name).trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      rows.push(row);
-    }
-    return rows;
-  }, [contactRemote, contactTick]);
+  const contactOptions = useMemo(
+    () => liveRelatedRecords("Contact"),
+    [contactTick],
+  );
   const relatedOptions = useMemo(
     () => rankRelatedRecordsByContact(relatedRemote, contactName),
     [relatedRemote, contactName],
@@ -152,30 +142,13 @@ export function MeetingRelatedFields({
         <label className={cn(labelClass, "mb-1.5 block")}>
           Contact Name <span className="text-red-500">*</span>
         </label>
-        {addingContact ? (
-          <QuickAddContactForm
-            initialQuery={addContactQuery}
-            onCancel={() => setAddingContact(false)}
-            onCreated={(contact) => {
-              onContactNameChange?.(contact.name);
-              setContactTick((n) => n + 1);
-              setAddingContact(false);
-            }}
-          />
-        ) : (
-          <RelatedRecordCombobox
-            value={contactName}
-            onChange={(name) => onContactNameChange?.(name)}
-            options={contactOptions}
-            loading={contactsLoading}
-            placeholder={contactsLoading ? "Loading contacts…" : "Search contact…"}
-            onAddNew={(query) => {
-              setAddContactQuery(query);
-              setAddingContact(true);
-            }}
-            addNewLabel="+ Add contact"
-          />
-        )}
+        <ContactNameCombobox
+          value={contactName}
+          onChange={(name) => onContactNameChange?.(name)}
+          placeholder="Add contact"
+          addLabel="Add contact"
+          error={Boolean(contactError)}
+        />
         {contactError ? (
           <p className="mt-1.5 text-[12px] font-medium text-rose-500">
             {contactError}
@@ -479,7 +452,7 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
               type="radio"
               checked={locationMode === "default"}
               onChange={() => onLocationModeChange("default")}
-              className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
+              className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
             />
             <span>
               Calendar default
@@ -494,7 +467,7 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
                 type="radio"
                 checked={locationMode === "custom"}
                 onChange={() => onLocationModeChange("custom")}
-                className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
+                className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
               />
               <span>
                 Custom

@@ -22,7 +22,7 @@ import {
 } from "@/lib/leads/smoke-polyfill";
 
 const now = new Date(2026, 6, 23, 12, 0, 0);
-const QUICK_ORDER = "call,sms,email,meeting,task,note,attachment";
+const QUICK_ORDER = "call,sms,email,meeting,task,note";
 const fail: (msg: string) => never = smokeFail;
 
 function checkVm(vm: LeadCardViewModel, label: string) {
@@ -57,8 +57,8 @@ function checkVm(vm: LeadCardViewModel, label: string) {
     }
   }
 
-  if (vm.quickActions.length !== 7) {
-    fail(`${label}: expected 7 quick actions, got ${vm.quickActions.length}`);
+  if (vm.quickActions.length !== 6) {
+    fail(`${label}: expected 6 quick actions, got ${vm.quickActions.length}`);
   }
   const order = vm.quickActions.map((a) => a.kind).join(",");
   if (order !== QUICK_ORDER) fail(`${label}: quick order ${order}`);
@@ -70,7 +70,7 @@ function checkVm(vm: LeadCardViewModel, label: string) {
     ) {
       fail(`${label}: ${a.kind} must never be green`);
     }
-    if (a.kind === "note" || a.kind === "attachment") {
+    if (a.kind === "note") {
       if (a.urgency !== "neutral" || a.badgeCount !== 0) {
         fail(`${label}: ${a.kind} must stay neutral`);
       }

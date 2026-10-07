@@ -3,7 +3,10 @@ import {
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmFetch } from "@/lib/crm/request";
-import type { ManageColumn } from "@/components/work-queue/ManageColumnsModal";
+import {
+  orderManageColumnsByPin,
+  type ManageColumn,
+} from "@/components/work-queue/ManageColumnsModal";
 import type { ListViewConfig } from "@/components/common/ListViewSettingsModal";
 
 export type CrmTableColumnPref = {
@@ -246,7 +249,7 @@ export function applyTablePreferenceToColumns(
       pinned: pinned.has(def.id) || def.pinned,
     });
   }
-  return merged;
+  return orderManageColumnsByPin(merged);
 }
 
 export function tablePreferenceFromListView(

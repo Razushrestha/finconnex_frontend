@@ -10,8 +10,6 @@ import {
   Mail,
   CalendarDays,
   CheckSquare,
-  StickyNote,
-  Paperclip,
   Send,
   FileText,
   Settings,
@@ -50,7 +48,6 @@ import { KANBAN_CARD } from "@/lib/layout";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { LEAD_SEND_ACTIONS, leadSendHref } from "@/lib/leads/convert-actions";
 import { useLeadCallFlow } from "@/components/sales/leads/LeadCallPicker";
-
 interface LeadCardProps {
   card: LeadCardData;
   status: LeadStatus;
@@ -79,18 +76,16 @@ const QUICK_ICONS = {
   email: Mail,
   meeting: CalendarDays,
   task: CheckSquare,
-  note: StickyNote,
-  attachment: Paperclip,
+  note: FileText,
 } as const;
 
-const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
+const QUICK_LABELS: Record<keyof typeof QUICK_ICONS, string> = {
   call: "Call",
   sms: "SMS",
   email: "Email",
   meeting: "Appointment",
   task: "Task",
   note: "Note",
-  attachment: "Attachment",
 };
 
 export function LeadCard({
@@ -182,15 +177,18 @@ export function LeadCard({
     : "";
 
   const quickActionItems: QuickActionItem<LeadCardQuickActionState["kind"]>[] =
-    vm.quickActions.map((action) => {
-      const label = QUICK_LABELS[action.kind];
+    vm.quickActions
+      .filter((action) => action.kind !== "attachment")
+      .map((action) => {
+      const kind = action.kind as keyof typeof QUICK_ICONS;
+      const label = QUICK_LABELS[kind];
       const stateHint = QUICK_STATE_WORDS[action.urgency];
       const countHint =
         action.badgeCount >= 2 ? `, ${action.badgeCount} pending` : "";
 
       return {
         kind: action.kind,
-        icon: QUICK_ICONS[action.kind],
+        icon: QUICK_ICONS[kind],
         label,
         // Keep urgency in accessible labels only — icons stay visually neutral.
         ariaLabel: `${label}: ${stateHint}${countHint}`,
@@ -245,10 +243,6 @@ export function LeadCard({
             >
               {vm.name}
             </h3>
-            <p className="truncate text-[11px] text-foreground/70">
-              <span className="sr-only">Pipeline stage: </span>
-              {vm.sla?.stage ?? card.pipelineStage ?? vm.status}
-            </p>
           </div>
           <div className="relative flex shrink-0 items-center gap-1.5">
             <input
@@ -329,14 +323,14 @@ export function LeadCard({
           </dl>
         )}
 
-        {vm.showOwnerAvatar && (
+        {vm.showOwnerAvatar ? (
           <div className="mb-1.5">
             <CardOwnerRow
               name={vm.owner.name}
               initials={vm.owner.initials}
             />
           </div>
-        )}
+        ) : null}
 
         {/* §5 Activity Summary — omit entirely when empty (§12) */}
         {summary.primary && summary.urgency && (

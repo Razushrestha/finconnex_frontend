@@ -27,7 +27,7 @@ import {
   FOLLOWERS_KEY,
   LeadFollowersField,
 } from "@/components/sales/leads/detail/LeadFollowersField";
-import { LeadContactPicker, type LinkedLeadContact } from "@/components/sales/leads/LeadContactPicker";
+import { LeadContactPicker, MAX_LEAD_CONTACTS, type LinkedLeadContact } from "@/components/sales/leads/LeadContactPicker";
 import { LEAD_FIELD_KEYS } from "@/lib/leads/detail-snapshot";
 import {
   isMortgagePipelineStage,
@@ -196,14 +196,15 @@ export function CreateLeadForm({
   }
 
   function applyContacts(next: LinkedLeadContact[]) {
+    const capped = next.slice(0, MAX_LEAD_CONTACTS);
     setForm((prev) => {
-      const autoName = firstNamesLeadTitle(next);
+      const autoName = firstNamesLeadTitle(capped);
       const previousAuto = firstNamesLeadTitle(prev.contacts);
       const shouldFillName =
         !prev.leadName.trim() || prev.leadName === previousAuto;
       return {
         ...prev,
-        contacts: next,
+        contacts: capped,
         leadName: shouldFillName ? autoName : prev.leadName,
       };
     });
@@ -559,7 +560,7 @@ export function CreateLeadForm({
         <div className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950">
           <RecordTagsRow
             tags={form.tags}
-            relatedTo={form.leadName || form.contacts[0]?.name}
+            relatedTo={form.leadName || form.contacts[0]?.name || ""}
             onChange={(tags) => update("tags", tags)}
           />
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Ban, Mail, MailOpen, Paperclip, RotateCcw, Send, Trash2 } from "lucide-react";
 import type { Message, MessageStatus, MessageType } from "@/lib/messages/types";
 import { cardSubject } from "@/lib/motion";
@@ -24,7 +24,13 @@ import {
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 import { onRulesChange } from "@/lib/rules";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
-import { notify } from "@/lib/notify/toast";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  recordSortValue,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 const statusStyles: Record<MessageStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -47,10 +53,31 @@ interface MessagesListTableProps {
 const actionBtn =
   "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 disabled:opacity-50";
 
+const MESSAGE_COLUMNS = [
+  { key: "type", label: "Type" },
+  { key: "subject", label: "Subject" },
+  { key: "body", label: "Body" },
+  { key: "from", label: "From" },
+  { key: "to", label: "To" },
+  { key: "relatedTo", label: "Related To" },
+  { key: "status", label: "Status" },
+  { key: "sent", label: "Sent" },
+] as const;
+
 export function MessagesListTable({ data }: MessagesListTableProps) {
   const [detail, setDetail] = useState<Message | null>(null);
   const [rows, setRows] = useState(() => data ?? listMessages());
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
+
+  const sortedRows = useMemo(
+    () =>
+      sortRows(rows, columnSort, (message, field) =>
+        field === "sent" ? message.sentDate : recordSortValue(message, field),
+      ),
+    [rows, columnSort],
+  );
 
   useEffect(() => {
     setRows(data ?? listMessages());
@@ -78,7 +105,8 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
   }, [detail?.id]);
 
   function flash(msg: string) {
-    notify(msg);
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2600);
   }
 
   async function runAction(
@@ -155,6 +183,11 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white">
+      {toast ? (
+        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      ) : null}
       <ResizableColumns
         storageKey="messages-list"
         className="min-h-0 flex-1 overflow-auto"
@@ -162,28 +195,26 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
         <table className="w-full min-w-[900px] border-separate border-spacing-0 text-[12px]">
           <thead className="sticky top-0 z-10 bg-white">
             <tr>
-              {[
-                "Type",
-                "Subject",
-                "Body",
-                "From",
-                "To",
-                "Related To",
-                "Status",
-                "Sent",
-              ].map((heading) => (
+              {MESSAGE_COLUMNS.map((col) => (
                 <th
-                  key={heading}
-                  data-col-id={heading}
+                  key={col.key}
+                  data-col-id={col.key}
                   className="border-b border-slate-200 bg-slate-50/90 px-3 py-2.5 text-left text-[11px] font-medium tracking-wide text-slate-400 uppercase"
                 >
-                  {heading}
+                  <SortableColumnHeader
+                    label={col.label}
+                    field={col.key}
+                    sort={columnSort}
+                    onSort={(field) =>
+                      setColumnSort((current) => toggleColumnSort(current, field))
+                    }
+                  />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((message) => (
+            {sortedRows.map((message) => (
               <tr
                 key={message.id}
                 data-focus-id={message.id}

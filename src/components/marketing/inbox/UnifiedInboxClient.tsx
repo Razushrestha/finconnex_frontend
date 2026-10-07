@@ -11,7 +11,6 @@ import {
   UserPlus,
   Archive,
   CheckCheck,
-  StickyNote,
   Link2,
   ChevronDown,
   Smile,
@@ -34,6 +33,7 @@ import {
   Clock,
   Check,
   Loader2,
+  StickyNote,
 } from "lucide-react";
 import {
   INBOX_AGENTS,

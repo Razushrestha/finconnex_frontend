@@ -15,6 +15,15 @@ export const NOTE_TYPES: NoteType[] = [
   "Other",
 ];
 
+export interface NoteAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  /** data URL or remote URL for preview/download */
+  url: string;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -29,6 +38,7 @@ export interface Note {
   createdAt: string;
   updatedAt?: string;
   updatedBy?: string;
+  attachments?: NoteAttachment[];
 }
 
 export interface NoteColumn {

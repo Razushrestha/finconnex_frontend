@@ -59,93 +59,82 @@ const FONT_FAMILIES = [
 ] as const;
 
 const FONT_STACKS: Record<(typeof FONT_FAMILIES)[number], string> = {
-  Aptos: 'Aptos, "Source Sans 3", sans-serif',
-  Arial: "Arial, Arimo, Helvetica, sans-serif",
-  Calibri: "Calibri, Carlito, sans-serif",
-  Cambria: "Cambria, Caladea, serif",
+  Aptos: 'Aptos, Inter, "Segoe UI", sans-serif',
+  Arial: "Arial, Helvetica, sans-serif",
+  Calibri: 'Calibri, "Source Sans 3", "Segoe UI", sans-serif',
+  Cambria: 'Cambria, "Libre Baskerville", Georgia, serif',
   "Comic Sans MS": '"Comic Sans MS", "Comic Neue", cursive',
-  Consolas: 'Consolas, "Roboto Mono", monospace',
-  "Courier New": '"Courier New", Cousine, Courier, monospace',
-  Garamond: 'Garamond, "EB Garamond", "Times New Roman", serif',
-  Georgia: "Georgia, Gelasio, serif",
-  Helvetica: "Helvetica, Arial, Inter, sans-serif",
-  Impact: "Impact, Anton, Haettenschweiler, sans-serif",
-  "Lucida Sans": '"Lucida Sans", "Lucida Sans Unicode", "Nunito Sans", sans-serif',
+  Consolas: 'Consolas, "Roboto Mono", "Courier New", monospace',
+  "Courier New": '"Courier New", Courier, monospace',
+  Garamond: 'Garamond, "EB Garamond", Georgia, serif',
+  Georgia: "Georgia, serif",
+  Helvetica: 'Helvetica, "Helvetica Neue", Arial, sans-serif',
+  Impact: "Impact, Haettenschweiler, sans-serif",
+  "Lucida Sans": '"Lucida Sans", "Lucida Grande", sans-serif',
   "Palatino Linotype": '"Palatino Linotype", Palatino, "Libre Baskerville", serif',
-  "Segoe UI": '"Segoe UI", Manrope, sans-serif',
-  Tahoma: 'Tahoma, "Nunito Sans", sans-serif',
-  "Times New Roman": '"Times New Roman", Times, Tinos, serif',
-  "Trebuchet MS": '"Trebuchet MS", "Fira Sans", sans-serif',
-  Verdana: "Verdana, Lexend, sans-serif",
+  "Segoe UI": '"Segoe UI", Inter, Tahoma, sans-serif',
+  Tahoma: "Tahoma, Geneva, sans-serif",
+  "Times New Roman": '"Times New Roman", Times, serif',
+  "Trebuchet MS": '"Trebuchet MS", Trebuchet, sans-serif',
+  Verdana: "Verdana, Geneva, sans-serif",
 };
 
 const EDITOR_FONT_STYLESHEET =
-  "https://fonts.googleapis.com/css2?family=Anton&family=Arimo:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Comic+Neue:ital,wght@0,400;0,700;1,400;1,700&family=Cousine:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Fira+Sans:ital,wght@0,400;0,600;1,400&family=Gelasio:ital,wght@0,400;0,700;1,400;1,700&family=Inter:ital,wght@0,400;0,600;1,400&family=Lexend:wght@400;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;600&family=Nunito+Sans:ital,wght@0,400;0,700;1,400&family=Roboto+Mono:ital,wght@0,400;0,500;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap";
+  "https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Roboto+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap";
 
 function ensureEditorFonts() {
   if (typeof document === "undefined") return;
-  if (!document.getElementById("finconnex-editor-fonts")) {
-    const link = document.createElement("link");
-    link.id = "finconnex-editor-fonts";
-    link.rel = "stylesheet";
-    link.href = EDITOR_FONT_STYLESHEET;
-    document.head.appendChild(link);
-  }
-  const css = [
-    ".fc-font-face{font-family:var(--fc-font)!important;}",
-    ".fc-rich-editor u{text-decoration-line:underline!important;text-decoration-style:solid!important;text-decoration-color:currentColor!important;text-underline-offset:2px!important;}",
-    ".fc-rich-editor b,.fc-rich-editor strong{font-weight:700!important;}",
-    ".fc-rich-editor i,.fc-rich-editor em{font-style:italic!important;}",
-    ".fc-rich-editor a[href]{color:#1155cc!important;text-decoration-line:underline!important;text-decoration-style:solid!important;text-decoration-color:#1155cc!important;text-underline-offset:2px!important;cursor:pointer;}",
-    ".fc-rich-editor ::spelling-error,.fc-rich-editor ::grammar-error{text-decoration:none!important;background:transparent!important;}",
-  ].join("");
-  let style = document.getElementById("finconnex-editor-font-faces");
-  if (!style) {
-    style = document.createElement("style");
-    style.id = "finconnex-editor-font-faces";
-    document.head.appendChild(style);
-  }
-  style.textContent = css;
+  if (document.getElementById("finconnex-editor-fonts")) return;
+  const link = document.createElement("link");
+  link.id = "finconnex-editor-fonts";
+  link.rel = "stylesheet";
+  link.href = EDITOR_FONT_STYLESHEET;
+  document.head.appendChild(link);
 }
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36] as const;
 
 const TEXT_COLORS = [
-  { label: "Automatic", value: "#0f172a" },
+  { label: "Red", value: "#DC2626" },
+  { label: "Orange", value: "#EA580C" },
+  { label: "Dark Yellow", value: "#CA8A04" },
+  { label: "Green", value: "#16A34A" },
+  { label: "Blue", value: "#2563EB" },
+  { label: "Teal", value: "#0D9488" },
+  { label: "Purple", value: "#7C3AED" },
+  { label: "Pink", value: "#DB2777" },
+  { label: "Cyan", value: "#0891B2" },
+  { label: "Indigo", value: "#4F46E5" },
+  { label: "Rose", value: "#E11D48" },
+  { label: "Lime", value: "#65A30D" },
+  { label: "Dark", value: "#1E293B" },
+  { label: "Light Gray", value: "#9CA3AF" },
+  { label: "Gray", value: "#6B7280" },
+  { label: "Dark Gray", value: "#374151" },
+  { label: "Charcoal", value: "#1F2937" },
   { label: "Black", value: "#000000" },
-  { label: "Dark gray", value: "#374151" },
-  { label: "Gray", value: "#64748b" },
-  { label: "Red", value: "#dc2626" },
-  { label: "Dark red", value: "#991b1b" },
-  { label: "Orange", value: "#ea580c" },
-  { label: "Gold", value: "#ca8a04" },
-  { label: "Yellow", value: "#eab308" },
-  { label: "Green", value: "#16a34a" },
-  { label: "Dark green", value: "#166534" },
-  { label: "Teal", value: "#0d9488" },
-  { label: "Blue", value: "#2563eb" },
-  { label: "Dark blue", value: "#1e3a8a" },
-  { label: "Purple", value: "#7c3aed" },
-  { label: "Brand", value: "#5A32A3" },
-  { label: "Pink", value: "#db2777" },
-  { label: "Brown", value: "#92400e" },
 ] as const;
 
+/** Docs-style highlight palette: vivid → pastel → none/grays */
 const HIGHLIGHT_COLORS = [
+  { label: "Cyan", value: "#22D3EE" },
+  { label: "Lime", value: "#A3E635" },
+  { label: "Yellow", value: "#FACC15" },
+  { label: "Orange", value: "#FB923C" },
+  { label: "Red", value: "#F87171" },
+  { label: "Magenta", value: "#E879F9" },
+  { label: "Light Cyan", value: "#A5F3FC" },
+  { label: "Light Green", value: "#BBF7D0" },
+  { label: "Light Yellow", value: "#FEF08A" },
+  { label: "Light Orange", value: "#FED7AA" },
+  { label: "Light Red", value: "#FECACA" },
+  { label: "Light Purple", value: "#E9D5FF" },
   { label: "None", value: "transparent" },
-  { label: "Yellow", value: "#fef08a" },
-  { label: "Gold", value: "#fde68a" },
-  { label: "Orange", value: "#fdba74" },
-  { label: "Green", value: "#bbf7d0" },
-  { label: "Lime", value: "#d9f99d" },
-  { label: "Teal", value: "#99f6e4" },
-  { label: "Blue", value: "#bfdbfe" },
-  { label: "Sky", value: "#bae6fd" },
-  { label: "Purple", value: "#ddd6fe" },
-  { label: "Lavender", value: "#F3ECFB" },
-  { label: "Pink", value: "#fbcfe8" },
-  { label: "Rose", value: "#fecdd3" },
-  { label: "Gray", value: "#e2e8f0" },
+  { label: "Light Gray", value: "#E5E7EB" },
+  { label: "Gray", value: "#9CA3AF" },
+  { label: "Dark Gray", value: "#6B7280" },
+  { label: "Charcoal", value: "#374151" },
+  { label: "Black", value: "#111827" },
 ] as const;
 
 const BULLET_STYLES = [
@@ -192,10 +181,14 @@ interface TaskDescriptionEditorProps {
   toolbarLeading?: React.ReactNode;
   toolbarAfterLink?: React.ReactNode;
   toolbarTrailing?: React.ReactNode;
+  /** Extra items rendered inside the compact ⋯ overflow menu. */
+  toolbarOverflow?: React.ReactNode;
   belowEditor?: React.ReactNode;
   className?: string;
   fillHeight?: boolean;
   variant?: "full" | "notes";
+  /** Keep primary formatting on the bar; tuck the rest into ⋯ */
+  compactToolbar?: boolean;
 }
 
 function preventFocusLoss(event: React.MouseEvent) {
@@ -219,79 +212,8 @@ function clearNestedFontFamily(root: ParentNode) {
 }
 
 function applyStylesToElement(el: HTMLElement, styles: Record<string, string>) {
-  const important = new Set([
-    "fontFamily",
-    "fontWeight",
-    "fontStyle",
-    "fontSize",
-    "textDecorationLine",
-  ]);
   Object.entries(styles).forEach(([key, value]) => {
-    el.style.setProperty(camelToKebab(key), value, important.has(key) ? "important" : "");
-  });
-}
-
-function paintUnderlineElement(el: HTMLElement) {
-  el.style.setProperty("text-decoration-line", "underline", "important");
-  el.style.setProperty("text-decoration-style", "solid", "important");
-  el.style.setProperty("text-decoration-color", "currentColor", "important");
-  el.style.setProperty("text-underline-offset", "2px", "important");
-}
-
-function textNodesTouching(editor: HTMLElement, range: Range) {
-  const nodes: Text[] = [];
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-  let node = walker.nextNode();
-  while (node) {
-    const text = node as Text;
-    if (text.data.replace(/\u200b/g, "")) {
-      try {
-        if (range.intersectsNode(text)) nodes.push(text);
-      } catch {
-        // Ignore a range the browser has already discarded.
-      }
-    }
-    node = walker.nextNode();
-  }
-  return nodes;
-}
-
-function selectionHasMark(
-  editor: HTMLElement,
-  range: Range | null,
-  mark: "bold" | "italic",
-) {
-  if (!range || range.collapsed) return false;
-  const texts = textNodesTouching(editor, range);
-  const elements = texts.length
-    ? texts.map((text) => text.parentElement).filter((el): el is HTMLElement => Boolean(el))
-    : [range.startContainer instanceof HTMLElement ? range.startContainer : range.startContainer.parentElement].filter(
-        (el): el is HTMLElement => Boolean(el),
-      );
-  if (!elements.length) return false;
-  return elements.every((el) => {
-    const computed = window.getComputedStyle(el);
-    if (mark === "bold") {
-      const weight = Number.parseInt(computed.fontWeight, 10);
-      return computed.fontWeight === "bold" || weight >= 600;
-    }
-    return computed.fontStyle === "italic" || computed.fontStyle === "oblique";
-  });
-}
-
-function unwrapUnderlineSelection(editor: HTMLElement) {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const range = selection.getRangeAt(0);
-  const hosts = textNodesTouching(editor, range)
-    .map((text) => text.parentElement?.closest("u"))
-    .filter((node): node is HTMLElement => Boolean(node && editor.contains(node)));
-  const unique = [...new Set(hosts)];
-  unique.forEach((u) => {
-    const parent = u.parentNode;
-    if (!parent) return;
-    while (u.firstChild) parent.insertBefore(u.firstChild, u);
-    parent.removeChild(u);
+    el.style.setProperty(camelToKebab(key), value);
   });
 }
 
@@ -391,13 +313,6 @@ function insertTypingSpan(range: Range, styles: Record<string, string>) {
   return { span, caret };
 }
 
-function elementHasUnderline(element: HTMLElement) {
-  if (element.closest("u")) return true;
-  if (element.closest("a")) return false;
-  const line = window.getComputedStyle(element).textDecorationLine || "";
-  return line.split(/\s+/).includes("underline");
-}
-
 function elementAtCaret(selection: Selection | null) {
   const node = selection?.anchorNode;
   if (!node) return null;
@@ -406,54 +321,26 @@ function elementAtCaret(selection: Selection | null) {
     : node.parentElement;
 }
 
-function stackTokens(stack: string) {
-  const generics = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"]);
-  return stack
-    .split(",")
-    .map((part) => part.replace(/['"]/g, "").trim().toLowerCase())
-    .filter((part) => part && !generics.has(part));
-}
-
-function fontNameFromStack(stack: string) {
-  const tokens = stackTokens(stack);
-  if (!tokens.length) return null;
-  return (
-    FONT_FAMILIES.find((item) => item.toLowerCase() === tokens[0]) ??
-    FONT_FAMILIES.find((item) => {
-      const own = stackTokens(FONT_STACKS[item]);
-      return own[0] === tokens[0] || own.includes(tokens[0]);
-    }) ??
-    null
-  );
-}
-
 function computedFontName(element: HTMLElement) {
-  let el: HTMLElement | null = element;
-  while (el) {
-    if (el.style.fontFamily) {
-      const named = fontNameFromStack(el.style.fontFamily);
-      if (named) return named;
-    }
-    el = el.parentElement;
-  }
-  const family = window
-    .getComputedStyle(element)
-    .fontFamily.replace(/['"]/g, "")
-    .split(",")[0]
-    ?.trim();
+  const family = window.getComputedStyle(element).fontFamily.replace(/['"]/g, "").split(",")[0]?.trim();
   if (!family) return null;
-  return fontNameFromStack(family);
+  const resolved = family.toLowerCase();
+  const generics = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"]);
+  return (
+    FONT_FAMILIES.find((item) => {
+      if (item.toLowerCase() === resolved) return true;
+      const tokens = FONT_STACKS[item]
+        .split(",")
+        .map((part) => part.replace(/['"]/g, "").trim().toLowerCase())
+        .filter((part) => part && !generics.has(part));
+      return tokens.includes(resolved);
+    }) ?? null
+  );
 }
 
 function caretHasStyles(
   selection: Selection | null,
-  styles: {
-    family?: string | null;
-    size?: number | null;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-  },
+  styles: { family?: string | null; size?: number | null },
 ) {
   const element = elementAtCaret(selection);
   if (!element) return false;
@@ -466,26 +353,7 @@ function caretHasStyles(
     const size = Number.parseInt(computed.fontSize, 10);
     if (Number.isNaN(size) || Math.abs(size - styles.size) > 1) return false;
   }
-  if (typeof styles.bold === "boolean") {
-    const weight = Number.parseInt(computed.fontWeight, 10);
-    const isBold = computed.fontWeight === "bold" || weight >= 600;
-    if (isBold !== styles.bold) return false;
-  }
-  if (typeof styles.italic === "boolean") {
-    if ((computed.fontStyle === "italic") !== styles.italic) return false;
-  }
-  if (typeof styles.underline === "boolean") {
-    if (elementHasUnderline(element) !== styles.underline) return false;
-  }
   return true;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function applyInlineStyleToSelection(
@@ -524,7 +392,7 @@ function applyInlineStyleToSelection(
     }
     spanParents.forEach((el) => {
       clearNestedFontFamily(el);
-      el.style.setProperty("font-family", styles.fontFamily, "important");
+      el.style.fontFamily = styles.fontFamily;
     });
   }
   try {
@@ -552,100 +420,19 @@ function restoreEditorSelection(savedRangeRef: React.MutableRefObject<Range | nu
   const selection = window.getSelection();
   const saved = savedRangeRef.current;
   if (!selection || !saved) return false;
-  try {
-    selection.removeAllRanges();
-    selection.addRange(saved);
-    return true;
-  } catch {
-    savedRangeRef.current = null;
-    return false;
-  }
-}
-
-function textPointOffset(root: HTMLElement, container: Node, offset: number) {
-  const range = document.createRange();
-  range.setStart(root, 0);
-  try {
-    range.setEnd(container, offset);
-  } catch {
-    return root.textContent?.length ?? 0;
-  }
-  return range.toString().length;
-}
-
-function bookmarkEditorSelection(editor: HTMLElement) {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
-  if (!editor.contains(range.commonAncestorContainer)) return null;
-  const start = textPointOffset(editor, range.startContainer, range.startOffset);
-  const end = textPointOffset(editor, range.endContainer, range.endOffset);
-  return { start: Math.min(start, end), end: Math.max(start, end) };
-}
-
-function selectTextBookmark(
-  editor: HTMLElement,
-  mark: { start: number; end: number },
-) {
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-  let index = 0;
-  let startNode: Text | null = null;
-  let startOffset = 0;
-  let endNode: Text | null = null;
-  let endOffset = 0;
-  let lastNode: Text | null = null;
-  let node = walker.nextNode();
-  while (node) {
-    const text = node as Text;
-    lastNode = text;
-    const next = index + text.length;
-    if (!startNode && mark.start <= next) {
-      startNode = text;
-      startOffset = Math.min(text.length, mark.start - index);
-    }
-    if (startNode && mark.end <= next) {
-      endNode = text;
-      endOffset = Math.min(text.length, mark.end - index);
-      break;
-    }
-    index = next;
-    node = walker.nextNode();
-  }
-  const range = document.createRange();
-  if (!startNode) {
-    if (lastNode) {
-      range.setStart(lastNode, lastNode.length);
-      range.collapse(true);
-    } else {
-      range.selectNodeContents(editor);
-      range.collapse(false);
-    }
-  } else if (!endNode) {
-    range.setStart(startNode, startOffset);
-    range.collapse(true);
-  } else {
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset);
-  }
-  const selection = window.getSelection();
-  if (!selection) return null;
   selection.removeAllRanges();
-  selection.addRange(range);
-  return range;
+  selection.addRange(saved);
+  return true;
 }
 
-function focusEditorSelection(
-  editor: HTMLElement,
+/** Prefer live selection if still in the editor; otherwise restore the last saved range. */
+function ensureEditorSelection(
+  editor: HTMLDivElement | null,
   savedRangeRef: React.MutableRefObject<Range | null>,
 ) {
-  editor.focus();
-  const selection = window.getSelection();
-  if (selection && selection.rangeCount > 0) {
-    const live = selection.getRangeAt(0);
-    if (editor.contains(live.commonAncestorContainer)) return selection;
-  }
+  cacheEditorSelection(editor, savedRangeRef);
+  editor?.focus();
   restoreEditorSelection(savedRangeRef);
-  return window.getSelection();
 }
 
 function normalizeHtml(html: string) {
@@ -807,6 +594,7 @@ function FloatingMenu({
   return createPortal(
     <div
       ref={menuRef}
+      data-editor-floating-menu=""
       style={{
         position: "fixed",
         top: position.top,
@@ -849,8 +637,8 @@ function ColorDropdown({
   const swatchColor =
     currentColor === "transparent"
       ? variant === "highlight"
-        ? "#fef08a"
-        : "#0f172a"
+        ? "#FEF08A"
+        : "#1E293B"
       : currentColor;
 
   useEffect(() => {
@@ -877,59 +665,83 @@ function ColorDropdown({
           setOpen((current) => !current);
         }}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-md border bg-white px-2 text-slate-700 transition-colors hover:bg-slate-50",
+          "inline-flex h-7 items-center gap-0.5 rounded-md border bg-white px-1.5 text-slate-700 transition-colors hover:bg-slate-50",
           open ? "border-violet-300 bg-violet-50" : "border-slate-200",
         )}
       >
         {variant === "font" ? (
-          <span className="flex flex-col items-center justify-center px-0.5 leading-none">
-            <span className="text-[13px] font-bold" style={{ color: swatchColor }}>
-              A
+          <span className="inline-flex items-center gap-1 px-0.5">
+            <span className="flex flex-col items-center justify-center leading-none">
+              <span
+                className="text-[11px] font-bold"
+                style={{ color: swatchColor }}
+              >
+                A
+              </span>
+              <span
+                className="mt-px h-[2px] w-3 rounded-full"
+                style={{ backgroundColor: swatchColor }}
+              />
             </span>
-            <span
-              className="mt-0.5 h-[3px] w-4 rounded-full"
-              style={{ backgroundColor: swatchColor }}
-            />
+            <span className="h-3.5 w-px shrink-0 bg-slate-300" aria-hidden />
           </span>
         ) : (
-          <span className="flex flex-col items-center justify-center px-0.5 leading-none">
-            <Highlighter className="h-4 w-4 text-amber-500" strokeWidth={2.25} />
-            <span
-              className="mt-0.5 h-[3px] w-4 rounded-full"
-              style={{ backgroundColor: swatchColor }}
-            />
+          <span className="inline-flex items-center gap-1 px-0.5">
+            <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
+              <Highlighter
+                className="relative z-10 h-3.5 w-3.5 text-slate-800"
+                strokeWidth={2.4}
+              />
+              <span
+                aria-hidden
+                className="absolute bottom-0 left-[1px] right-0 h-[4px] rounded-[1px]"
+                style={{ backgroundColor: swatchColor }}
+              />
+            </span>
+            <span className="h-3.5 w-px shrink-0 bg-slate-300" aria-hidden />
           </span>
         )}
-        <ChevronDown className="h-3 w-3 text-slate-400" />
+        <ChevronDown className="h-2.5 w-2.5 text-slate-500" />
       </button>
 
-      <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={196}>
-        <div className="grid grid-cols-6 gap-1 px-2 py-2">
-          {options.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              title={option.label}
-              onMouseDown={preventFocusLoss}
-              onClick={() => {
-                onPick(option.value);
-                setOpen(false);
-              }}
-              className={cn(
-                "h-6 w-6 rounded-sm border border-slate-200 hover:scale-110",
-                option.value === currentColor && "ring-2 ring-[var(--brand-primary)] ring-offset-1",
-                option.value === "transparent" &&
-                  "bg-[linear-gradient(135deg,#fff_46%,#ef4444_46%,#ef4444_54%,#fff_54%)]",
-              )}
-              style={{
-                backgroundColor:
-                  option.value === "transparent" ? undefined : option.value,
-              }}
-            />
-          ))}
+      <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={168}>
+        <div className="grid grid-cols-6 gap-1.5 px-2 pt-2 pb-1.5">
+          {options.map((option) => {
+            const isNone = option.value === "transparent";
+            const selected = option.value === currentColor;
+            return (
+              <button
+                key={option.label}
+                type="button"
+                title={option.label}
+                onMouseDown={preventFocusLoss}
+                onClick={() => {
+                  onPick(option.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "relative h-5 w-5 rounded-full transition-transform hover:scale-110",
+                  !isNone && "ring-1 ring-black/10",
+                  selected && "ring-2 ring-slate-700 ring-offset-1",
+                )}
+                style={{
+                  backgroundColor: isNone ? "#ffffff" : option.value,
+                }}
+              >
+                {isNone ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 rounded-full border border-slate-300"
+                  >
+                    <span className="absolute top-1/2 left-1/2 h-px w-[120%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-slate-400" />
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
-        <label className="mx-2 mb-2 flex h-7 cursor-pointer items-center justify-center rounded-md bg-slate-100 text-[10px] font-semibold text-slate-600 hover:bg-slate-200">
-          More colours
+        <label className="mx-2 mb-2 flex h-6 cursor-pointer items-center justify-center rounded-md bg-slate-100 text-[10px] font-medium text-slate-600 hover:bg-slate-200">
+          More Colours
           <input
             type="color"
             className="sr-only"
@@ -960,10 +772,6 @@ function FontFamilyDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    ensureEditorFonts();
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
     function handleClick(event: MouseEvent) {
       const target = event.target as Node;
@@ -987,14 +795,12 @@ function FontFamilyDropdown({
           setOpen((current) => !current);
         }}
         className={cn(
-          "inline-flex h-8 min-w-[108px] max-w-[148px] items-center justify-between gap-1.5 rounded-md border bg-white px-2.5 text-[15px] text-slate-800 transition-colors hover:bg-slate-50",
+          "inline-flex h-8 min-w-[108px] max-w-[140px] items-center justify-between gap-1.5 rounded-md border bg-white px-2.5 text-[12px] text-slate-700 transition-colors hover:bg-slate-50",
           open ? "border-violet-300 bg-violet-50" : "border-slate-200",
         )}
         style={{ fontFamily: cssFontFamily(value) }}
       >
-        <span className="truncate" style={{ fontFamily: cssFontFamily(value) }}>
-          {value}
-        </span>
+        <span className="truncate">{value}</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </button>
       <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={200} maxHeight={280}>
@@ -1008,12 +814,12 @@ function FontFamilyDropdown({
               setOpen(false);
             }}
             className={cn(
-              "flex w-full items-center px-3 py-1.5 text-left text-[18px] leading-7 text-slate-800 hover:bg-slate-50",
-              family === value && "bg-violet-50 text-violet-700",
+              "flex w-full items-center px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50",
+              family === value && "bg-violet-50 font-medium text-violet-700",
             )}
             style={{ fontFamily: cssFontFamily(family) }}
           >
-            <span style={{ fontFamily: cssFontFamily(family) }}>{family}</span>
+            {family}
           </button>
         ))}
       </FloatingMenu>
@@ -1324,9 +1130,11 @@ const EMOJI_SET = [
 function TableInsertButton({
   onBeforeOpen,
   onInsertTable,
+  inline = false,
 }: {
   onBeforeOpen: () => void;
   onInsertTable: (rows: number, cols: number) => void;
+  inline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hoverCell, setHoverCell] = useState({ rows: 1, cols: 1 });
@@ -1335,7 +1143,7 @@ function TableInsertButton({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     function handleClick(event: MouseEvent) {
       const target = event.target as Node;
       if (rootRef.current?.contains(target)) return;
@@ -1344,10 +1152,48 @@ function TableInsertButton({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, inline]);
+
+  const grid = (
+    <div className={cn(inline ? "mt-1.5 rounded-md border border-slate-200 bg-white p-2" : "px-2 py-1.5")}>
+      <p className="mb-1.5 text-[12px] font-semibold text-slate-700">Insert table</p>
+      <div
+        className="grid gap-[3px]"
+        style={{ gridTemplateColumns: `repeat(${TABLE_GRID}, 14px)` }}
+      >
+        {Array.from({ length: TABLE_GRID * TABLE_GRID }, (_, index) => {
+          const col = (index % TABLE_GRID) + 1;
+          const row = Math.floor(index / TABLE_GRID) + 1;
+          const active = row <= hoverCell.rows && col <= hoverCell.cols;
+          return (
+            <button
+              key={index}
+              type="button"
+              onMouseDown={preventFocusLoss}
+              onMouseEnter={() => setHoverCell({ rows: row, cols: col })}
+              onClick={() => {
+                onBeforeOpen();
+                onInsertTable(row, col);
+                setOpen(false);
+              }}
+              className={cn(
+                "h-[14px] w-[14px] rounded-[2px] border",
+                active
+                  ? "border-[#5A32A3] bg-[#F3ECFB]"
+                  : "border-slate-300 bg-white",
+              )}
+            />
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-center text-[11px] text-slate-500">
+        {hoverCell.rows} × {hoverCell.cols} table
+      </p>
+    </div>
+  );
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={cn("relative", inline && "w-full")}>
       <button
         ref={buttonRef}
         type="button"
@@ -1359,67 +1205,43 @@ function TableInsertButton({
           setHoverCell({ rows: 1, cols: 1 });
         }}
         className={cn(
-          "inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 transition-colors hover:border-slate-200 hover:bg-white",
+          "inline-flex h-8 items-center justify-center rounded-md border text-slate-600 transition-colors hover:border-slate-200 hover:bg-white",
+          inline ? "w-auto gap-1.5 px-2 text-[12px] font-medium" : "w-8",
           open ? "border-violet-300 bg-violet-50 text-violet-700" : "border-transparent",
         )}
       >
         <Table className="h-4 w-4" />
+        {inline ? <span>Table</span> : null}
       </button>
-      <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={168}>
-        <div className="px-2 py-1.5">
-          <p className="mb-1.5 text-[12px] font-semibold text-slate-700">Insert table</p>
-          <div
-            className="grid gap-[3px]"
-            style={{ gridTemplateColumns: `repeat(${TABLE_GRID}, 14px)` }}
-          >
-            {Array.from({ length: TABLE_GRID * TABLE_GRID }, (_, index) => {
-              const col = (index % TABLE_GRID) + 1;
-              const row = Math.floor(index / TABLE_GRID) + 1;
-              const active = row <= hoverCell.rows && col <= hoverCell.cols;
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onMouseDown={preventFocusLoss}
-                  onMouseEnter={() => setHoverCell({ rows: row, cols: col })}
-                  onClick={() => {
-                    onInsertTable(row, col);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "h-[14px] w-[14px] rounded-[2px] border",
-                    active
-                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]"
-                      : "border-slate-300 bg-white",
-                  )}
-                />
-              );
-            })}
-          </div>
-          <p className="mt-1.5 text-center text-[11px] text-slate-500">
-            {hoverCell.rows} × {hoverCell.cols} table
-          </p>
-        </div>
-      </FloatingMenu>
+      {inline ? (open ? grid : null) : (
+        <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={168}>
+          {grid}
+        </FloatingMenu>
+      )}
     </div>
   );
 }
 
 function MoreInsertMenu({
   onBeforeOpen,
+  onInsertLink,
+  onInsertTable,
   onInsertImage,
   onInsertEmoji,
   onInsertHr,
   onInsertQuote,
 }: {
   onBeforeOpen: () => void;
+  onInsertLink: () => void;
+  onInsertTable: (rows: number, cols: number) => void;
   onInsertImage: (file: File) => void;
   onInsertEmoji: (emoji: string) => void;
   onInsertHr: () => void;
   onInsertQuote: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [panel, setPanel] = useState<null | "emoji">(null);
+  const [panel, setPanel] = useState<null | "table" | "emoji">(null);
+  const [hoverCell, setHoverCell] = useState({ rows: 1, cols: 1 });
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1484,6 +1306,19 @@ function MoreInsertMenu({
           <div className="grid grid-cols-3 gap-0.5 p-1.5">
             <button
               type="button"
+              title="Insert link"
+              onMouseDown={preventFocusLoss}
+              onMouseEnter={() => setPanel(null)}
+              onClick={() => {
+                onInsertLink();
+                closeAll();
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+            >
+              <Link2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               title="Insert image"
               onMouseDown={preventFocusLoss}
               onMouseEnter={() => setPanel(null)}
@@ -1531,7 +1366,65 @@ function MoreInsertMenu({
             >
               <Quote className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              title="Add a table"
+              onMouseDown={preventFocusLoss}
+              onMouseEnter={() => {
+                setPanel("table");
+                setHoverCell({ rows: 1, cols: 1 });
+              }}
+              onClick={() => {
+                setPanel("table");
+                setHoverCell({ rows: 1, cols: 1 });
+              }}
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100",
+                panel === "table" && "bg-slate-100",
+              )}
+            >
+              <Table className="h-4 w-4" />
+            </button>
           </div>
+          {panel === "table" ? (
+            <div
+              className="border-l border-slate-100 p-2"
+              onMouseEnter={() => setPanel("table")}
+            >
+              <p className="mb-1.5 text-[12px] font-semibold text-slate-700">Insert Table</p>
+              <div
+                className="grid gap-[3px]"
+                style={{ gridTemplateColumns: `repeat(${TABLE_GRID}, 14px)` }}
+              >
+                {Array.from({ length: TABLE_GRID * TABLE_GRID }, (_, index) => {
+                  const col = (index % TABLE_GRID) + 1;
+                  const row = Math.floor(index / TABLE_GRID) + 1;
+                  const active = row <= hoverCell.rows && col <= hoverCell.cols;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onMouseDown={preventFocusLoss}
+                      onMouseEnter={() => setHoverCell({ rows: row, cols: col })}
+                      onClick={() => {
+                        onInsertTable(row, col);
+                        closeAll();
+                      }}
+                      className={cn(
+                        "h-[14px] w-[14px] rounded-[2px] border",
+                        active
+                          ? "border-[#5A32A3] bg-[#F3ECFB]"
+                          : "border-slate-300 bg-white",
+                      )}
+                    />
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-center text-[11px] text-slate-500">
+                {hoverCell.rows} × {hoverCell.cols} table
+              </p>
+            </div>
+          ) : null}
           {panel === "emoji" ? (
             <div className="grid w-[184px] grid-cols-8 gap-0.5 border-l border-slate-100 p-1.5">
               {EMOJI_SET.map((emoji) => (
@@ -1556,6 +1449,91 @@ function MoreInsertMenu({
   );
 }
 
+function CompactToolbarMore({
+  onBeforeOpen,
+  children,
+}: {
+  onBeforeOpen?: () => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      // Nested portaled menus (list styles, etc.)
+      if (target.closest("[data-editor-floating-menu]")) return;
+      setOpen(false);
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        title="More tools"
+        aria-label="More tools"
+        aria-expanded={open}
+        onMouseDown={preventFocusLoss}
+        onClick={() => {
+          onBeforeOpen?.();
+          setOpen((current) => !current);
+        }}
+        className={cn(
+          "inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 transition-colors hover:border-slate-200 hover:bg-white",
+          open ? "border-violet-300 bg-violet-50 text-violet-700" : "border-transparent",
+        )}
+      >
+        <Ellipsis className="h-4 w-4" />
+      </button>
+      <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={260} alignEnd>
+        <div
+          className="flex max-h-[min(420px,70vh)] flex-col gap-0.5 overflow-y-auto p-1.5"
+          onMouseDown={preventFocusLoss}
+        >
+          {children}
+        </div>
+      </FloatingMenu>
+    </div>
+  );
+}
+
+function CompactMoreRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-slate-50">
+      <span className="w-[88px] shrink-0 text-[11px] font-medium text-slate-500">
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function TaskDescriptionEditor({
   value,
   onChange,
@@ -1565,32 +1543,22 @@ export function TaskDescriptionEditor({
   toolbarLeading,
   toolbarAfterLink,
   toolbarTrailing,
+  toolbarOverflow,
   belowEditor,
   className,
   fillHeight,
   variant = "full",
+  compactToolbar = false,
 }: TaskDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
   const savedRangeRef = useRef<Range | null>(null);
-  const linkBookmarkRef = useRef<{ start: number; end: number } | null>(null);
-  const restoringSelectionRef = useRef(false);
-  const pendingFormatRef = useRef({
-    family: "Aptos",
-    size: 12,
-    bold: false,
-    italic: false,
-    underline: false,
-  });
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [linkLabel, setLinkLabel] = useState("");
-  const [linkError, setLinkError] = useState("");
+  const pendingFormatRef = useRef({ family: "Aptos", size: 12 });
   const lockToolbarFontRef = useRef(false);
   const [fontFamily, setFontFamily] = useState<string>("Aptos");
   const [fontSize, setFontSize] = useState<number>(12);
-  const [textColor, setTextColor] = useState<string>("#0f172a");
-  const [highlightColor, setHighlightColor] = useState<string>("#fef08a");
+  const [textColor, setTextColor] = useState<string>("#1E293B");
+  const [highlightColor, setHighlightColor] = useState<string>("#FEF08A");
   const [showMarks, setShowMarks] = useState(false);
   const [textAlign, setTextAlign] = useState<"left" | "center" | "right" | "justify">("left");
   const [activeFormats, setActiveFormats] = useState({
@@ -1630,8 +1598,7 @@ export function TaskDescriptionEditor({
   const runCommand = useCallback(
     (command: string, commandValue?: string) => {
       const editor = editorRef.current;
-      editor?.focus();
-      restoreEditorSelection(savedRangeRef);
+      ensureEditorSelection(editor, savedRangeRef);
       document.execCommand(command, false, commandValue);
       syncContent();
     },
@@ -1641,8 +1608,7 @@ export function TaskDescriptionEditor({
   function applyListStyle(styleId: ListStyleId) {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.focus();
-    restoreEditorSelection(savedRangeRef);
+    ensureEditorSelection(editor, savedRangeRef);
 
     const ordered = isOrderedListStyle(styleId);
     const selection = window.getSelection();
@@ -1782,19 +1748,6 @@ export function TaskDescriptionEditor({
         setFontFamily(match);
         pendingFormatRef.current.family = match;
       }
-      const weight = Number.parseInt(computed.fontWeight, 10);
-      const isBold = computed.fontWeight === "bold" || weight >= 600;
-      const isItalic = computed.fontStyle === "italic" || computed.fontStyle === "oblique";
-      const isUnderline = elementHasUnderline(element);
-      pendingFormatRef.current.bold = isBold;
-      pendingFormatRef.current.italic = isItalic;
-      pendingFormatRef.current.underline = isUnderline;
-      setActiveFormats((current) => ({
-        ...current,
-        bold: isBold,
-        italic: isItalic,
-        underline: isUnderline,
-      }));
       if (!Number.isNaN(size)) {
         const nearest = FONT_SIZES.reduce((prev, curr) =>
           Math.abs(curr - size) < Math.abs(prev - size) ? curr : prev,
@@ -1825,24 +1778,16 @@ export function TaskDescriptionEditor({
     if (!editor.style.fontSize) {
       editor.style.fontSize = "12px";
     }
-    editor.spellcheck = false;
-    editor.setAttribute("spellcheck", "false");
-    editor.setAttribute("autocorrect", "off");
-    editor.setAttribute("autocapitalize", "off");
-    editor.setAttribute("data-gramm", "false");
-    editor.setAttribute("data-gramm_editor", "false");
-    editor.setAttribute("data-enable-grammarly", "false");
   }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
     const incoming = value || "";
-    if (editor.innerHTML === incoming || lastHtmlRef.current === incoming) {
+    if (editor.innerHTML === incoming) {
       lastHtmlRef.current = incoming;
       return;
     }
-    if (linkBookmarkRef.current) return;
     editor.innerHTML = incoming;
     lastHtmlRef.current = incoming;
   }, [value]);
@@ -1854,100 +1799,11 @@ export function TaskDescriptionEditor({
     };
   }
 
-  function typingStyles() {
-    const pending = pendingFormatRef.current;
-    return {
-      ...currentFormatStyles(),
-      ...(pending.bold ? { fontWeight: "700" } : {}),
-      ...(pending.italic ? { fontStyle: "italic" } : {}),
-    };
-  }
-
-  function wrapWithUnderline(node: Node) {
-    const u = document.createElement("u");
-    paintUnderlineElement(u);
-    node.parentNode?.insertBefore(u, node);
-    u.appendChild(node);
-    return u;
-  }
-
-  function toggleMark(mark: "bold" | "italic" | "underline") {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selection = focusEditorSelection(editor, savedRangeRef);
-    const range =
-      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    const collapsed =
-      !range || range.collapsed || !editor.contains(range.commonAncestorContainer);
-
-    if (mark === "underline") {
-      if (!collapsed && range) {
-        const texts = textNodesTouching(editor, range);
-        const fully =
-          texts.length > 0 &&
-          texts.every((text) => Boolean(text.parentElement?.closest("u")));
-        if (fully) unwrapUnderlineSelection(editor);
-        else toggleUnderlineSelection(editor);
-        editor.querySelectorAll("u").forEach((node) => paintUnderlineElement(node as HTMLElement));
-      } else {
-        document.execCommand("styleWithCSS", false, "false");
-        document.execCommand("underline", false);
-        editor.querySelectorAll("u").forEach((node) => paintUnderlineElement(node as HTMLElement));
-      }
-      const anchorNode = window.getSelection()?.anchorNode ?? null;
-      const host =
-        anchorNode instanceof HTMLElement ? anchorNode : anchorNode?.parentElement ?? null;
-      const underlined = collapsed
-        ? document.queryCommandState("underline")
-        : Boolean(host?.closest("u"));
-      pendingFormatRef.current.underline = underlined;
-      setActiveFormats((current) => ({ ...current, underline: underlined }));
-      syncContent();
-      return;
-    }
-
-    const command = mark === "bold" ? "bold" : "italic";
-    const turningOn = collapsed
-      ? !document.queryCommandState(command)
-      : !selectionHasMark(editor, range, mark);
-    if (!collapsed && range) {
-      wrapRangeWithInlineStyles(
-        editor,
-        range,
-        mark === "bold"
-          ? { fontWeight: turningOn ? "700" : "400" }
-          : { fontStyle: turningOn ? "italic" : "normal" },
-      );
-    } else {
-      document.execCommand("styleWithCSS", false, "true");
-      document.execCommand(command, false);
-    }
-    pendingFormatRef.current[mark] = turningOn;
-    setActiveFormats((current) => ({ ...current, [mark]: turningOn }));
-    syncContent();
-  }
-
   function applyFontFamily(nextFamily: string) {
     pendingFormatRef.current.family = nextFamily;
     lockToolbarFontRef.current = true;
     setFontFamily(nextFamily);
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selection = focusEditorSelection(editor, savedRangeRef);
-    const stack = cssFontFamily(nextFamily);
-    const range =
-      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    if (range && !range.collapsed && editor.contains(range.commonAncestorContainer)) {
-      wrapRangeWithInlineStyles(editor, range, { fontFamily: stack });
-    }
-    document.execCommand("styleWithCSS", false, "false");
-    document.execCommand("fontName", false, nextFamily);
-    editor.querySelectorAll("font[face]").forEach((node) => {
-      const face = node.getAttribute("face")?.replace(/['"]/g, "") ?? "";
-      if (face.toLowerCase() === nextFamily.toLowerCase()) {
-        (node as HTMLElement).style.setProperty("font-family", stack, "important");
-      }
-    });
+    applyInlineStyleToSelection(editorRef.current, savedRangeRef, currentFormatStyles(nextFamily));
     syncContent();
   }
 
@@ -1955,37 +1811,16 @@ export function TaskDescriptionEditor({
     pendingFormatRef.current.size = nextSize;
     lockToolbarFontRef.current = true;
     setFontSize(nextSize);
-    const editor = editorRef.current;
-    if (!editor) return;
-    focusEditorSelection(editor, savedRangeRef);
-    const live = window.getSelection();
-    const range = live && live.rangeCount > 0 ? live.getRangeAt(0) : null;
-    if (range && !range.collapsed && editor.contains(range.commonAncestorContainer)) {
-      wrapRangeWithInlineStyles(editor, range, { fontSize: `${nextSize}px` });
-    }
-    document.execCommand("styleWithCSS", false, "false");
-    document.execCommand("fontSize", false, "7");
-    editor.querySelectorAll('font[size="7"]').forEach((node) => {
-      const font = node as HTMLElement;
-      font.removeAttribute("size");
-      font.style.setProperty("font-size", `${nextSize}px`, "important");
-    });
+    applyInlineStyleToSelection(editorRef.current, savedRangeRef, currentFormatStyles(undefined, nextSize));
     syncContent();
   }
 
   function insertPendingText(text: string) {
     const editor = editorRef.current;
     if (!editor) return;
-    let selection = window.getSelection();
-    if (
-      !selection ||
-      selection.rangeCount === 0 ||
-      !editor.contains(selection.getRangeAt(0).commonAncestorContainer)
-    ) {
-      editor.focus();
-      restoreEditorSelection(savedRangeRef);
-      selection = window.getSelection();
-    }
+    editor.focus();
+    restoreEditorSelection(savedRangeRef);
+    const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
     if (!editor.contains(range.commonAncestorContainer)) return;
@@ -1994,9 +1829,6 @@ export function TaskDescriptionEditor({
     if (anchor?.nodeType === Node.TEXT_NODE && (anchor.textContent === "\u200b" || anchor.textContent === "")) {
       const node = anchor as Text;
       node.data = text;
-      if (pendingFormatRef.current.underline && !node.parentElement?.closest("u")) {
-        wrapWithUnderline(node);
-      }
       const caret = document.createRange();
       caret.setStart(node, text.length);
       caret.collapse(true);
@@ -2009,10 +1841,9 @@ export function TaskDescriptionEditor({
 
     range.deleteContents();
     const span = document.createElement("span");
-    applyStylesToElement(span, typingStyles());
+    applyStylesToElement(span, currentFormatStyles());
     span.textContent = text;
-    if (pendingFormatRef.current.underline) wrapWithUnderline(span);
-    range.insertNode(pendingFormatRef.current.underline ? span.parentNode! : span);
+    range.insertNode(span);
     const caret = document.createRange();
     caret.setStart(span.firstChild ?? span, text.length);
     caret.collapse(true);
@@ -2031,10 +1862,10 @@ export function TaskDescriptionEditor({
     if (!range.collapsed || !editor.contains(range.commonAncestorContainer)) return;
     const block = blockAncestor(selection.anchorNode, editor);
     if (block && !(block.textContent ?? "").replace(/\u200b/g, "").trim()) {
-      applyStylesToElement(block, typingStyles());
+      applyStylesToElement(block, currentFormatStyles());
       return;
     }
-    const { caret } = insertTypingSpan(range, typingStyles());
+    const { caret } = insertTypingSpan(range, currentFormatStyles());
     selection.removeAllRanges();
     selection.addRange(caret);
     savedRangeRef.current = caret.cloneRange();
@@ -2042,94 +1873,15 @@ export function TaskDescriptionEditor({
 
   function handleBeforeInput(event: React.FormEvent<HTMLDivElement>) {
     const native = event.nativeEvent as InputEvent;
+    if (native.inputType === "insertParagraph" || native.inputType === "insertLineBreak") {
+      window.requestAnimationFrame(() => ensurePendingAtCaret());
+      return;
+    }
     if (native.inputType !== "insertText" || !native.data) return;
     const selection = window.getSelection();
-    if (!selection?.isCollapsed || selection.rangeCount === 0) return;
-    const editor = editorRef.current;
-    const caret = elementAtCaret(selection);
-    const link = caret?.closest("a[href]");
-    if (editor && link && editor.contains(link) && caretAtEndOfLink(link, selection.getRangeAt(0))) {
-      native.preventDefault();
-      pendingFormatRef.current.underline = false;
-      placeCaretAfterLink(link);
-      insertPendingText(native.data);
-      return;
-    }
-    if (!caret) return;
-    const pending = pendingFormatRef.current;
-    const computed = window.getComputedStyle(caret);
-    const weight = Number.parseInt(computed.fontWeight, 10);
-    const size = Number.parseInt(computed.fontSize, 10);
-    const boldOk = !pending.bold || computed.fontWeight === "bold" || weight >= 600;
-    const italicOk = !pending.italic || computed.fontStyle === "italic";
-    const underlineOk = !pending.underline || Boolean(caret.closest("u"));
-    const fontOk = computedFontName(caret) === pending.family;
-    const sizeOk = !Number.isNaN(size) && Math.abs(size - pending.size) <= 1;
-    if (boldOk && italicOk && underlineOk && fontOk && sizeOk) return;
+    if (selection?.isCollapsed && caretHasStyles(selection, pendingFormatRef.current)) return;
     native.preventDefault();
     insertPendingText(native.data);
-  }
-
-  function placeUnderlineCaret(on: boolean) {
-    const editor = editorRef.current;
-    const selection = window.getSelection();
-    if (!editor || !selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    if (!range.collapsed || !editor.contains(range.commonAncestorContainer)) return;
-    const host =
-      range.startContainer instanceof HTMLElement
-        ? range.startContainer
-        : range.startContainer.parentElement;
-    const current = host?.closest("u");
-    if (on && current && editor.contains(current)) return;
-    if (!on && current && editor.contains(current)) {
-      const after = document.createRange();
-      after.setStartAfter(current);
-      after.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(after);
-      savedRangeRef.current = after.cloneRange();
-      return;
-    }
-    if (!on) return;
-    const u = document.createElement("u");
-    paintUnderlineElement(u);
-    u.appendChild(document.createTextNode("\u200b"));
-    range.insertNode(u);
-    const caret = document.createRange();
-    caret.setStart(u.firstChild!, 1);
-    caret.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(caret);
-    savedRangeRef.current = caret.cloneRange();
-  }
-
-  function toggleUnderlineSelection(editor: HTMLElement) {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    const host =
-      range.commonAncestorContainer instanceof HTMLElement
-        ? range.commonAncestorContainer
-        : range.commonAncestorContainer.parentElement;
-    const existing = host?.closest("u");
-    if (existing && editor.contains(existing) && existing.textContent === range.toString()) {
-      const parent = existing.parentNode;
-      if (!parent) return;
-      while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
-      parent.removeChild(existing);
-      return;
-    }
-    const fragment = range.extractContents();
-    const u = document.createElement("u");
-    paintUnderlineElement(u);
-    u.appendChild(fragment);
-    range.insertNode(u);
-    const next = document.createRange();
-    next.selectNodeContents(u);
-    selection.removeAllRanges();
-    selection.addRange(next);
-    savedRangeRef.current = next.cloneRange();
   }
 
   function applyTextColor(color: string) {
@@ -2190,138 +1942,24 @@ export function TaskDescriptionEditor({
     readSelectionStyles();
   }
 
-  function openLinkEditor() {
-    const editor = editorRef.current;
-    if (editor) linkBookmarkRef.current = bookmarkEditorSelection(editor);
-    rememberSelection();
-    const selected = window.getSelection()?.toString().replace(/\u200b/g, "").trim() ?? "";
-    setLinkLabel(selected);
-    setLinkUrl("");
-    setLinkError("");
-    setLinkOpen(true);
-  }
-
-  function normalizeLinkHref(raw: string) {
-    const value = raw.trim();
-    if (!value || value === "https://" || value === "http://") return "";
-    if (/^(https?:|mailto:|tel:)/i.test(value)) return value;
-    if (value.includes("@") && !/\s/.test(value)) return `mailto:${value}`;
-    return `https://${value}`;
-  }
-
-  function paintLink(anchor: HTMLAnchorElement, href: string) {
-    anchor.href = href;
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.spellcheck = false;
-    anchor.title = href;
-    anchor.setAttribute("data-fc-link", "true");
-    anchor.style.setProperty("color", "#1155cc", "important");
-    anchor.style.setProperty("text-decoration-line", "underline", "important");
-    anchor.style.setProperty("text-decoration-style", "solid", "important");
-    anchor.style.setProperty("text-decoration-color", "#1155cc", "important");
-    anchor.style.setProperty("text-underline-offset", "2px", "important");
-    anchor.style.setProperty("cursor", "pointer", "important");
-  }
-
-  function placeCaretAfterLink(anchor: Element) {
-    const next = anchor.nextSibling;
-    const spacer = next instanceof Text ? next : document.createTextNode("\u200b");
-    if (spacer !== next) anchor.after(spacer);
-    const range = document.createRange();
-    range.setStart(spacer, next instanceof Text ? 0 : spacer.data.length);
-    range.collapse(true);
+  function insertLink() {
+    ensureEditorSelection(editorRef.current, savedRangeRef);
     const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    return range;
-  }
-
-  function caretAtEndOfLink(link: Element, range: Range) {
-    if (!range.collapsed || !link.contains(range.startContainer)) return false;
-    const end = document.createRange();
-    end.selectNodeContents(link);
-    end.collapse(false);
-    try {
-      return range.compareBoundaryPoints(Range.END_TO_END, end) === 0;
-    } catch {
-      return false;
-    }
-  }
-
-  function openEditorLink(href: string) {
-    const opener = document.createElement("a");
-    opener.href = href;
-    opener.target = "_blank";
-    opener.rel = "noopener noreferrer";
-    document.body.appendChild(opener);
-    opener.click();
-    opener.remove();
-  }
-
-  function commitLink() {
-    const href = normalizeLinkHref(linkUrl);
-    if (!href) {
-      setLinkError("Enter a web address or email.");
-      return;
-    }
-    setLinkError("");
-    const editor = editorRef.current;
-    if (!editor) return;
-    const mark = linkBookmarkRef.current;
-    restoringSelectionRef.current = true;
-    editor.focus();
-    const bookmarked = mark ? selectTextBookmark(editor, mark) : null;
-    if (!bookmarked) restoreEditorSelection(savedRangeRef);
-    restoringSelectionRef.current = false;
-    const selection = window.getSelection();
-    if (!selection) return;
-    if (
-      selection.rangeCount === 0 ||
-      !editor.contains(selection.getRangeAt(0).commonAncestorContainer)
-    ) {
-      if (!bookmarked) {
-        const end = document.createRange();
-        end.selectNodeContents(editor);
-        end.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(end);
-      }
-    }
-    const range = selection.getRangeAt(0);
-    const selectedText = range.toString().replace(/\u200b/g, "");
-    const label = linkLabel.trim() || selectedText.trim() || href;
-    const reuseSelection =
-      !range.collapsed &&
-      Boolean(selectedText.trim()) &&
-      (!linkLabel.trim() || linkLabel.trim() === selectedText.trim());
-
-    const anchor = document.createElement("a");
-    paintLink(anchor, href);
-    if (reuseSelection) {
-      anchor.appendChild(range.extractContents());
+    const selected = selection?.toString().trim() ?? "";
+    const url = window.prompt("Enter URL", "https://");
+    if (!url) return;
+    if (!selected) {
+      runCommand("insertHTML", `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
     } else {
-      if (!range.collapsed) range.deleteContents();
-      anchor.textContent = label;
+      runCommand("createLink", url);
     }
-    if (!anchor.textContent?.replace(/\u200b/g, "").trim()) anchor.textContent = label;
-    range.insertNode(anchor);
-    paintLink(anchor, href);
-    const after = placeCaretAfterLink(anchor);
-    savedRangeRef.current = after.cloneRange();
-    pendingFormatRef.current.underline = false;
-    setActiveFormats((current) => ({ ...current, underline: false }));
-    linkBookmarkRef.current = null;
-    setLinkOpen(false);
-    syncContent();
     readSelectionStyles();
   }
 
   function insertHtmlAtCaret(html: string) {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.focus();
-    restoreEditorSelection(savedRangeRef);
+    ensureEditorSelection(editor, savedRangeRef);
     document.execCommand("insertHTML", false, html);
     syncContent();
     readSelectionStyles();
@@ -2362,8 +2000,7 @@ export function TaskDescriptionEditor({
   function insertQuote() {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.focus();
-    restoreEditorSelection(savedRangeRef);
+    ensureEditorSelection(editor, savedRangeRef);
     document.execCommand("formatBlock", false, "blockquote");
     syncContent();
     readSelectionStyles();
@@ -2422,21 +2059,30 @@ export function TaskDescriptionEditor({
               <ToolButton
                 title="Bold"
                 active={activeFormats.bold}
-                onClick={() => toggleMark("bold")}
+                onClick={() => {
+                  runCommand("bold");
+                  readSelectionStyles();
+                }}
               >
                 <Bold className="h-4 w-4" />
               </ToolButton>
               <ToolButton
                 title="Underline"
                 active={activeFormats.underline}
-                onClick={() => toggleMark("underline")}
+                onClick={() => {
+                  runCommand("underline");
+                  readSelectionStyles();
+                }}
               >
                 <Underline className="h-4 w-4" />
               </ToolButton>
               <ToolButton
                 title="Italic"
                 active={activeFormats.italic}
-                onClick={() => toggleMark("italic")}
+                onClick={() => {
+                  runCommand("italic");
+                  readSelectionStyles();
+                }}
               >
                 <Italic className="h-4 w-4" />
               </ToolButton>
@@ -2458,6 +2104,14 @@ export function TaskDescriptionEditor({
                 onBeforeOpen={rememberSelection}
                 onPick={applyTextColor}
               />
+              <ColorDropdown
+                title="Highlight color"
+                variant="highlight"
+                options={HIGHLIGHT_COLORS}
+                currentColor={highlightColor}
+                onBeforeOpen={rememberSelection}
+                onPick={applyHighlight}
+              />
               <ListSplitButton
                 kind="bullet"
                 active={activeFormats.unorderedList}
@@ -2474,7 +2128,7 @@ export function TaskDescriptionEditor({
                 onPick={pickListStyle}
                 onBeforeOpen={rememberSelection}
               />
-              <ToolButton title="Insert link" onClick={openLinkEditor}>
+              <ToolButton title="Insert link" onClick={insertLink}>
                 <Link2 className="h-4 w-4" />
               </ToolButton>
               <ToolButton title="Undo" onClick={() => runCommand("undo")}>
@@ -2483,6 +2137,289 @@ export function TaskDescriptionEditor({
               <ToolButton title="Redo" onClick={() => runCommand("redo")}>
                 <Redo2 className="h-4 w-4" />
               </ToolButton>
+            </>
+          ) : compactToolbar ? (
+            <>
+              {toolbarLeading ? (
+                <>
+                  {toolbarLeading}
+                  <ToolbarDivider />
+                </>
+              ) : null}
+              <FontFamilyDropdown
+                value={fontFamily}
+                onBeforeOpen={rememberSelection}
+                onPick={applyFontFamily}
+              />
+              <FontSizeDropdown
+                value={fontSize}
+                onBeforeOpen={rememberSelection}
+                onPick={applyFontSize}
+              />
+              <ToolbarDivider />
+              <ToolButton
+                title="Bold"
+                active={activeFormats.bold}
+                onClick={() => {
+                  runCommand("bold");
+                  readSelectionStyles();
+                }}
+              >
+                <Bold className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Italic"
+                active={activeFormats.italic}
+                onClick={() => {
+                  runCommand("italic");
+                  readSelectionStyles();
+                }}
+              >
+                <Italic className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Underline"
+                active={activeFormats.underline}
+                onClick={() => {
+                  runCommand("underline");
+                  readSelectionStyles();
+                }}
+              >
+                <Underline className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Strikethrough"
+                active={activeFormats.strikeThrough}
+                onClick={() => {
+                  runCommand("strikeThrough");
+                  readSelectionStyles();
+                }}
+              >
+                <Strikethrough className="h-4 w-4" />
+              </ToolButton>
+              <ToolbarDivider />
+              <ColorDropdown
+                title="Font color"
+                variant="font"
+                options={TEXT_COLORS}
+                currentColor={textColor}
+                onBeforeOpen={rememberSelection}
+                onPick={applyTextColor}
+              />
+              <ColorDropdown
+                title="Text highlight"
+                variant="highlight"
+                options={HIGHLIGHT_COLORS}
+                currentColor={highlightColor}
+                onBeforeOpen={rememberSelection}
+                onPick={applyHighlight}
+              />
+              <CaseDropdown onBeforeOpen={rememberSelection} onPick={changeCase} />
+              <ToolbarDivider />
+              <ListSplitButton
+                kind="bullet"
+                active={activeFormats.unorderedList}
+                currentStyle={currentListStyle}
+                onToggle={() => toggleListKind(false)}
+                onPick={pickListStyle}
+                onBeforeOpen={rememberSelection}
+              />
+              <ListSplitButton
+                kind="number"
+                active={activeFormats.orderedList}
+                currentStyle={currentListStyle}
+                onToggle={() => toggleListKind(true)}
+                onPick={pickListStyle}
+                onBeforeOpen={rememberSelection}
+              />
+              <ToolbarDivider />
+              <ToolButton
+                title="Insert link"
+                onClick={() => {
+                  rememberSelection();
+                  insertLink();
+                }}
+              >
+                <Link2 className="h-4 w-4" />
+              </ToolButton>
+              {toolbarAfterLink ? toolbarAfterLink : null}
+              <ToolbarDivider />
+              <CompactToolbarMore onBeforeOpen={rememberSelection}>
+                <CompactMoreRow label="Script">
+                  <ToolButton
+                    title="Subscript"
+                    active={activeFormats.subscript}
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("subscript");
+                      readSelectionStyles();
+                    }}
+                  >
+                    <Subscript className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Superscript"
+                    active={activeFormats.superscript}
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("superscript");
+                      readSelectionStyles();
+                    }}
+                  >
+                    <Superscript className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Clear formatting"
+                    onClick={() => {
+                      rememberSelection();
+                      clearFormatting();
+                    }}
+                  >
+                    <Eraser className="h-4 w-4" />
+                  </ToolButton>
+                </CompactMoreRow>
+                <div className="px-1.5 py-1">
+                  <p className="mb-1 text-[11px] font-medium text-slate-500">Insert</p>
+                  <TableInsertButton
+                    inline
+                    onBeforeOpen={rememberSelection}
+                    onInsertTable={insertTable}
+                  />
+                </div>
+                <CompactMoreRow label="List">
+                  <ToolButton
+                    title="Multilevel list"
+                    onClick={() => {
+                      rememberSelection();
+                      insertMultilevelItem();
+                    }}
+                  >
+                    <ListTree className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Decrease indent"
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("outdent");
+                      readSelectionStyles();
+                    }}
+                  >
+                    <IndentDecrease className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Increase indent"
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("indent");
+                      readSelectionStyles();
+                    }}
+                  >
+                    <IndentIncrease className="h-4 w-4" />
+                  </ToolButton>
+                </CompactMoreRow>
+                <CompactMoreRow label="Align">
+                  <ToolButton
+                    title="Align left"
+                    active={textAlign === "left"}
+                    onClick={() => {
+                      rememberSelection();
+                      setAlignment("left");
+                    }}
+                  >
+                    <AlignLeft className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Align center"
+                    active={textAlign === "center"}
+                    onClick={() => {
+                      rememberSelection();
+                      setAlignment("center");
+                    }}
+                  >
+                    <AlignCenter className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Align right"
+                    active={textAlign === "right"}
+                    onClick={() => {
+                      rememberSelection();
+                      setAlignment("right");
+                    }}
+                  >
+                    <AlignRight className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Justify"
+                    active={textAlign === "justify"}
+                    onClick={() => {
+                      rememberSelection();
+                      setAlignment("justify");
+                    }}
+                  >
+                    <AlignJustify className="h-4 w-4" />
+                  </ToolButton>
+                </CompactMoreRow>
+                <CompactMoreRow label="Extras">
+                  <ToolButton
+                    title="Sort A to Z"
+                    onClick={() => {
+                      rememberSelection();
+                      sortSelectedLines();
+                    }}
+                  >
+                    <span className="text-[12px] font-semibold">A↓</span>
+                  </ToolButton>
+                  <ToolButton
+                    title="Show formatting marks"
+                    active={showMarks}
+                    onClick={() => setShowMarks((current) => !current)}
+                  >
+                    <Pilcrow className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Undo"
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("undo");
+                    }}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Redo"
+                    onClick={() => {
+                      rememberSelection();
+                      runCommand("redo");
+                    }}
+                  >
+                    <Redo2 className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Horizontal line"
+                    onClick={() => {
+                      rememberSelection();
+                      insertHr();
+                    }}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton
+                    title="Quote"
+                    onClick={() => {
+                      rememberSelection();
+                      insertQuote();
+                    }}
+                  >
+                    <Quote className="h-4 w-4" />
+                  </ToolButton>
+                </CompactMoreRow>
+                {toolbarOverflow ? (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    {toolbarOverflow}
+                  </>
+                ) : null}
+              </CompactToolbarMore>
             </>
           ) : (
             <>
@@ -2506,21 +2443,30 @@ export function TaskDescriptionEditor({
           <ToolButton
             title="Bold"
             active={activeFormats.bold}
-            onClick={() => toggleMark("bold")}
+            onClick={() => {
+              runCommand("bold");
+              readSelectionStyles();
+            }}
           >
             <Bold className="h-4 w-4" />
           </ToolButton>
           <ToolButton
             title="Italic"
             active={activeFormats.italic}
-            onClick={() => toggleMark("italic")}
+            onClick={() => {
+              runCommand("italic");
+              readSelectionStyles();
+            }}
           >
             <Italic className="h-4 w-4" />
           </ToolButton>
           <ToolButton
             title="Underline"
             active={activeFormats.underline}
-            onClick={() => toggleMark("underline")}
+            onClick={() => {
+              runCommand("underline");
+              readSelectionStyles();
+            }}
           >
             <Underline className="h-4 w-4" />
           </ToolButton>
@@ -2579,7 +2525,7 @@ export function TaskDescriptionEditor({
             onBeforeOpen={rememberSelection}
             onInsertTable={insertTable}
           />
-          <ToolButton title="Insert link" onClick={openLinkEditor}>
+          <ToolButton title="Insert link" onClick={insertLink}>
             <Link2 className="h-4 w-4" />
           </ToolButton>
           {toolbarAfterLink ? toolbarAfterLink : null}
@@ -2663,6 +2609,8 @@ export function TaskDescriptionEditor({
           <ToolbarDivider />
           <MoreInsertMenu
             onBeforeOpen={rememberSelection}
+            onInsertLink={insertLink}
+            onInsertTable={insertTable}
             onInsertImage={insertImageFile}
             onInsertEmoji={insertEmoji}
             onInsertHr={insertHr}
@@ -2679,58 +2627,10 @@ export function TaskDescriptionEditor({
         ) : null}
       </div>
 
-      {linkOpen ? (
-        <form
-          className="absolute top-12 left-3 z-40 flex w-[min(420px,calc(100%-24px))] flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
-          onSubmit={(event) => {
-            event.preventDefault();
-            commitLink();
-          }}
-        >
-          <input
-            autoFocus
-            value={linkLabel}
-            onChange={(event) => setLinkLabel(event.target.value)}
-            placeholder="Link text"
-            className="h-8 min-w-[120px] flex-1 rounded-md border border-slate-200 px-2 text-[13px] outline-none focus:border-violet-300"
-          />
-          <input
-            value={linkUrl}
-            onChange={(event) => setLinkUrl(event.target.value)}
-            placeholder="https://example.com"
-            className="h-8 min-w-[160px] flex-[1.4] rounded-md border border-slate-200 px-2 text-[13px] outline-none focus:border-violet-300"
-          />
-          <button
-            type="submit"
-            onMouseDown={(event) => event.preventDefault()}
-            className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white"
-          >
-            Insert
-          </button>
-          <button
-            type="button"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => {
-              linkBookmarkRef.current = null;
-              setLinkOpen(false);
-            }}
-            className="h-8 rounded-md px-2 text-[12px] font-medium text-slate-500 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          {linkError ? (
-            <p className="w-full px-1 text-[12px] text-red-600">{linkError}</p>
-          ) : null}
-        </form>
-      ) : null}
-
       <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
       <div
         ref={editorRef}
         contentEditable
-        spellCheck={false}
-        autoCorrect="off"
-        autoCapitalize="off"
         suppressContentEditableWarning
         role="textbox"
         aria-multiline
@@ -2744,14 +2644,6 @@ export function TaskDescriptionEditor({
         onBlur={syncContent}
         onKeyDown={(event) => {
           if (mentions.handleKeyDown(event)) return;
-        }}
-        onClick={(event) => {
-          const anchor = (event.target as HTMLElement).closest?.("a[href]");
-          if (!anchor || !editorRef.current?.contains(anchor)) return;
-          const href = anchor.getAttribute("href");
-          if (!href) return;
-          event.preventDefault();
-          openEditorLink(href);
         }}
         onMouseUp={() => {
           lockToolbarFontRef.current = false;
@@ -2774,7 +2666,6 @@ export function TaskDescriptionEditor({
           mentions.syncMention();
         }}
         onFocus={() => {
-          if (restoringSelectionRef.current) return;
           rememberSelection();
           if (!lockToolbarFontRef.current) readSelectionStyles();
         }}
@@ -2788,8 +2679,6 @@ export function TaskDescriptionEditor({
           "[&_table]:max-w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-1.5",
           "[&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-600",
           "[&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800",
-          "[&_a]:font-medium",
-          "[&_[data-email-signature]_img]:!block [&_[data-email-signature]_img]:!h-auto [&_[data-email-signature]_img]:!max-h-none [&_[data-email-signature]_img]:!w-[80%] [&_[data-email-signature]_img]:!max-w-[80%]",
           showMarks && "[&_p]:relative [&_p]:border-b [&_p]:border-dashed [&_p]:border-slate-200 [&_p]:pb-1",
           editorClassName,
         )}

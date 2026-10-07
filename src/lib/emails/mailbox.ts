@@ -180,15 +180,6 @@ export function restoreToInbox(id: string) {
   });
 }
 
-export function moveToCustomFolder(id: string, folderId: string | null) {
-  return patchMailbox(id, {
-    folderId: folderId ?? "",
-    trash: false,
-    spam: false,
-    archived: false,
-  });
-}
-
 export function setFocusOverride(id: string, view: "focused" | "other") {
   return patchMailbox(id, { focusOverride: view });
 }
@@ -225,7 +216,6 @@ export function isHiddenFromFolder(flags: MailboxFlags, folder: MailFolder) {
   if (folder === "spam") return !flags.spam;
   if (folder === "archive") return !flags.archived || Boolean(flags.trash);
   if (flags.trash || flags.spam) return true;
-  if (flags.folderId && (folder === "inbox" || folder === "all")) return true;
   if (flags.archived && folder !== "all" && folder !== "starred" && folder !== "important") {
     return true;
   }

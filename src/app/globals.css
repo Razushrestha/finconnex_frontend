@@ -229,8 +229,8 @@
   }
 }
 
-/* Every native dropdown shows a chevron. Skip .fc-select-caret (already has an overlay arrow). */
-select:not([multiple]):not([size]):not(.fc-select-caret) {
+/* Every native dropdown shows a chevron. Skip overlay-arrow selects. */
+select:not([multiple]):not([size]):not(.fc-select-caret):not(:has(+ svg)) {
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   appearance: none !important;
@@ -241,8 +241,15 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
   padding-right: 2rem !important;
 }
 
-.dark select:not([multiple]):not([size]):not(.fc-select-caret) {
+.dark select:not([multiple]):not([size]):not(.fc-select-caret):not(:has(+ svg)) {
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+}
+
+/* Overlay-arrow selects still hide the OS caret. */
+select:not([multiple]):not([size]) {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
 }
 
 /* Workqueue deep-link highlight (?focus=id) */
@@ -383,6 +390,19 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
   list-style-position: outside;
   padding-left: 1.75rem;
   margin: 0.25rem 0;
+}
+
+.fc-rich-editor a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fc-rich-editor [data-note-pending-link] {
+  background-color: rgba(147, 197, 253, 0.55);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .fc-rich-editor li {

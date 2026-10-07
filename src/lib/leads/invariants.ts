@@ -19,7 +19,6 @@ const QUICK_ORDER = [
   "meeting",
   "task",
   "note",
-  "attachment",
 ] as const;
 
 /** Validate a single card view-model against spec contracts. */
@@ -93,10 +92,10 @@ export function checkLeadCardInvariants(
     }
   }
 
-  if (vm.quickActions.length !== 7) {
+  if (vm.quickActions.length !== 6) {
     issues.push({
       code: "quick_count",
-      message: `${vm.name}: expected 7 quick actions`,
+      message: `${vm.name}: expected 6 quick actions`,
     });
   }
   const order = vm.quickActions.map((a) => a.kind).join(",");
@@ -117,7 +116,7 @@ export function checkLeadCardInvariants(
       });
     }
     if (
-      (a.kind === "note" || a.kind === "attachment") &&
+      a.kind === "note" &&
       (a.urgency !== "neutral" || a.badgeCount !== 0)
     ) {
       issues.push({

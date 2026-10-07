@@ -79,7 +79,7 @@ export function EmailsWorkspace({
   const [revision, setRevision] = useState(0);
   const [folder, setFolder] = useState<MailFolder>("inbox");
   const [customFolderId, setCustomFolderId] = useState<string | null>(null);
-  const [focusView, setFocusView] = useState<FocusView>("all");
+  const [focusView, setFocusView] = useState<FocusView>("focused");
   const [labelFilter, setLabelFilter] = useState<MailLabel | null>(null);
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");

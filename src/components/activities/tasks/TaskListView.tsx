@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -40,6 +39,7 @@ import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   ManageColumnsModal,
+  visibleManageColumns,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
@@ -53,6 +53,8 @@ import {
   tablePreferenceFromColumns,
   tryCrmTablePreference,
 } from "@/lib/table-preferences/api";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import { toggleColumnSort } from "@/lib/tables/column-sort";
 
 interface FlatTask extends Task {
   statusColorClass: string;
@@ -74,15 +76,6 @@ const PRIORITY_STYLE: Record<Priority, { className: string }> = {
   High: { className: "bg-orange-500" },
   Medium: { className: "bg-violet-500" },
   Low: { className: "bg-sky-500" },
-};
-
-const STATUS_STYLE: Record<TaskStatus, { className: string }> = {
-  "Not Started": { className: "bg-slate-500" },
-  "In Progress": { className: "bg-sky-500" },
-  Waiting: { className: "bg-amber-500" },
-  Review: { className: "bg-violet-500" },
-  Completed: { className: "bg-emerald-500" },
-  Cancelled: { className: "bg-red-500" },
 };
 
 function parseDueDate(dateStr: string): number {
@@ -173,8 +166,6 @@ function TaskPriorityCell({ task }: { task: FlatTask }) {
 function TaskStatusCell({ task }: { task: FlatTask }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { className } =
-    STATUS_STYLE[task.status] ?? STATUS_STYLE["Not Started"];
 
   useEffect(() => {
     if (!open) return;
@@ -198,11 +189,9 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Status ${task.status}. Change status`}
-        className="text-left"
+        className="text-left text-[12px] text-slate-700 hover:text-slate-900"
       >
-        <ArrowTag compact className={className}>
-          {task.status}
-        </ArrowTag>
+        {task.status}
       </button>
       {open && (
         <div
@@ -210,35 +199,31 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
           aria-label="Select status"
           className="absolute left-0 top-full z-30 mt-1 w-40 rounded-lg border border-slate-100 bg-white py-1 shadow-lg"
         >
-          {TASK_STATUSES.map((status) => {
-            const opt = STATUS_STYLE[status];
-            return (
-              <button
-                key={status}
-                type="button"
-                role="option"
-                aria-selected={status === task.status}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (status !== task.status) {
-                    updateTaskStatus(task.taskId, status);
-                    void tryCrmTask(() =>
-                      syncTaskStatus(task.taskId, status),
-                    ).then(persistRemoteTask);
-                    toast.success(`Status changed to "${status}"`);
-                  }
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-slate-50",
-                  status === task.status && "font-semibold text-violet-700",
-                )}
-              >
-                <span className={cn("h-2 w-2 rounded-full", opt.className)} />
-                {status}
-              </button>
-            );
-          })}
+          {TASK_STATUSES.map((status) => (
+            <button
+              key={status}
+              type="button"
+              role="option"
+              aria-selected={status === task.status}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (status !== task.status) {
+                  updateTaskStatus(task.taskId, status);
+                  void tryCrmTask(() =>
+                    syncTaskStatus(task.taskId, status),
+                  ).then(persistRemoteTask);
+                  toast.success(`Status changed to "${status}"`);
+                }
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50",
+                status === task.status && "font-semibold text-violet-700",
+              )}
+            >
+              {status}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -574,19 +559,17 @@ export function TaskListView({
 
   const columnRenderers = useMemo(() => buildColumnRenderers(), []);
   const orderedVisibleColumns = useMemo(
-    () => manageColumns.filter((c) => c.checked),
+    () => visibleManageColumns(manageColumns),
     [manageColumns],
   );
 
   const handleHeaderSort = (key: string) => {
     if (!onSortChange || !isTaskColumnSortable(key)) return;
-    if (sortField === key && sortDirection === "desc") {
-      onClearSort?.();
-      return;
-    }
-    const nextDirection: "asc" | "desc" =
-      sortField === key && sortDirection === "asc" ? "desc" : "asc";
-    onSortChange(key, nextDirection);
+    const next = toggleColumnSort(
+      sortField ? { field: sortField, direction: sortDirection ?? "asc" } : null,
+      key,
+    );
+    onSortChange(next.field, next.direction);
   };
 
   function handleSaveColumns(next: ManageColumn[]) {
@@ -637,28 +620,21 @@ export function TaskListView({
                     data-col-id={col.id}
                     className="px-3 py-2.5 whitespace-nowrap"
                   >
-                    {sortable ? (
-                  <button
-                        type="button"
-                        onClick={() => handleHeaderSort(col.id)}
-                        className={cn(
-                          "inline-flex items-center gap-1 hover:text-slate-700",
-                          sortField === col.id && "text-violet-700",
-                        )}
-                  >
-                    {col.label}
-                        {sortField === col.id ? (
-                          <span className="text-[10px] font-bold" aria-hidden>
-                            {sortDirection === "asc" ? "↑" : "↓"}
-                          </span>
-                        ) : (
-                          <ArrowUpDown className="h-3 w-3" aria-hidden />
-                        )}
-                      </button>
-                    ) : (
-                      col.label
-                    )}
-                </th>
+                    <SortableColumnHeader
+                      label={col.label}
+                      field={col.id}
+                      sort={
+                        sortField
+                          ? {
+                              field: sortField,
+                              direction: sortDirection ?? "asc",
+                            }
+                          : null
+                      }
+                      onSort={handleHeaderSort}
+                      disabled={!sortable}
+                    />
+                  </th>
                 );
               })}
               <th

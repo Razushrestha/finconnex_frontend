@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "@/lib/notify/toast";
+import { toast } from "sonner";
 import Link from "next/link";
 import { ArrowLeft, Check, CheckCircle2, History, Pencil, X } from "lucide-react";
 import type { TaskStatus } from "@/lib/tasks/types";
@@ -80,16 +80,16 @@ export function TaskHeader({
               <Pencil className="h-3.5 w-3.5" />
               Edit
             </button>
+            <button
+              type="button"
+              onClick={() => setConfirmClose(true)}
+              className="flex items-center gap-1.5 bg-[#5A32A3] px-3.5 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Close Task
+            </button>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => setConfirmClose(true)}
-          className="flex items-center gap-1.5 bg-[var(--brand-primary)] px-3.5 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Close Task
-        </button>
       </div>
 
       {confirmClose ? (
@@ -120,7 +120,7 @@ export function TaskHeader({
               <button
                 type="button"
                 onClick={confirmCloseTask}
-                className="inline-flex h-9 items-center rounded-lg bg-[var(--brand-primary)] px-4 text-[13px] font-medium text-white hover:opacity-90"
+                className="inline-flex h-9 items-center rounded-lg bg-[#5A32A3] px-4 text-[13px] font-medium text-white hover:opacity-90"
               >
                 Yes
               </button>
