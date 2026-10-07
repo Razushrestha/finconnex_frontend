@@ -395,9 +395,9 @@ export function WorkQueueView() {
       className="flex h-full min-h-0 w-full min-w-0 flex-col bg-white text-slate-900 antialiased"
       style={
         {
-          "--wq-accent": "#4F46E5",
-          "--wq-accent-soft": "#EEF2FF",
-          "--wq-accent-badge": "#E0E7FF",
+          "--wq-accent": "var(--brand-primary)",
+          "--wq-accent-soft": "var(--brand-primary-soft)",
+          "--wq-accent-badge": "var(--brand-primary-muted)",
           "--wq-surface": "#F8FAFC",
           "--wq-line": "#E2E8F0",
           "--wq-danger": "#DC2626",

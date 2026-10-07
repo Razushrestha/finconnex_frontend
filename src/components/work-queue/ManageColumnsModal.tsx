@@ -170,7 +170,7 @@ export function ManageColumnsModal({
               }}
               className={cn(
                 "group flex items-center gap-2 rounded-md py-1.5",
-                col.pinned && "bg-blue-50/70",
+                col.pinned && "bg-[var(--brand-primary-faint)]",
                 dragIndex !== null &&
                   working[dragIndex]?.id === col.id &&
                   "opacity-50",
@@ -192,7 +192,7 @@ export function ManageColumnsModal({
                 className={cn(
                   "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                   col.checked
-                    ? "border-blue-600 bg-blue-600"
+                    ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]"
                     : "border-gray-300 bg-white",
                   col.required && "cursor-not-allowed opacity-90",
                 )}
@@ -276,7 +276,7 @@ export function ManageColumnsModal({
           <button
             type="button"
             onClick={() => onSave(working)}
-            className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700"
+            className="rounded-lg bg-[var(--brand-primary)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--brand-primary-strong)]"
           >
             Save
           </button>

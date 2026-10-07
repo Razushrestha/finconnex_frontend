@@ -305,18 +305,18 @@ function ToOption({
     <div
       className={cn(
         "rounded-lg border p-2.5",
-        active ? "border-blue-300 bg-blue-50/40" : "border-slate-200",
+        active ? "border-[var(--brand-primary-border)] bg-[var(--brand-primary-faint)]" : "border-slate-200",
       )}
     >
       <button type="button" onClick={onClick} className="flex w-full items-start gap-2.5 text-left">
         <span
           className={cn(
             "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-            active ? "border-blue-600" : "border-slate-300",
+            active ? "border-[var(--brand-primary)]" : "border-slate-300",
           )}
           aria-hidden
         >
-          {active && <span className="h-2 w-2 rounded-full bg-blue-600" />}
+          {active && <span className="h-2 w-2 rounded-full bg-[var(--brand-primary)]" />}
         </span>
         <span className="flex-1">
           <span className="block text-sm font-medium text-slate-700">{title}</span>

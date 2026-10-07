@@ -188,7 +188,7 @@ export function MemberSearchField({
                   onClick={() => toggle(member.userId)}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50",
-                    selected && "bg-blue-50/60"
+                    selected && "bg-[var(--brand-primary-faint)]"
                   )}
                 >
                   <span className="min-w-0">
@@ -201,7 +201,7 @@ export function MemberSearchField({
                       </span>
                     )}
                   </span>
-                  {selected && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+                  {selected && <Check className="h-4 w-4 shrink-0 text-[var(--brand-primary)]" />}
                 </button>
               );
             })}

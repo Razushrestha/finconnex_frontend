@@ -62,7 +62,7 @@ function NodeShell({ icon, iconClassName, title, subtitle, selected, onClick, on
       onClick={onClick}
       className={cn(
         "group relative flex w-[280px] cursor-pointer items-center gap-3 rounded-xl border bg-white p-3 shadow-sm transition hover:shadow-md",
-        selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"
+        selected ? "border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary-soft)]" : "border-slate-200"
       )}
     >
       {handles?.top && <Handle type="target" position={Position.Top} className="!bg-slate-300" />}
@@ -127,7 +127,7 @@ export function TriggerNode({ data }: NodeProps<BuilderNode>) {
     <div
       className={cn(
         "w-[280px] overflow-hidden rounded-xl border bg-white shadow-sm transition hover:shadow-md",
-        selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"
+        selected ? "border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary-soft)]" : "border-slate-200"
       )}
     >
       <Handle type="source" position={Position.Bottom} className="!bg-slate-300" />

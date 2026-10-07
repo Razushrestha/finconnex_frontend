@@ -314,7 +314,7 @@ function MonthCalendar({
               className={cn(
                 "mx-auto my-0.5 flex h-8 w-8 items-center justify-center rounded-full text-[13px]",
                 cell.outside ? "text-slate-300" : "text-slate-700 hover:bg-slate-100",
-                active && "bg-blue-600 font-semibold text-white hover:bg-blue-600",
+                active && "bg-[var(--brand-primary)] font-semibold text-white hover:bg-[var(--brand-primary)]",
               )}
             >
               {cell.date.getDate()}
