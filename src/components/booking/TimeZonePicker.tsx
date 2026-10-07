@@ -152,7 +152,7 @@ export function TimeZonePicker({
         aria-expanded={open}
         data-timezone={selected}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-left text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand,#5A32A3)]",
+          "flex h-11 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-left text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand,var(--brand-primary))]",
           className,
         )}
       >
@@ -226,7 +226,7 @@ export function TimeZonePicker({
                       className={cn(
                         "flex w-full items-center px-3 py-2 text-left text-[13px]",
                         row.value === selected
-                          ? "font-semibold text-[var(--booking-brand,#5A32A3)]"
+                          ? "font-semibold text-[var(--booking-brand,var(--brand-primary))]"
                           : "text-slate-700",
                         index === active && "bg-slate-50",
                       )}

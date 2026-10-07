@@ -1314,11 +1314,11 @@ function ThemePanel({
             onClick={() => onChange({ ...branding, layout })}
             className={cn(
               "relative rounded-lg border bg-white p-2 text-left",
-              branding.layout === layout ? "border-[#5A32A3]" : "border-slate-200",
+              branding.layout === layout ? "border-[var(--brand-primary)]" : "border-slate-200",
             )}
           >
             {branding.layout === layout ? (
-              <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-white">
+              <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white">
                 <Check className="h-2.5 w-2.5" />
               </span>
             ) : null}
@@ -1354,7 +1354,7 @@ function ThemePanel({
           onClick={() => onChange({ ...branding, showBanner: !branding.showBanner })}
           className={cn(
             "relative h-5 w-9 rounded-full transition",
-            branding.showBanner ? "bg-[#5A32A3]" : "bg-slate-300",
+            branding.showBanner ? "bg-[var(--brand-primary)]" : "bg-slate-300",
           )}
           aria-pressed={branding.showBanner}
         >
@@ -1385,7 +1385,7 @@ function ThemePanel({
           }
           className={cn(
             "relative h-5 w-9 rounded-full transition",
-            branding.showUserAsCards ? "bg-[#5A32A3]" : "bg-slate-300",
+            branding.showUserAsCards ? "bg-[var(--brand-primary)]" : "bg-slate-300",
           )}
           aria-pressed={branding.showUserAsCards}
         >
@@ -1406,7 +1406,7 @@ function ThemePanel({
           onChange({ ...branding, buttonText: event.target.value })
         }
         placeholder="Book Appointment"
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]"
+        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
       />
       <SaveButton saving={saving} onClick={onSave} />
     </div>
@@ -1562,7 +1562,7 @@ function WorkspacePanel({
           })
         }
         placeholder="Workspace name"
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]"
+        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
       />
       <SaveButton saving={saving} onClick={onSave} />
     </div>
@@ -1626,7 +1626,7 @@ function SeoPanel({
           onChange={(event) =>
             onChange({ ...branding, seo: { ...branding.seo, title: event.target.value } })
           }
-          className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]"
+          className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
         />
       </label>
       <label className="block">
@@ -1642,7 +1642,7 @@ function SeoPanel({
             })
           }
           rows={3}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)]"
         />
       </label>
       <SaveButton saving={saving} onClick={onSave} />
@@ -1675,7 +1675,7 @@ function LabeledInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]"
+        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
       />
     </label>
   );

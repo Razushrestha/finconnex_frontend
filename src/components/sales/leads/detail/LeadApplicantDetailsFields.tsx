@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const fieldShell =
-  "h-12 w-full rounded-lg bg-white px-3.5 text-[14px] text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.07)] outline-none ring-1 ring-black/5 focus:ring-2 focus:ring-[#5A32A3] disabled:bg-slate-50";
+  "h-12 w-full rounded-lg bg-white px-3.5 text-[14px] text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.07)] outline-none ring-1 ring-black/5 focus:ring-2 focus:ring-[var(--brand-primary)] disabled:bg-slate-50";
 
 export function LeadApplicantDetailsFields({
   valueOf,
@@ -163,7 +163,7 @@ export function LeadApplicantDetailsFields({
               className={cn(
                 "h-11 min-w-[72px] rounded-lg px-5 text-[13px] font-semibold",
                 valueOf("nameChanged") === opt
-                  ? "bg-[#EDE4F7] text-[#5A32A3]"
+                  ? "bg-[var(--brand-primary-muted)] text-[var(--brand-primary)]"
                   : "bg-white text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.07)] ring-1 ring-black/5",
               )}
             >
@@ -198,7 +198,7 @@ export function LeadApplicantDetailsFields({
               className={cn(
                 "h-11 rounded-lg px-2 text-center text-[12px] font-semibold leading-tight sm:text-[13px]",
                 valueOf("residency") === opt
-                  ? "bg-[#EDE4F7] text-[#5A32A3]"
+                  ? "bg-[var(--brand-primary-muted)] text-[var(--brand-primary)]"
                   : "bg-white text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.07)] ring-1 ring-black/5",
               )}
             >
@@ -250,7 +250,7 @@ export function LeadApplicantDetailsFields({
             <button
               type="button"
               onClick={() => setCardHelp((value) => !value)}
-              className="mt-1.5 text-[12px] font-semibold text-[#5A32A3] hover:underline"
+              className="mt-1.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
             >
               Where can I find this?
             </button>
@@ -330,7 +330,7 @@ function PhoneField({
         {label}
         {required ? <span className="text-rose-500"> *</span> : null}
       </span>
-      <div className="flex overflow-hidden rounded-lg bg-white shadow-[0_2px_10px_rgba(15,23,42,0.07)] ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+      <div className="flex overflow-hidden rounded-lg bg-white shadow-[0_2px_10px_rgba(15,23,42,0.07)] ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)]">
         <span className="flex items-center gap-1.5 border-r border-slate-100 bg-white px-3 text-[13px] font-semibold text-slate-700">
           <span aria-hidden>🇦🇺</span>
           <ChevronDown className="h-3 w-3 text-slate-400" />
@@ -377,7 +377,7 @@ function ChoiceField({
               className={cn(
                 "inline-flex h-11 items-center justify-center rounded-lg px-5 text-[13px] font-semibold",
                 active
-                  ? "bg-[#EDE4F7] text-[#5A32A3]"
+                  ? "bg-[var(--brand-primary-muted)] text-[var(--brand-primary)]"
                   : "bg-white text-slate-700 shadow-[0_2px_10px_rgba(15,23,42,0.07)] ring-1 ring-black/5 hover:bg-slate-50",
               )}
             >
@@ -496,11 +496,11 @@ function FancySelect({
         onClick={() => setOpen((value) => !value)}
         className={cn(
           "flex h-12 w-full items-center justify-between rounded-lg bg-white px-3.5 text-left text-[14px] text-slate-900 shadow-[0_2px_10px_rgba(15,23,42,0.07)] outline-none ring-1 ring-black/5",
-          open && "ring-2 ring-[#5A32A3]",
+          open && "ring-2 ring-[var(--brand-primary)]",
         )}
       >
         <span className={value ? "" : "text-slate-400"}>{value || placeholder}</span>
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-50 text-[#5A32A3]">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-50 text-[var(--brand-primary)]">
           <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
         </span>
       </button>

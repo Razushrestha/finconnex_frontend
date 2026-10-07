@@ -42,7 +42,7 @@ export const ACCENT = "#5A4FCF";
 const POPOVER =
   "absolute left-0 right-0 z-30 rounded-2xl border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.14)]";
 const SEARCH_INPUT =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white text-[14px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A4FCF]";
+  "h-11 w-full rounded-xl border border-slate-200 bg-white text-[14px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary-strong)]";
 
 type Icon = ComponentType<{ className?: string }>;
 
@@ -96,11 +96,11 @@ export function PickerTrigger({
       onClick={onClick}
       className={cn(
         "flex h-[58px] w-full items-center gap-3 rounded-xl border bg-white px-3 text-left transition-colors outline-none",
-        "focus-visible:border-[#5A4FCF] focus-visible:ring-2 focus-visible:ring-[#5A4FCF]/15",
+        "focus-visible:border-[var(--brand-primary-strong)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary-strong)]/15",
         invalid
           ? "border-rose-300"
           : open
-            ? "border-[#5A4FCF]"
+            ? "border-[var(--brand-primary-strong)]"
             : "border-slate-200 hover:border-slate-300",
       )}
     >
@@ -428,8 +428,8 @@ export function DateTimePicker({
               className={cn(
                 "h-11 w-full rounded-full border text-[14px] font-medium transition-colors",
                 slot.startTime === selectedSlot
-                  ? "border-[#5A4FCF] bg-[#5A4FCF] text-white"
-                  : "border-[#5A4FCF] bg-white text-slate-700 hover:bg-[#F4F2FF]",
+                  ? "border-[var(--brand-primary-strong)] bg-[var(--brand-primary-strong)] text-white"
+                  : "border-[var(--brand-primary-strong)] bg-white text-slate-700 hover:bg-[#F4F2FF]",
               )}
             >
               {slotClockLabel(slot.label)}
@@ -507,7 +507,7 @@ export function DateTimePicker({
                         className={cn(
                           "relative mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-[13px] transition-colors",
                           selected
-                            ? "bg-[#5A4FCF] font-semibold text-white after:absolute after:bottom-[3px] after:left-1/2 after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-[3.5px] after:border-b-[4px] after:border-x-transparent after:border-b-white after:content-['']"
+                            ? "bg-[var(--brand-primary-strong)] font-semibold text-white after:absolute after:bottom-[3px] after:left-1/2 after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-[3.5px] after:border-b-[4px] after:border-x-transparent after:border-b-white after:content-['']"
                             : today
                               ? "border border-slate-200 text-slate-800 after:absolute after:bottom-[2px] after:left-1/2 after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-[3.5px] after:border-b-[4px] after:border-x-transparent after:border-b-slate-400 after:content-['']"
                               : past
@@ -517,7 +517,7 @@ export function DateTimePicker({
                       >
                         {cell.day}
                         {hasSlots && !selected && !today ? (
-                          <span className="absolute bottom-[3px] left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#5A4FCF]/60" />
+                          <span className="absolute bottom-[3px] left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[var(--brand-primary-strong)]/60" />
                         ) : null}
                       </button>
                     );
@@ -696,7 +696,7 @@ function CustomerPopover({
                             }}
                             className={cn(
                               "block w-full px-3 py-1.5 text-left text-[14px] text-slate-700 hover:bg-slate-50",
-                              item === source && "font-semibold text-[#5A4FCF]",
+                              item === source && "font-semibold text-[var(--brand-primary-strong)]",
                             )}
                           >
                             {item}
@@ -803,7 +803,7 @@ function NewCustomerForm({
     }
   }
 
-  const input = "h-10 w-full rounded-lg border border-slate-200 px-3 text-[14px] outline-none placeholder:text-slate-400 focus:border-[#5A4FCF]";
+  const input = "h-10 w-full rounded-lg border border-slate-200 px-3 text-[14px] outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary-strong)]";
   return (
     <form
       noValidate
@@ -843,7 +843,7 @@ function NewCustomerForm({
         <button
           type="submit"
           disabled={busy}
-          className="h-10 flex-1 rounded-lg bg-[#5A4FCF] text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-60"
+          className="h-10 flex-1 rounded-lg bg-[var(--brand-primary-strong)] text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-60"
         >
           {busy ? "Adding…" : "Add Customer"}
         </button>
@@ -893,7 +893,7 @@ export function PaymentDetailsCard({
               className={cn(
                 "h-9 min-w-[72px] rounded-lg border px-4 text-[14px] font-medium transition-colors",
                 status === item
-                  ? "border-[#5A4FCF] bg-[#EEEDFB] text-[#5A4FCF]"
+                  ? "border-[var(--brand-primary-strong)] bg-[#EEEDFB] text-[var(--brand-primary-strong)]"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
               )}
             >
@@ -903,7 +903,7 @@ export function PaymentDetailsCard({
         </div>
         <p className="mt-3 mb-1.5 text-[12px] text-slate-500">Payment Details</p>
         <div className="flex items-center gap-3">
-          <div className="flex h-10 min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-[#5A4FCF]">
+          <div className="flex h-10 min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-[var(--brand-primary-strong)]">
             <span className="flex items-center border-r border-slate-200 bg-slate-100 px-3 text-[13px] font-medium text-slate-500">
               {currencyPrefix(currency)}
             </span>

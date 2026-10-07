@@ -24,10 +24,10 @@ const labelClass =
   "text-[11px] font-medium uppercase tracking-wide text-gray-500";
 
 const selectClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 focus:border-[#5A32A3] focus:outline-none focus:ring-2 focus:ring-[#5A32A3]/20";
+  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20";
 
 const inputClass =
-  "rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 focus:border-[#5A32A3] focus:outline-none focus:ring-2 focus:ring-[#5A32A3]/20";
+  "rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20";
 
 interface RepeatReminderFieldsProps {
   value: ReminderRepeatRule;
@@ -258,7 +258,7 @@ export function RepeatReminderFields({
             <input
               type="radio"
               name={monthlyName}
-              className="h-4 w-4 accent-[#5A32A3]"
+              className="h-4 w-4 accent-[var(--brand-primary)]"
               checked={monthlyMode === "day"}
               onChange={() => patch({ monthlyMode: "day" as MonthlyRepeatMode })}
             />
@@ -286,7 +286,7 @@ export function RepeatReminderFields({
             <input
               type="radio"
               name={monthlyName}
-              className="h-4 w-4 accent-[#5A32A3]"
+              className="h-4 w-4 accent-[var(--brand-primary)]"
               checked={monthlyMode === "weekday"}
               onChange={() =>
                 patch({
@@ -341,7 +341,7 @@ export function RepeatReminderFields({
             <input
               type="radio"
               name={yearlyName}
-              className="h-4 w-4 accent-[#5A32A3]"
+              className="h-4 w-4 accent-[var(--brand-primary)]"
               checked={monthlyMode === "day"}
               onChange={() => patch({ monthlyMode: "day" as MonthlyRepeatMode })}
             />
@@ -386,7 +386,7 @@ export function RepeatReminderFields({
             <input
               type="radio"
               name={yearlyName}
-              className="h-4 w-4 accent-[#5A32A3]"
+              className="h-4 w-4 accent-[var(--brand-primary)]"
               checked={monthlyMode === "weekday"}
               onChange={() =>
                 patch({
@@ -464,7 +464,7 @@ export function RepeatReminderFields({
                   className={cn(
                     "inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium",
                     checked
-                      ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
+                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                       : "border-slate-200 bg-white text-slate-600",
                   )}
                 >
@@ -528,7 +528,7 @@ export function RepeatReminderFields({
         <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-800">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
             checked={Boolean(value.exceptWeekendsAndHolidays)}
             onChange={(e) =>
               patch({ exceptWeekendsAndHolidays: e.target.checked })
@@ -558,7 +558,7 @@ export function RepeatReminderFields({
               <input
                 type="radio"
                 name={endsName}
-                className="h-4 w-4 accent-[#5A32A3]"
+                className="h-4 w-4 accent-[var(--brand-primary)]"
                 checked={value.ends === "never"}
                 onChange={() => patch({ ends: "never" })}
               />
@@ -568,7 +568,7 @@ export function RepeatReminderFields({
               <input
                 type="radio"
                 name={endsName}
-                className="h-4 w-4 accent-[#5A32A3]"
+                className="h-4 w-4 accent-[var(--brand-primary)]"
                 checked={value.ends === "after"}
                 onChange={() => patch({ ends: "after" })}
               />
@@ -596,7 +596,7 @@ export function RepeatReminderFields({
               <input
                 type="radio"
                 name={endsName}
-                className="h-4 w-4 accent-[#5A32A3]"
+                className="h-4 w-4 accent-[var(--brand-primary)]"
                 checked={value.ends === "on"}
                 onChange={() =>
                   patch({

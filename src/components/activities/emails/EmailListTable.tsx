@@ -269,7 +269,7 @@ export function EmailListTable({
             checked={allSelected}
             onChange={toggleSelectAll}
             aria-label="Select all emails"
-            className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3]"
+            className="h-4 w-4 rounded border-slate-300 text-[var(--brand-primary)] accent-[var(--brand-primary)]"
           />
         </label>
         <span className="mr-auto text-[13px] font-semibold text-slate-700">
@@ -549,7 +549,7 @@ export function EmailListTable({
               className={cn(
                 "group flex cursor-pointer items-start gap-1.5 border-b border-slate-100 px-2 py-2.5 transition-colors",
                 selected
-                  ? "bg-[#F3ECFB]"
+                  ? "bg-[var(--brand-primary-soft)]"
                   : sent
                     ? "bg-white hover:bg-slate-50"
                     : unread
@@ -570,7 +570,7 @@ export function EmailListTable({
                   type="checkbox"
                   readOnly
                   checked={selected}
-                  className="pointer-events-none h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3]"
+                  className="pointer-events-none h-4 w-4 rounded border-slate-300 text-[var(--brand-primary)] accent-[var(--brand-primary)]"
                 />
               </button>
 
@@ -595,7 +595,7 @@ export function EmailListTable({
 
               {flags.pinned ? (
                 <span className="mt-2 flex h-6 w-4 shrink-0 items-center justify-center" title="Pinned">
-                  <Pin className="h-3.5 w-3.5 fill-[#5A32A3] text-[#5A32A3]" />
+                  <Pin className="h-3.5 w-3.5 fill-[var(--brand-primary)] text-[var(--brand-primary)]" />
                 </span>
               ) : (
                 <span className="w-0 shrink-0" />
@@ -614,7 +614,7 @@ export function EmailListTable({
                 <div className="flex items-center gap-2">
                   {unread ? (
                     <span
-                      className="h-2 w-2 shrink-0 rounded-full bg-[#5A32A3]"
+                      className="h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary)]"
                       aria-hidden
                     />
                   ) : null}
@@ -706,12 +706,12 @@ export function EmailListTable({
                           type="button"
                           title={flags.pinned ? "Unpin" : "Pin"}
                           onClick={() => move([email.id], "pinned")}
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                         >
                           <Pin
                             className={cn(
                               "h-3.5 w-3.5",
-                              flags.pinned && "fill-[#5A32A3] text-[#5A32A3]",
+                              flags.pinned && "fill-[var(--brand-primary)] text-[var(--brand-primary)]",
                             )}
                           />
                         </button>
@@ -720,7 +720,7 @@ export function EmailListTable({
                             type="button"
                             title={folder === "spam" ? "Not spam" : "Restore"}
                             onClick={() => restoreEmails([email.id])}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </button>
@@ -730,7 +730,7 @@ export function EmailListTable({
                               type="button"
                               title="Archive"
                               onClick={() => move([email.id], "archived")}
-                              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                             >
                               <Archive className="h-3.5 w-3.5" />
                             </button>
@@ -756,7 +756,7 @@ export function EmailListTable({
                           type="button"
                           title={unread ? "Mark as read" : "Mark as unread"}
                           onClick={() => markReadState([email.id], unread)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                         >
                           {unread ? (
                             <MailOpen className="h-3.5 w-3.5" />
@@ -770,7 +770,7 @@ export function EmailListTable({
                           onClick={() =>
                             setLabelMenuFor((id) => (id === email.id ? null : email.id))
                           }
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </button>
@@ -795,7 +795,7 @@ export function EmailListTable({
                                     className={cn(
                                       "flex h-3.5 w-3.5 items-center justify-center rounded border",
                                       on
-                                        ? "border-[#5A32A3] bg-[#5A32A3] text-white"
+                                        ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white"
                                         : "border-slate-300",
                                     )}
                                   >

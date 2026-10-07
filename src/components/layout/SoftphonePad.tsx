@@ -737,7 +737,7 @@ export function SoftphonePad({
             type="button"
             disabled={!noteBody.trim()}
             onClick={saveCallNote}
-            className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-[#5A32A3] text-[13px] font-semibold text-white disabled:opacity-40"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-[var(--brand-primary)] text-[13px] font-semibold text-white disabled:opacity-40"
           >
             <StickyNote className="h-3.5 w-3.5" />
             Save
@@ -1369,7 +1369,7 @@ function RelatedRecordSearch({
 
   return (
     <div ref={wrapRef} className="relative mt-1.5">
-      <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 focus-within:border-[#5A32A3]">
+      <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 focus-within:border-[var(--brand-primary)]">
         <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
         <input
           value={query}
@@ -1417,7 +1417,7 @@ function RelatedRecordSearch({
                 className={cn(
                   "flex w-full px-3 py-1.5 text-left text-[12px] hover:bg-violet-50",
                   value?.id === item.id
-                    ? "font-semibold text-[#5A32A3]"
+                    ? "font-semibold text-[var(--brand-primary)]"
                     : "text-slate-700",
                 )}
               >
@@ -1492,7 +1492,7 @@ function CallNoteComposer({
     <div className="flex h-full min-h-0 flex-col py-0.5">
       <div className="shrink-0 border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5A32A3] text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white">
             <Phone className="h-4 w-4" />
           </span>
           <div className="min-w-0">
@@ -1537,7 +1537,7 @@ function CallNoteComposer({
                 className={cn(
                   "h-9 rounded-lg border text-[12px] font-medium",
                   active
-                    ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
+                    ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
                 )}
               >
@@ -1555,7 +1555,7 @@ function CallNoteComposer({
           onChange={(e) =>
             onRelatedKind(e.target.value as "" | SoftphoneRelatedKind)
           }
-          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[#5A32A3]"
+          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[var(--brand-primary)]"
         >
           <option value="">None</option>
           <option value="Lead">Lead</option>
@@ -1611,7 +1611,7 @@ function CallNoteComposer({
               type="button"
               disabled={!body.trim()}
               onClick={onSave}
-              className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-[#5A32A3] text-[12px] font-semibold text-white disabled:opacity-40"
+              className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-[var(--brand-primary)] text-[12px] font-semibold text-white disabled:opacity-40"
             >
               <StickyNote className="h-3.5 w-3.5" />
               Save

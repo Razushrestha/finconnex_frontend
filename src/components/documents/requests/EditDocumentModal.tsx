@@ -71,7 +71,7 @@ export function EditDocumentModal({
             maxLength={DESC_MAX}
             rows={5}
             onChange={(e) => setValue(e.target.value.slice(0, DESC_MAX))}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 pb-7 text-[13px] leading-relaxed text-slate-800 outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 pb-7 text-[13px] leading-relaxed text-slate-800 outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
           />
           <span className="pointer-events-none absolute right-2.5 bottom-2 text-[11px] text-slate-400">
             {value.length}/{DESC_MAX}
@@ -83,7 +83,7 @@ export function EditDocumentModal({
             type="checkbox"
             checked={applyToTemplates}
             onChange={(e) => setApplyToTemplates(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3]"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[var(--brand-primary)] accent-[var(--brand-primary)]"
           />
           <span>
             <span className="block text-[13px] font-medium text-slate-800">

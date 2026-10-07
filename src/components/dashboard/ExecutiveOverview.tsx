@@ -103,7 +103,7 @@ function WidgetLink({ href, children }: { href: string; children: string }) {
   return (
     <Link
       href={href}
-      className="mt-auto inline-flex shrink-0 items-center gap-1 pt-3 text-[11px] font-semibold text-[#5A32A3] hover:underline"
+      className="mt-auto inline-flex shrink-0 items-center gap-1 pt-3 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
     >
       {children}
       <ArrowRight className="h-3 w-3" />
@@ -216,7 +216,7 @@ export function ExecutiveKpis({ data }: { data: ExecutiveData }) {
         icon={Handshake}
         href="/sales/deals"
         vs={vs}
-        iconClass="bg-violet-50 text-[#5A32A3]"
+        iconClass="bg-violet-50 text-[var(--brand-primary)]"
         sparkColor="#7C3AED"
       />
       <KpiCard
@@ -369,7 +369,7 @@ export function PerformanceSnapshot({ data }: { data: ExecutiveData }) {
       delta: data.avgDealSizeDelta,
       suffix: "%",
       icon: Briefcase,
-      iconClass: "bg-violet-50 text-[#5A32A3]",
+      iconClass: "bg-violet-50 text-[var(--brand-primary)]",
     },
   ];
   return (
@@ -477,7 +477,7 @@ export function CriticalActions({ data }: { data: ExecutiveData }) {
           <Link
             key={item.label}
             href={item.href}
-            className="flex items-center justify-between py-2.5 text-[13px] hover:text-[#5A32A3]"
+            className="flex items-center justify-between py-2.5 text-[13px] hover:text-[var(--brand-primary)]"
           >
             <span className="flex items-center gap-2 text-slate-600">
               <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg", item.tone)}>
@@ -489,7 +489,7 @@ export function CriticalActions({ data }: { data: ExecutiveData }) {
               className={cn(
                 "inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-[12px] font-bold",
                 item.value > 0
-                  ? "bg-violet-50 text-[#5A32A3]"
+                  ? "bg-violet-50 text-[var(--brand-primary)]"
                   : "bg-slate-50 text-slate-400",
               )}
             >
@@ -595,7 +595,7 @@ export function TopPerforming({ data }: { data: ExecutiveData }) {
               onClick={() => setTab(id)}
               className={cn(
                 "rounded-md px-2 py-1 text-[11px] font-semibold",
-                tab === id ? "bg-white text-[#5A32A3] shadow-sm" : "text-slate-500",
+                tab === id ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-slate-500",
               )}
             >
               {label}
@@ -618,7 +618,7 @@ export function AlertsInsights({ data }: { data: ExecutiveData }) {
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex shrink-0 items-center justify-between">
         <h3 className="text-[13px] font-semibold text-slate-900">Alerts & Insights</h3>
-        <Link href="/?view=performance" className="text-[11px] font-semibold text-[#5A32A3] hover:underline">
+        <Link href="/?view=performance" className="text-[11px] font-semibold text-[var(--brand-primary)] hover:underline">
           View All Insights
         </Link>
       </div>
@@ -670,7 +670,7 @@ export function ExecutiveFooter({ data }: { data: ExecutiveData }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 text-[var(--brand-primary)]">
           <CheckCircle2 className="h-4 w-4" />
         </span>
         <h3 className="text-[13px] font-semibold text-slate-900">Executive Summary</h3>

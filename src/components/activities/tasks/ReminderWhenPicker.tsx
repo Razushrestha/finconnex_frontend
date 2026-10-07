@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 const RELATIVE_COUNTS = Array.from({ length: 31 }, (_, i) => i);
 
 const fieldClass =
-  "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+  "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -127,7 +127,7 @@ export function ReminderWhenPicker({
         className={cn(
           "w-full rounded-xl border p-3 text-left transition-colors",
           mode === "onDate"
-            ? "border-[#5A32A3] bg-white shadow-sm"
+            ? "border-[var(--brand-primary)] bg-white shadow-sm"
             : "border-slate-200 bg-white/70 hover:border-slate-300",
         )}
       >
@@ -135,7 +135,7 @@ export function ReminderWhenPicker({
           <input
             type="radio"
             name={name}
-            className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+            className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
             checked={mode === "onDate"}
             onChange={() => onModeChange("onDate")}
           />
@@ -188,7 +188,7 @@ export function ReminderWhenPicker({
         className={cn(
           "w-full rounded-xl border p-3 text-left transition-colors",
           mode === "relative"
-            ? "border-[#5A32A3] bg-white shadow-sm"
+            ? "border-[var(--brand-primary)] bg-white shadow-sm"
             : "border-slate-200 bg-white/70 hover:border-slate-300",
         )}
       >
@@ -196,7 +196,7 @@ export function ReminderWhenPicker({
           <input
             type="radio"
             name={name}
-            className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+            className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
             checked={mode === "relative"}
             onChange={() => onModeChange("relative")}
           />
@@ -253,7 +253,7 @@ export function ReminderWhenPicker({
               />
             </span>
             {mode === "relative" && preview ? (
-              <span className="mt-2 block text-[11px] font-medium text-[#5A32A3]">
+              <span className="mt-2 block text-[11px] font-medium text-[var(--brand-primary)]">
                 Reminds {preview}
               </span>
             ) : null}

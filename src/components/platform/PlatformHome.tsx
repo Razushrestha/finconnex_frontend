@@ -105,7 +105,7 @@ export function PlatformHome() {
           href="/platform/workspaces"
           className="group rounded-3xl border border-white bg-white p-6 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5A32A3]/10 text-[#5A32A3]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]">
             <Building2 className="h-5 w-5" />
           </div>
           <h3 className="mt-4 text-lg font-semibold">All workspaces</h3>
@@ -113,7 +113,7 @@ export function PlatformHome() {
             Search tenants, suspend or restore, then enter one. Entering mints a
             workspace JWT for the normal CRM dashboard.
           </p>
-          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5A32A3]">
+          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand-primary)]">
             Open directory
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </span>
@@ -122,7 +122,7 @@ export function PlatformHome() {
           href="/platform/users"
           className="group rounded-3xl border border-white bg-white p-6 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-[#5A32A3]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-[var(--brand-primary)]">
             <Users className="h-5 w-5" />
           </div>
           <h3 className="mt-4 text-lg font-semibold">Platform users</h3>
@@ -131,7 +131,7 @@ export function PlatformHome() {
             <span className="font-mono text-[12px]">globalRole</span> including
             Super Admin.
           </p>
-          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5A32A3]">
+          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand-primary)]">
             Open users
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </span>
@@ -160,7 +160,7 @@ function StatCard({
         <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
           {label}
         </p>
-        <Icon className="h-4 w-4 text-[#5A32A3]" />
+        <Icon className="h-4 w-4 text-[var(--brand-primary)]" />
       </div>
       <p
         className={

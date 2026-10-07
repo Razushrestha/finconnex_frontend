@@ -102,13 +102,13 @@ export function CallTranscriptSection({
             className={cn(
               "relative pb-1 text-xs font-medium transition-colors",
               activeTab === key
-                ? "font-semibold text-[#5A32A3]"
+                ? "font-semibold text-[var(--brand-primary)]"
                 : "text-slate-400 hover:text-slate-700",
             )}
           >
             {label}
             {activeTab === key ? (
-              <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
+              <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[var(--brand-primary)]" />
             ) : null}
           </button>
         ))}
@@ -155,7 +155,7 @@ export function CallTranscriptSection({
                 type="button"
                 onClick={handleSave}
                 disabled={!draft.trim() || draft.trim() === saved}
-                className="bg-[#5A32A3] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="bg-[var(--brand-primary)] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Save Note
               </button>
@@ -194,7 +194,7 @@ export function CallTranscriptSection({
                   type="button"
                   disabled={!pendingFiles.length || uploading}
                   onClick={() => void handleUploadAttachments()}
-                  className="bg-[#5A32A3] px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="bg-[var(--brand-primary)] px-4 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {uploading ? "Uploading…" : "Add attachments"}
                 </button>
@@ -223,7 +223,7 @@ function Bubble({
       <div
         className={cn(
           "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
-          self ? "bg-[#F3ECFB] text-[#5A32A3]" : avatarColor(name),
+          self ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]" : avatarColor(name),
         )}
       >
         {initials(name)}

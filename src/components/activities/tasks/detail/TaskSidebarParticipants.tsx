@@ -199,7 +199,7 @@ export function TaskSidebarParticipants({
             }}
             className={cn(
               "text-slate-400 hover:text-slate-700",
-              searchOpen && "text-[#5A32A3]",
+              searchOpen && "text-[var(--brand-primary)]",
             )}
             aria-label="Add participant"
             aria-expanded={searchOpen}
@@ -214,7 +214,7 @@ export function TaskSidebarParticipants({
             key={`${person.role}-${person.name}`}
             className="flex items-center gap-2"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3ECFB] text-xs font-bold text-[#5A32A3]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-xs font-bold text-[var(--brand-primary)]">
               {initials(person.name || "P")}
             </span>
             <div className="min-w-0 flex-1 border-b border-slate-100 pb-2">
@@ -237,7 +237,7 @@ export function TaskSidebarParticipants({
         {editing && searchOpen ? (
           <div ref={searchRef} className="relative">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3ECFB] text-xs font-bold text-[#5A32A3]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-xs font-bold text-[var(--brand-primary)]">
                 {query.trim() ? initials(query) : "P"}
               </span>
               <div className="min-w-0 flex-1">
@@ -258,7 +258,7 @@ export function TaskSidebarParticipants({
                       }
                     }}
                     placeholder="Search collaborators…"
-                    className="w-full border-b border-[#5A32A3] bg-transparent py-0.5 pl-4 text-xs font-medium text-slate-800 outline-none"
+                    className="w-full border-b border-[var(--brand-primary)] bg-transparent py-0.5 pl-4 text-xs font-medium text-slate-800 outline-none"
                   />
                 </div>
                 <p className="text-[10px] text-slate-400">Collaborator</p>
@@ -271,9 +271,9 @@ export function TaskSidebarParticipants({
                     <button
                       type="button"
                       onClick={() => addCollaborator(name)}
-                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                     >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F3ECFB] text-[10px] font-bold text-[#5A32A3]">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-[10px] font-bold text-[var(--brand-primary)]">
                         {initials(name)}
                       </span>
                       {name}

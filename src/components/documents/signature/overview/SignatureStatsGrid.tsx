@@ -103,7 +103,7 @@ export function SignatureStatsGrid() {
         <Link
           key={stat.label}
           href={stat.href}
-          className="group rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-[#5A32A3]/25"
+          className="group rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-[var(--brand-primary)]/25"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -113,7 +113,7 @@ export function SignatureStatsGrid() {
               <p className="mt-1 text-[26px] leading-none font-bold tracking-tight text-slate-900">
                 {stat.value}
               </p>
-              <p className="mt-1.5 text-[11px] leading-snug font-medium text-[#5A32A3] group-hover:underline">
+              <p className="mt-1.5 text-[11px] leading-snug font-medium text-[var(--brand-primary)] group-hover:underline">
                 {stat.link}
               </p>
             </div>

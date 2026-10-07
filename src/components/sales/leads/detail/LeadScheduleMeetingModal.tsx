@@ -59,7 +59,7 @@ type MeetingDraft = {
   owner: string;
 };
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 
 function todayIso() {
   const now = new Date();

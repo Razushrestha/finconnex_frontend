@@ -468,7 +468,7 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
               type="radio"
               checked={locationMode === "default"}
               onChange={() => onLocationModeChange("default")}
-              className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+              className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
             />
             <span>
               Calendar default
@@ -483,7 +483,7 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
                 type="radio"
                 checked={locationMode === "custom"}
                 onChange={() => onLocationModeChange("custom")}
-                className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+                className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
               />
               <span>
                 Custom

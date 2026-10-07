@@ -326,7 +326,7 @@ export function ComposeActionBar({
                   <Check
                     className={cn(
                       "h-3.5 w-3.5 shrink-0",
-                      item.id === activeId ? "text-[#5A32A3]" : "text-transparent",
+                      item.id === activeId ? "text-[var(--brand-primary)]" : "text-transparent",
                     )}
                   />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -357,7 +357,7 @@ export function ComposeActionBar({
                   <Check
                     className={cn(
                       "mt-0.5 h-3.5 w-3.5 shrink-0",
-                      profile.id === activeId ? "text-[#5A32A3]" : "text-transparent",
+                      profile.id === activeId ? "text-[var(--brand-primary)]" : "text-transparent",
                     )}
                   />
                   <span className="min-w-0">
@@ -373,7 +373,7 @@ export function ComposeActionBar({
                   type="button"
                   disabled={sigBusy}
                   onClick={() => signatureFileRef.current?.click()}
-                  className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[#5A32A3]/30 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-50"
+                  className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[var(--brand-primary)]/30 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-50"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   {sigBusy ? "Saving…" : "Upload signature"}
@@ -418,7 +418,7 @@ export function ComposeActionBar({
             }}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >
-            <Bell className="h-3.5 w-3.5 text-[#5A32A3]" />
+            <Bell className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
             Follow up
             <ChevronDown className="h-3 w-3 text-slate-400" />
           </button>
@@ -445,12 +445,12 @@ export function ComposeActionBar({
         </div>
 
         <div className="relative" ref={sendRef}>
-          <div className="inline-flex h-9 overflow-hidden rounded-lg bg-[#5A32A3] shadow-sm">
+          <div className="inline-flex h-9 overflow-hidden rounded-lg bg-[var(--brand-primary)] shadow-sm">
             <button
               type="button"
               disabled={sending}
               onClick={() => onSend("now")}
-              className="inline-flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold text-white hover:bg-[#4a2888] disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 px-4 text-[13px] font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-50"
             >
               {sending ? "Sending…" : "Send"}
               <Send className="h-3.5 w-3.5" />
@@ -465,7 +465,7 @@ export function ComposeActionBar({
                 setSendOpen(next);
                 setScheduleOpen(false);
               }}
-              className="border-l border-white/20 px-2 text-white hover:bg-[#4a2888] disabled:opacity-50"
+              className="border-l border-white/20 px-2 text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-50"
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -479,7 +479,7 @@ export function ComposeActionBar({
                   onSend("now");
                 }}
               >
-                <Send className="h-3.5 w-3.5 text-[#5A32A3]" />
+                <Send className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                 Send now
               </MenuItem>
               <MenuItem
@@ -488,15 +488,15 @@ export function ComposeActionBar({
                   setScheduleOpen(true);
                 }}
               >
-                <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                 Schedule send
               </MenuItem>
               <MenuItem onClick={() => scheduleFor(tomorrowNine())}>
-                <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                 Tomorrow 9:00 AM
               </MenuItem>
               <MenuItem onClick={() => scheduleFor(nextMondayNine())}>
-                <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                 Next Monday 9:00 AM
               </MenuItem>
               <div className="my-1 border-t border-slate-100" />
@@ -522,7 +522,7 @@ export function ComposeActionBar({
                 min={toLocalInput(new Date())}
                 value={scheduleAt}
                 onChange={(event) => setScheduleAt(event.target.value)}
-                className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]"
+                className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]"
               />
               {!scheduleValid ? (
                 <p className="mt-1 text-[11px] text-red-600">Choose a time in the future.</p>
@@ -544,7 +544,7 @@ export function ComposeActionBar({
                   onClick={() => {
                     if (scheduleDate) scheduleFor(scheduleDate);
                   }}
-                  className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888] disabled:opacity-40"
+                  className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:opacity-40"
                 >
                   Schedule
                 </button>
@@ -581,10 +581,10 @@ function ChipButton({
       className={cn(
         "inline-flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[12px] font-medium shadow-sm disabled:opacity-50",
         emphasize
-          ? "border-violet-200 text-[#5A32A3]"
+          ? "border-violet-200 text-[var(--brand-primary)]"
           : "border-slate-200 text-slate-700",
         active && "border-violet-300 bg-violet-50",
-        !emphasize && "[&_svg]:text-[#5A32A3]",
+        !emphasize && "[&_svg]:text-[var(--brand-primary)]",
       )}
     >
       {children}

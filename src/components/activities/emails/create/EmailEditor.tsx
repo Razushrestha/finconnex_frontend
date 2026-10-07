@@ -236,8 +236,8 @@ export function EmailEditor({
       ) : null}
 
       {dragging ? (
-        <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-[#5A32A3] bg-[#5A32A3]/8">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#5A32A3] shadow-sm">
+        <div className="pointer-events-none absolute inset-4 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--brand-primary)] bg-[var(--brand-primary)]/8">
+          <p className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[var(--brand-primary)] shadow-sm">
             <Paperclip className="h-4 w-4" />
             Drop files to attach
           </p>

@@ -64,7 +64,7 @@ export function ProvideDocumentsClient({
   return (
     <div className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-10">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-[0.14em] text-[#5A32A3] uppercase">
+        <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--brand-primary)] uppercase">
           Document request
         </p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
@@ -120,7 +120,7 @@ export function ProvideDocumentsClient({
                       disabled={busy || Boolean(busyId)}
                       onClick={() => openPicker(item.id)}
                       className={cn(
-                        "mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 py-1.5 text-xs font-semibold text-white",
+                        "mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-white",
                         "disabled:opacity-50",
                       )}
                     >

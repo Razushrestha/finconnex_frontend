@@ -263,13 +263,13 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
           </button>
           <button
             type="button"
-            className={cn(toolBtn, flags.pinned && "text-[#5A32A3]")}
+            className={cn(toolBtn, flags.pinned && "text-[var(--brand-primary)]")}
             onClick={() => {
               toggleMailboxFlag(email.id, "pinned");
               refresh();
             }}
           >
-            <Pin className={cn("h-3.5 w-3.5", flags.pinned && "fill-[#5A32A3]")} />
+            <Pin className={cn("h-3.5 w-3.5", flags.pinned && "fill-[var(--brand-primary)]")} />
             Pin
           </button>
           <button
@@ -378,7 +378,7 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
               </span>
             ) : null}
             {flags.pinned ? (
-              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-[#5A32A3]">
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-[var(--brand-primary)]">
                 Pinned
               </span>
             ) : null}
@@ -409,8 +409,8 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
               onClick={() => setSummary(summariseEmail(email))}
               className="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
             >
-              <ListTree className="h-3.5 w-3.5 text-[#5A32A3]" />
-              <Sparkles className="h-3 w-3 text-[#5A32A3]" />
+              <ListTree className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
+              <Sparkles className="h-3 w-3 text-[var(--brand-primary)]" />
               Summarise
             </button>
             <div className="relative" ref={emojiRef}>
@@ -498,9 +498,9 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
           </div>
 
           {summary ? (
-            <div className="mt-4 rounded-xl border border-violet-100 bg-[#F8F4FC] px-4 py-3">
+            <div className="mt-4 rounded-xl border border-violet-100 bg-[var(--brand-primary-faint)] px-4 py-3">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#5A32A3]">
+                <p className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--brand-primary)]">
                   <Sparkles className="h-3.5 w-3.5" />
                   AI Email Summary
                 </p>
@@ -508,7 +508,7 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
                   <button
                     type="button"
                     onClick={() => setSummary(summariseEmail(email))}
-                    className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#5A32A3]"
+                    className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-[var(--brand-primary)]"
                   >
                     Generate Summary
                   </button>
@@ -538,7 +538,7 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
                   <Paperclip className="h-3.5 w-3.5" />
                   {files.length} Attachment{files.length === 1 ? "" : "s"}
                 </p>
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#5A32A3]">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--brand-primary)]">
                   <Download className="h-3.5 w-3.5" />
                   Download All
                 </span>

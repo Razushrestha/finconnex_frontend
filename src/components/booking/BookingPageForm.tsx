@@ -84,7 +84,7 @@ const DURATION_PRESETS = [15, 30, 45, 60, 90];
 const BUFFER_PRESETS = [0, 5, 10, 15, 30];
 const NOTICE_PRESETS = [0, 1, 2, 4, 12, 24];
 const ADVANCE_PRESETS = [7, 14, 30, 60, 90];
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 const EVENT_META: Record<
   BookingEventType,
@@ -621,7 +621,7 @@ export function BookingPageForm({
         </p>
         <Link
           href="/booking/schedules"
-          className="text-[13px] font-semibold text-[#5A32A3]"
+          className="text-[13px] font-semibold text-[var(--brand-primary)]"
         >
           Back to schedules
         </Link>
@@ -933,9 +933,9 @@ export function BookingPageForm({
                           className={cn(
                             "relative flex flex-col items-center rounded-lg border px-1 py-1.5 transition-all",
                             selected
-                              ? "border-[#5A32A3] bg-[#F3ECFB] shadow-[0_0_0_2px_rgba(90,50,163,0.12)]"
+                              ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] shadow-[0_0_0_2px_rgba(90,50,163,0.12)]"
                               : r.enabled
-                                ? "border-[#5A32A3]/25 bg-white hover:border-[#5A32A3]/45"
+                                ? "border-[var(--brand-primary)]/25 bg-white hover:border-[var(--brand-primary)]/45"
                                 : "border-slate-200 bg-slate-50/80 text-slate-400 hover:border-slate-300",
                           )}
                         >
@@ -979,7 +979,7 @@ export function BookingPageForm({
                           className={cn(
                             "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold transition-all",
                             selected.enabled
-                              ? "border-[#5A32A3] text-white"
+                              ? "border-[var(--brand-primary)] text-white"
                               : "border-slate-200 bg-white text-slate-500",
                           )}
                           style={
@@ -1427,7 +1427,7 @@ export function BookingPageForm({
                             </span>
                             {name}
                             {consultantPriorities[name] ? (
-                              <span className="text-[8px] text-[#5A32A3]">
+                              <span className="text-[8px] text-[var(--brand-primary)]">
                                 · {consultantPriorities[name]}
                               </span>
                             ) : null}
@@ -1493,7 +1493,7 @@ export function BookingPageForm({
             <button
               type="button"
               onClick={() => onSave(true)}
-              className="h-9 rounded-lg border border-[#5A32A3]/30 bg-[#F3ECFB] px-3.5 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#EDE0F8]"
+              className="h-9 rounded-lg border border-[var(--brand-primary)]/30 bg-[var(--brand-primary-soft)] px-3.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[#EDE0F8]"
             >
               Save &amp; New
             </button>

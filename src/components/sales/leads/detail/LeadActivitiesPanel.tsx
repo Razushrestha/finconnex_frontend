@@ -43,7 +43,7 @@ import type { LeadCardData } from "@/lib/leads/types";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 
 type ActivityType = "task" | "call" | "meeting";
 type StatusFilter = "all" | "open" | "overdue" | "completed";
@@ -490,7 +490,7 @@ export function LeadActivitiesPanel({
             className={cn(
               "inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium",
               filterOpen || type !== "all"
-                ? "border-purple-200 bg-purple-50 text-[#5A32A3]"
+                ? "border-purple-200 bg-purple-50 text-[var(--brand-primary)]"
                 : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
             )}
           >
@@ -561,7 +561,7 @@ export function LeadActivitiesPanel({
                     className={cn(
                       "flex w-full rounded-lg px-2 py-1.5 text-left text-[12px]",
                       priority === id
-                        ? "font-semibold text-[#5A32A3]"
+                        ? "font-semibold text-[var(--brand-primary)]"
                         : "text-slate-700 hover:bg-slate-50",
                     )}
                   >
@@ -589,7 +589,7 @@ export function LeadActivitiesPanel({
                   className={cn(
                     "flex w-full px-3 py-1.5 text-left text-[12px]",
                     sort === id
-                      ? "font-semibold text-[#5A32A3]"
+                      ? "font-semibold text-[var(--brand-primary)]"
                       : "text-slate-700 hover:bg-slate-50",
                   )}
                 >

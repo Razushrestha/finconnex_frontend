@@ -110,7 +110,7 @@ function TableCard({
         </tbody>
       </table>
       </div>
-      <Link href={href} className="mt-auto pt-3 text-[11px] font-semibold text-[#5A32A3] hover:underline">
+      <Link href={href} className="mt-auto pt-3 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline">
         {link} →
       </Link>
     </section>
@@ -157,7 +157,7 @@ export function WorkQueueDashboardView({
           <Kpi label="Tasks Due Today" value={data.tasksDueToday} icon={Clock3} tone="bg-orange-50 text-orange-600" />
           <Kpi label="Follow-ups Due" value={data.followUpsDue} icon={Phone} tone="bg-sky-50 text-sky-600" />
           <Kpi label="Documents Pending" value={data.documentsPending} icon={FileWarning} tone="bg-emerald-50 text-emerald-600" />
-          <Kpi label="Appointments Today" value={data.appointmentsToday} icon={CalendarDays} tone="bg-violet-50 text-[#5A32A3]" />
+          <Kpi label="Appointments Today" value={data.appointmentsToday} icon={CalendarDays} tone="bg-violet-50 text-[var(--brand-primary)]" />
           <Kpi label="SLA Breaches" value={data.slaBreaches} icon={ShieldAlert} tone="bg-amber-50 text-amber-600" />
         </div>
       ),
@@ -277,7 +277,7 @@ export function WorkQueueDashboardView({
               <p className="py-6 text-center text-[12px] text-slate-400">No urgent items.</p>
             )}
           </div>
-          <Link href="/work-queue" className="mt-auto pt-3 text-[11px] font-semibold text-[#5A32A3] hover:underline">
+          <Link href="/work-queue" className="mt-auto pt-3 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline">
             View All ({data.slaBreaches}) →
           </Link>
         </section>

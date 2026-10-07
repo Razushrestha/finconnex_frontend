@@ -47,6 +47,57 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Workspace brand. DashboardShell sets --brand-primary on <html> from the
+ * workspace's branding (Settings → Branding), so every component follows it:
+ * the shades below, the hard-coded brand hex values (now these variables),
+ * and Tailwind's violet / purple / indigo scales, which are re-derived from
+ * the brand so `bg-violet-600`, `text-purple-700`… change with it too.
+ * Set on :root (not the dashboard frame) so dialogs portalled to <body>
+ * inherit it.
+ */
+:root {
+  --brand-primary: #5a32a3;
+  --brand-primary-strong: color-mix(in srgb, var(--brand-primary) 82%, black);
+  --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 9%, white);
+  --brand-primary-muted: color-mix(in srgb, var(--brand-primary) 14%, white);
+  --brand-primary-faint: color-mix(in srgb, var(--brand-primary) 5%, white);
+  --brand-primary-border: color-mix(in srgb, var(--brand-primary) 35%, white);
+  --color-violet-50: color-mix(in srgb, var(--brand-primary) 6%, white);
+  --color-violet-100: color-mix(in srgb, var(--brand-primary) 12%, white);
+  --color-violet-200: color-mix(in srgb, var(--brand-primary) 24%, white);
+  --color-violet-300: color-mix(in srgb, var(--brand-primary) 42%, white);
+  --color-violet-400: color-mix(in srgb, var(--brand-primary) 68%, white);
+  --color-violet-500: color-mix(in srgb, var(--brand-primary) 86%, white);
+  --color-violet-600: var(--brand-primary);
+  --color-violet-700: color-mix(in srgb, var(--brand-primary) 86%, black);
+  --color-violet-800: color-mix(in srgb, var(--brand-primary) 72%, black);
+  --color-violet-900: color-mix(in srgb, var(--brand-primary) 58%, black);
+  --color-violet-950: color-mix(in srgb, var(--brand-primary) 42%, black);
+  --color-purple-50: color-mix(in srgb, var(--brand-primary) 6%, white);
+  --color-purple-100: color-mix(in srgb, var(--brand-primary) 12%, white);
+  --color-purple-200: color-mix(in srgb, var(--brand-primary) 24%, white);
+  --color-purple-300: color-mix(in srgb, var(--brand-primary) 42%, white);
+  --color-purple-400: color-mix(in srgb, var(--brand-primary) 68%, white);
+  --color-purple-500: color-mix(in srgb, var(--brand-primary) 86%, white);
+  --color-purple-600: var(--brand-primary);
+  --color-purple-700: color-mix(in srgb, var(--brand-primary) 86%, black);
+  --color-purple-800: color-mix(in srgb, var(--brand-primary) 72%, black);
+  --color-purple-900: color-mix(in srgb, var(--brand-primary) 58%, black);
+  --color-purple-950: color-mix(in srgb, var(--brand-primary) 42%, black);
+  --color-indigo-50: color-mix(in srgb, var(--brand-primary) 6%, white);
+  --color-indigo-100: color-mix(in srgb, var(--brand-primary) 12%, white);
+  --color-indigo-200: color-mix(in srgb, var(--brand-primary) 24%, white);
+  --color-indigo-300: color-mix(in srgb, var(--brand-primary) 42%, white);
+  --color-indigo-400: color-mix(in srgb, var(--brand-primary) 68%, white);
+  --color-indigo-500: color-mix(in srgb, var(--brand-primary) 86%, white);
+  --color-indigo-600: var(--brand-primary);
+  --color-indigo-700: color-mix(in srgb, var(--brand-primary) 86%, black);
+  --color-indigo-800: color-mix(in srgb, var(--brand-primary) 72%, black);
+  --color-indigo-900: color-mix(in srgb, var(--brand-primary) 58%, black);
+  --color-indigo-950: color-mix(in srgb, var(--brand-primary) 42%, black);
+}
+
 /* Default (light) theme — applies whenever no .dark class is present */
 :root,
 .light {
@@ -56,7 +107,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #5A32A3;
+  --primary: var(--brand-primary);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -92,7 +143,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.23 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #9B7ED9;
+  --primary: color-mix(in srgb, var(--brand-primary) 70%, white);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.28 0 0);
   --secondary-foreground: oklch(0.985 0 0);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Info, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 export type AdditionalSettingsValues = {
   assignOnBook: boolean;
@@ -49,7 +49,7 @@ function Toggle({
       onClick={() => onChange(!on)}
       className={cn(
         "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-        on ? "bg-[#5A32A3]" : "bg-slate-300",
+        on ? "bg-[var(--brand-primary)]" : "bg-slate-300",
       )}
     >
       <span
@@ -162,7 +162,7 @@ export function BookingAdditionalSettingsStep({
               onChange={(e) =>
                 patch({ rescheduleExpire: Number(e.target.value) || 0 })
               }
-              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] outline-none focus:border-[#5A32A3]/40"
+              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] outline-none focus:border-[var(--brand-primary)]/40"
             />
             <select
               value={values.rescheduleUnit}
@@ -195,7 +195,7 @@ export function BookingAdditionalSettingsStep({
               onChange={(e) =>
                 patch({ cancelExpire: Number(e.target.value) || 0 })
               }
-              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] outline-none focus:border-[#5A32A3]/40"
+              className="h-9 w-20 rounded-lg border border-[#E5E7EB] px-2 text-[13px] outline-none focus:border-[var(--brand-primary)]/40"
             />
             <select
               value={values.cancelUnit}
@@ -231,14 +231,14 @@ export function BookingAdditionalSettingsStep({
           Optional two-way sync:{" "}
           <Link
             href="/settings/integrations/google-calendar"
-            className="font-semibold text-[#5A32A3] hover:underline"
+            className="font-semibold text-[var(--brand-primary)] hover:underline"
           >
             Google Calendar
           </Link>
           {" · "}
           <Link
             href="/settings/integrations/outlook-calendar"
-            className="font-semibold text-[#5A32A3] hover:underline"
+            className="font-semibold text-[var(--brand-primary)] hover:underline"
           >
             Outlook
           </Link>
@@ -253,7 +253,7 @@ export function BookingAdditionalSettingsStep({
               value={values.inviteNotes}
               onChange={(e) => patch({ inviteNotes: e.target.value })}
               rows={7}
-              className="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 pr-8 text-[13px] leading-relaxed outline-none focus:border-[#5A32A3]/40"
+              className="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 pr-8 text-[13px] leading-relaxed outline-none focus:border-[var(--brand-primary)]/40"
             />
             <Tag className="absolute right-3 bottom-3 h-3.5 w-3.5 text-slate-400" />
           </div>

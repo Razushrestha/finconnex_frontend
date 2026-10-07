@@ -36,7 +36,7 @@ function Checkbox({
       className={cn(
         "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border",
         checked
-          ? "border-[#5A32A3] bg-[#5A32A3] text-white"
+          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white"
           : "border-slate-300 bg-white",
       )}
     >
@@ -273,8 +273,8 @@ export function RequestDocumentsPicker({
             className={cn(
               "h-10 w-full rounded-lg border bg-white pr-11 pl-3 text-[13px] outline-none",
               templateOpen
-                ? "border-[#5A32A3] bg-[#F3ECFB]"
-                : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12",
+                ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]"
+                : "border-slate-200 focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12",
             )}
           />
           <button
@@ -283,7 +283,7 @@ export function RequestDocumentsPicker({
             onClick={() => setTemplateOpen((v) => !v)}
             className={cn(
               "absolute top-1/2 right-1.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md",
-              templateOpen ? "bg-[#EDE4FB] text-[#5A32A3]" : "text-slate-400",
+              templateOpen ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]" : "text-slate-400",
             )}
           >
             <ChevronDown
@@ -305,7 +305,7 @@ export function RequestDocumentsPicker({
                     setTemplateQ("");
                     setTemplateOpen(false);
                   }}
-                  className="block w-full px-3 py-2 text-left text-[13px] text-slate-800 hover:bg-[#F3ECFB]"
+                  className="block w-full px-3 py-2 text-left text-[13px] text-slate-800 hover:bg-[var(--brand-primary-soft)]"
                 >
                   {t}
                 </button>
@@ -338,7 +338,7 @@ export function RequestDocumentsPicker({
                     {cat.label}
                   </span>
                   <span className="shrink-0 text-right">
-                    <span className="block text-[13px] font-semibold text-[#5A32A3]">
+                    <span className="block text-[13px] font-semibold text-[var(--brand-primary)]">
                       {twoApplicants ? `${name1} / ${name2}` : name1}
                     </span>
                     <span className="flex items-center justify-end gap-1 text-[11px] text-slate-400">
@@ -356,7 +356,7 @@ export function RequestDocumentsPicker({
                   </span>
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 shrink-0 text-[#5A32A3] transition-transform",
+                      "h-4 w-4 shrink-0 text-[var(--brand-primary)] transition-transform",
                       open && "rotate-180",
                     )}
                   />
@@ -399,7 +399,7 @@ export function RequestDocumentsPicker({
                             type="button"
                             aria-label={`Edit ${item.title}`}
                             onClick={() => setEditing({ catId: cat.id, item })}
-                            className="mt-0.5 shrink-0 text-[#5A32A3]/70 hover:text-[#5A32A3]"
+                            className="mt-0.5 shrink-0 text-[var(--brand-primary)]/70 hover:text-[var(--brand-primary)]"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -429,7 +429,7 @@ export function RequestDocumentsPicker({
                           value={newTitle}
                           onChange={(e) => setNewTitle(e.target.value)}
                           placeholder="Document name"
-                          className="h-9 flex-1 rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]/45"
+                          className="h-9 flex-1 rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") addDocument(cat.id);
                             if (e.key === "Escape") setAddingFor(null);
@@ -447,9 +447,9 @@ export function RequestDocumentsPicker({
                       <button
                         type="button"
                         onClick={() => setAddingFor(cat.id)}
-                        className="mt-1.5 flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#5A32A3] text-[13px] font-semibold text-slate-800 hover:bg-[#F3ECFB]"
+                        className="mt-1.5 flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--brand-primary)] text-[13px] font-semibold text-slate-800 hover:bg-[var(--brand-primary-soft)]"
                       >
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-white">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white">
                           <Plus className="h-2.5 w-2.5" strokeWidth={3} />
                         </span>
                         Add new document

@@ -6,7 +6,7 @@ import { resolveAttendeeRole, withResolvedRoles } from "@/lib/meetings/roles";
 import { cn } from "@/lib/utils";
 
 const ROLE_STYLE: Record<MeetingAttendeeRole, string> = {
-  Host: "bg-[#F3ECFB] text-[#5A32A3]",
+  Host: "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
   Guest: "bg-slate-100 text-slate-600",
   "Main Applicant": "bg-emerald-50 text-emerald-700",
 };

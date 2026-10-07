@@ -92,7 +92,7 @@ import {
   type ConsultantPriority,
 } from "@/lib/booking/types";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 type ViewMode = "grid" | "list";
 
@@ -509,7 +509,7 @@ export function ConsultationsBoard() {
           <button
             type="button"
             onClick={() => void finishConsultation(formValues, additionalValues ?? undefined)}
-            className="h-10 min-w-[96px] rounded-lg bg-[#5A32A3] px-6 text-[13px] font-semibold text-white hover:brightness-110"
+            className="h-10 min-w-[96px] rounded-lg bg-[var(--brand-primary)] px-6 text-[13px] font-semibold text-white hover:brightness-110"
           >
             Finish setup
           </button>
@@ -584,7 +584,7 @@ export function ConsultationsBoard() {
           <button
             type="button"
             onClick={() => reachSetupStep("settings")}
-            className="h-10 min-w-[96px] rounded-lg bg-[#5A32A3] px-6 text-[13px] font-semibold text-white hover:brightness-110"
+            className="h-10 min-w-[96px] rounded-lg bg-[var(--brand-primary)] px-6 text-[13px] font-semibold text-white hover:brightness-110"
           >
             Next
           </button>
@@ -722,7 +722,7 @@ export function ConsultationsBoard() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search consultations…"
-            className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-9 pl-9 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
+            className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-9 pl-9 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/15"
           />
           {query ? (
             <button
@@ -742,7 +742,7 @@ export function ConsultationsBoard() {
             className={cn(
               "flex h-10 w-10 items-center justify-center",
               view === "grid"
-                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                 : "text-slate-400 hover:bg-slate-50",
             )}
             aria-label="Grid view"
@@ -755,7 +755,7 @@ export function ConsultationsBoard() {
             className={cn(
               "flex h-10 w-10 items-center justify-center border-l border-[#E5E7EB]",
               view === "list"
-                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                 : "text-slate-400 hover:bg-slate-50",
             )}
             aria-label="List view"
@@ -782,7 +782,7 @@ export function ConsultationsBoard() {
             aria-expanded={sectionOpen}
           >
             {sectionFilter}
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[#F3ECFB] px-1.5 text-[11px] font-bold text-[#5A32A3]">
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[var(--brand-primary-soft)] px-1.5 text-[11px] font-bold text-[var(--brand-primary)]">
               {filtered.length}
             </span>
             <ChevronDown
@@ -805,7 +805,7 @@ export function ConsultationsBoard() {
                   className={cn(
                     "flex w-full px-3 py-2.5 text-left text-[13px] font-medium",
                     option === sectionFilter
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                       : "text-slate-800 hover:bg-slate-50",
                   )}
                 >
@@ -963,11 +963,11 @@ function ChooseCalendarTypeModal({
                     key={t.title}
                     type="button"
                     onClick={() => onSelect({ mode: t.mode, title: t.title })}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[var(--brand-primary)]/40 hover:bg-[var(--brand-primary-soft)] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/25 focus-visible:outline-none"
                   >
-                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#5A32A3]" />
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--brand-primary)]" />
                     <div className="min-w-0">
-                      <p className="text-[15px] font-bold text-[#5A32A3]">
+                      <p className="text-[15px] font-bold text-[var(--brand-primary)]">
                         {t.title}
                       </p>
                     </div>
@@ -978,7 +978,7 @@ function ChooseCalendarTypeModal({
             <button
               type="button"
               onClick={() => setMore((v) => !v)}
-              className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+              className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
             >
               <ChevronRight
                 className={cn("h-4 w-4 transition-transform", more && "rotate-90")}
@@ -1015,7 +1015,7 @@ function ConsultationCard({
           onOpen();
         }
       }}
-      className="relative flex min-w-0 cursor-pointer flex-col rounded-xl border border-[#5A32A3]/25 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-colors hover:bg-[#F3ECFB]"
+      className="relative flex min-w-0 cursor-pointer flex-col rounded-xl border border-[var(--brand-primary)]/25 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-colors hover:bg-[var(--brand-primary-soft)]"
     >
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3 text-left">
@@ -1069,7 +1069,7 @@ function ConsultationRow({
           onOpen();
         }
       }}
-      className="flex cursor-pointer flex-col gap-3 border-b border-[#F3F4F6] px-4 py-3.5 transition-colors last:border-0 hover:bg-[#F3ECFB] sm:flex-row sm:items-center sm:justify-between"
+      className="flex cursor-pointer flex-col gap-3 border-b border-[#F3F4F6] px-4 py-3.5 transition-colors last:border-0 hover:bg-[var(--brand-primary-soft)] sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex min-w-0 items-center gap-3 text-left">
         <BrandMark page={page} />
@@ -1283,8 +1283,8 @@ function ShareButton({
           e.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold hover:bg-[#F3ECFB]"
-        style={{ borderColor: `${BRAND}55`, color: BRAND }}
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold hover:bg-[var(--brand-primary-soft)]"
+        style={{ borderColor: `color-mix(in srgb, ${BRAND} 33%, transparent)`, color: BRAND }}
       >
         <Share2 className="h-3.5 w-3.5" />
         Share

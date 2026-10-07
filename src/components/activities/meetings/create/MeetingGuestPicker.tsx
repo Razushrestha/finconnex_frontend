@@ -160,7 +160,7 @@ export function MeetingGuestPicker({
                 }
               }}
               placeholder="Search contact…"
-              className="h-10 w-full rounded-md border border-slate-200 bg-white pr-8 pl-9 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
+              className="h-10 w-full rounded-md border border-slate-200 bg-white pr-8 pl-9 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
             />
             <button
               type="button"
@@ -180,7 +180,7 @@ export function MeetingGuestPicker({
                     setCreating(true);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {query.trim()
@@ -226,7 +226,7 @@ export function MeetingGuestPicker({
             setQuery("");
             setOpen(true);
           }}
-          className="inline-flex items-center gap-1 text-sm font-medium text-[#5A32A3] hover:text-[#4A2888]"
+          className="inline-flex items-center gap-1 text-sm font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]"
         >
           <Plus className="h-3.5 w-3.5" />
           Add guests

@@ -10,7 +10,7 @@ import {
 import { publishPublicBookingPage } from "@/lib/booking/publish-public-page";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 type ShareTab = "shorten" | "onetime" | "embed" | "slots";
 type EmbedId = "inline" | "button" | "link";
@@ -293,7 +293,7 @@ export function ShareConsultationModal({
 
         <div className="space-y-4 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[#F3ECFB] py-1.5 pr-1.5 pl-3">
+            <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[var(--brand-primary-soft)] py-1.5 pr-1.5 pl-3">
               {editing ? (
                 <input
                   autoFocus
@@ -306,10 +306,10 @@ export function ShareConsultationModal({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") setEditing(false);
                   }}
-                  className="h-8 min-w-0 flex-1 rounded-md bg-white px-2 text-[12px] font-medium text-[#5A32A3] outline-none"
+                  className="h-8 min-w-0 flex-1 rounded-md bg-white px-2 text-[12px] font-medium text-[var(--brand-primary)] outline-none"
                 />
               ) : (
-                <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#5A32A3]">
+                <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--brand-primary)]">
                   {displayUrl}
                 </p>
               )}
@@ -353,7 +353,7 @@ export function ShareConsultationModal({
                 setPath(slug);
                 setEditing(false);
               }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#5A32A3] hover:bg-slate-50"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[var(--brand-primary)] hover:bg-slate-50"
               aria-label="Reset link"
             >
               <RefreshCw className="h-4 w-4" />
@@ -377,7 +377,7 @@ export function ShareConsultationModal({
               <button
                 type="button"
                 onClick={downloadQr}
-                className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+                className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
               >
                 <Download className="h-3.5 w-3.5" />
                 Download QR
@@ -395,7 +395,7 @@ export function ShareConsultationModal({
                   className={cn(
                     "shrink-0 border-b-2 pb-2.5 text-[13px] font-medium whitespace-nowrap",
                     tab === item.id
-                      ? "border-[#5A32A3] text-[#5A32A3]"
+                      ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                       : "border-transparent text-slate-500 hover:text-slate-700",
                   )}
                 >
@@ -411,7 +411,7 @@ export function ShareConsultationModal({
                 <button
                   type="button"
                   onClick={() => void generateShort()}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
                   style={{ borderColor: BRAND }}
                 >
                   Generate Shortened URL
@@ -438,7 +438,7 @@ export function ShareConsultationModal({
                 <button
                   type="button"
                   onClick={() => void generateOnce()}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
                   style={{ borderColor: BRAND }}
                 >
                   Generate One Time Link
@@ -469,8 +469,8 @@ export function ShareConsultationModal({
                     className={cn(
                       "rounded-xl border bg-white",
                       open
-                        ? "border-[#5A32A3]/50"
-                        : "border-[#E5E7EB] hover:border-[#5A32A3]/30",
+                        ? "border-[var(--brand-primary)]/50"
+                        : "border-[#E5E7EB] hover:border-[var(--brand-primary)]/30",
                     )}
                   >
                     <button
@@ -494,7 +494,7 @@ export function ShareConsultationModal({
                       <ChevronDown
                         className={cn(
                           "h-4 w-4 shrink-0 text-slate-400 transition-transform",
-                          open && "rotate-180 text-[#5A32A3]",
+                          open && "rotate-180 text-[var(--brand-primary)]",
                         )}
                       />
                     </button>
@@ -541,7 +541,7 @@ export function ShareConsultationModal({
                   type="button"
                   disabled={slots.length === 0}
                   onClick={() => copyText(slots.join("\n"), setSlotsCopied)}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-40"
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-40"
                   style={{ borderColor: BRAND }}
                 >
                   {slotsCopied ? "Copied" : "Copy Time Slots"}
@@ -579,7 +579,7 @@ function InlineEmbedPreview() {
             key={i}
             className={cn(
               "flex h-3 items-center justify-center rounded-[2px] bg-white",
-              i === 5 && "bg-[#5A32A3]",
+              i === 5 && "bg-[var(--brand-primary)]",
             )}
           >
             {i === 5 ? (
@@ -598,7 +598,7 @@ function ButtonEmbedPreview() {
       <span className="relative h-full w-full rounded-[3px] bg-white">
         <span className="absolute top-1.5 left-1.5 h-1 w-6 rounded-sm bg-slate-200" />
         <span className="absolute top-3.5 left-1.5 h-1 w-8 rounded-sm bg-slate-100" />
-        <span className="absolute right-1 bottom-1 h-2.5 w-5 rounded-[3px] bg-[#5A32A3]" />
+        <span className="absolute right-1 bottom-1 h-2.5 w-5 rounded-[3px] bg-[var(--brand-primary)]" />
       </span>
     </BrowserChrome>
   );
@@ -610,7 +610,7 @@ function LinkEmbedPreview() {
       <span className="relative h-full w-full rounded-[3px] bg-white">
         <span className="absolute top-1.5 left-1.5 h-1 w-8 rounded-sm bg-slate-200" />
         <span className="absolute top-3.5 left-1.5 h-1 w-6 rounded-sm bg-slate-100" />
-        <span className="absolute top-6 left-1.5 h-0.5 w-7 rounded-sm bg-[#5A32A3]" />
+        <span className="absolute top-6 left-1.5 h-0.5 w-7 rounded-sm bg-[var(--brand-primary)]" />
       </span>
     </BrowserChrome>
   );

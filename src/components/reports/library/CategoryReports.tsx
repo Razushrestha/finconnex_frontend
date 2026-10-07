@@ -104,7 +104,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
     return (
       <div className="p-6 text-sm text-slate-500">
         Unknown category.{" "}
-        <Link href="/reports" className="text-[#5A32A3] underline">
+        <Link href="/reports" className="text-[var(--brand-primary)] underline">
           Back to reports
         </Link>
       </div>
@@ -210,7 +210,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
                 <div className="flex items-start justify-between gap-2">
                   <Link
                     href={`/reports/library/${category.id}/${report.id}`}
-                    className="text-[14px] font-semibold text-slate-900 hover:text-[#5A32A3]"
+                    className="text-[14px] font-semibold text-slate-900 hover:text-[var(--brand-primary)]"
                   >
                     {report.name}
                   </Link>
@@ -227,7 +227,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
                       <Pin
                         className={cn(
                           "h-3.5 w-3.5",
-                          isPinned ? "fill-[#5A32A3] text-[#5A32A3]" : "text-slate-300",
+                          isPinned ? "fill-[var(--brand-primary)] text-[var(--brand-primary)]" : "text-slate-300",
                         )}
                       />
                     </button>
@@ -256,7 +256,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
                     <AddToFolderMenu reportId={report.id} refreshKey={favorites.join("|")} onAdded={refreshPins} />
                     <Link
                       href={`/reports/library/${category.id}/${report.id}`}
-                      className="rounded-full bg-[#6D5AE6] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[#5B4BD4]"
+                      className="rounded-full bg-[var(--brand-primary)] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
                     >
                       Open
                     </Link>
@@ -305,7 +305,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
                   <tr key={row.id} className="border-t border-slate-100">
                     <td className="px-4 py-3 font-medium text-slate-500">{row.reportId}</td>
                     <td className="px-4 py-3">
-                      <Link href={`/reports/${row.id}`} className="font-semibold text-slate-900 hover:text-[#5A32A3]">
+                      <Link href={`/reports/${row.id}`} className="font-semibold text-slate-900 hover:text-[var(--brand-primary)]">
                         {row.name}
                       </Link>
                     </td>

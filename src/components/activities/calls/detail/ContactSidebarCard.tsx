@@ -40,7 +40,7 @@ export function ContactSidebarCard({
           <button
             type="button"
             onClick={() => router.push(profileHref)}
-            className="text-slate-400 hover:text-[#5A32A3]"
+            className="text-slate-400 hover:text-[var(--brand-primary)]"
             aria-label="Open related record"
           >
             <ExternalLink className="h-3.5 w-3.5" />
@@ -67,7 +67,7 @@ export function ContactSidebarCard({
               }),
             )
           }
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#5A32A3] hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--brand-primary)] hover:underline"
         >
           <Mail className="h-3.5 w-3.5" />
           Email
@@ -78,7 +78,7 @@ export function ContactSidebarCard({
             if (profileHref) router.push(profileHref);
           }}
           disabled={!profileHref}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#5A32A3] hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--brand-primary)] hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
         >
           <UserIcon className="h-3.5 w-3.5" />
           Profile

@@ -446,7 +446,7 @@ export function DashboardWorkspace({
                   aria-label="Manage dashboard"
                   title="Manage dashboard"
                   className={cn(
-                    "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#5A32A3] outline-none hover:bg-violet-50",
+                    "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-[var(--brand-primary)] outline-none hover:bg-violet-50",
                     fullscreen && "bg-violet-50 ring-1 ring-violet-200",
                   )}
                 >
@@ -455,9 +455,9 @@ export function DashboardWorkspace({
                 <DropdownMenuContent align="end" className="min-w-52">
                   <DropdownMenuItem className="text-[13px]" onClick={() => void toggleFullscreen()}>
                     {fullscreen ? (
-                      <Minimize2 className="h-4 w-4 text-[#5A32A3]" />
+                      <Minimize2 className="h-4 w-4 text-[var(--brand-primary)]" />
                     ) : (
-                      <Maximize2 className="h-4 w-4 text-[#5A32A3]" />
+                      <Maximize2 className="h-4 w-4 text-[var(--brand-primary)]" />
                     )}
                     {fullscreen ? "Exit full screen" : "View full screen"}
                   </DropdownMenuItem>

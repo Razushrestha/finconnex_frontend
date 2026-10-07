@@ -52,7 +52,7 @@ function DateRangeMenuBody({
             key={option.value}
             className={cn(
               "px-1.5 py-0.5 text-[12px]",
-              filters.dateRange === option.value && "bg-violet-50 font-semibold text-[#5A32A3]",
+              filters.dateRange === option.value && "bg-violet-50 font-semibold text-[var(--brand-primary)]",
             )}
             onClick={() => pick(option.value)}
           >
@@ -68,7 +68,7 @@ function DateRangeMenuBody({
         <DropdownMenuItem
           className={cn(
             "px-1.5 py-0.5 text-[12px]",
-            filters.dateRange === "custom" && "bg-violet-50 font-semibold text-[#5A32A3]",
+            filters.dateRange === "custom" && "bg-violet-50 font-semibold text-[var(--brand-primary)]",
           )}
           closeOnClick={false}
           onClick={() => setCustomOpen(true)}
@@ -107,7 +107,7 @@ function DateRangeMenuBody({
                   dateTo: to,
                 })
               }
-              className="w-full rounded bg-[#5A32A3] px-2 py-1 text-[11px] font-semibold text-white hover:bg-[#4a2788]"
+              className="w-full rounded bg-[var(--brand-primary)] px-2 py-1 text-[11px] font-semibold text-white hover:bg-[#4a2788]"
             >
               Apply
             </button>

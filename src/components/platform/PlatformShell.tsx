@@ -43,7 +43,7 @@ export function PlatformShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F4F1FA] font-sans text-slate-900">
+    <div className="flex min-h-screen bg-[var(--brand-primary-soft)] font-sans text-slate-900">
       <aside className="hidden w-[260px] shrink-0 flex-col bg-[#0F172A] text-slate-200 lg:flex">
         <div className="border-b border-white/10 px-5 py-6">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-[#C4B5FD] uppercase">
@@ -70,7 +70,7 @@ export function PlatformShell({
                 className={cn(
                   "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors",
                   active
-                    ? "bg-[#5A32A3] text-white shadow-lg shadow-[#5A32A3]/30"
+                    ? "bg-[var(--brand-primary)] text-white shadow-lg shadow-[var(--brand-primary)]/30"
                     : "text-slate-300 hover:bg-white/10 hover:text-white",
                 )}
               >
@@ -82,7 +82,7 @@ export function PlatformShell({
         </nav>
         <div className="border-t border-white/10 p-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#5A32A3] text-xs font-semibold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-primary)] text-xs font-semibold text-white">
               {user.name
                 .split(/\s+/)
                 .slice(0, 2)
@@ -113,9 +113,9 @@ export function PlatformShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-3 border-b border-[#5A32A3]/10 bg-white/90 px-4 py-3 backdrop-blur-md lg:px-8">
+        <header className="flex items-center justify-between gap-3 border-b border-[var(--brand-primary)]/10 bg-white/90 px-4 py-3 backdrop-blur-md lg:px-8">
           <div className="lg:hidden">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-[#5A32A3] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-primary)] uppercase">
               Platform
             </p>
             <p className="text-sm font-semibold">{user.name}</p>
@@ -132,7 +132,7 @@ export function PlatformShell({
                   className={cn(
                     "rounded-full px-3 py-1.5 text-[12px] font-semibold whitespace-nowrap",
                     active
-                      ? "bg-[#5A32A3] text-white"
+                      ? "bg-[var(--brand-primary)] text-white"
                       : "bg-white text-slate-600 ring-1 ring-slate-200",
                   )}
                 >
@@ -144,7 +144,7 @@ export function PlatformShell({
           <div className="ml-auto hidden items-center gap-4 lg:flex">
             <p className="text-[12px] text-slate-500">
               Same login as every other FinConnex user. Access is{" "}
-              <span className="font-semibold text-[#5A32A3]">
+              <span className="font-semibold text-[var(--brand-primary)]">
                 {platformRoleLabel(user.role)}
               </span>{" "}
               on the CRM user record.
@@ -152,7 +152,7 @@ export function PlatformShell({
             {tenant.hasWorkspace ? (
               <Link
                 href="/"
-                className="inline-flex h-9 shrink-0 items-center rounded-full bg-[#5A32A3] px-3.5 text-[12px] font-semibold text-white"
+                className="inline-flex h-9 shrink-0 items-center rounded-full bg-[var(--brand-primary)] px-3.5 text-[12px] font-semibold text-white"
               >
                 Open {tenant.name}
               </Link>

@@ -16,7 +16,7 @@ import {
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 /* -------------------------------------------------------------------------- */
 /* Slot limit values                                                           */
@@ -264,16 +264,16 @@ export function ListboxSelect({
           open
             ? segment
               ? // Joined "Per day" half: purple outline on all four sides, a touch heavier.
-                "relative z-10 border-[#5A32A3] shadow-[0_0_0_1px_#5A32A3]"
+                "relative z-10 border-[var(--brand-primary)] shadow-[0_0_0_1px_var(--brand-primary)]"
               : // Standalone: thin purple outline.
-                "relative z-10 border-[#5A32A3]"
+                "relative z-10 border-[var(--brand-primary)]"
             : segment
-              ? "border-[#E5E7EB] hover:border-[#CBB8EA] focus:relative focus:z-10 focus:border-[#5A32A3] focus:shadow-[0_0_0_1px_#5A32A3]"
+              ? "border-[#E5E7EB] hover:border-[var(--brand-primary-border)] focus:relative focus:z-10 focus:border-[var(--brand-primary)] focus:shadow-[0_0_0_1px_var(--brand-primary)]"
               : selectedIndex > 0 && !selected?.placeholder
                 ? // A chosen option (e.g. "One active appointment"): dark slate outline.
                   "border-[#475569] hover:border-[#334155]"
                 : // Default "No limit": light outline, darkens once picked/focused.
-                  "border-[#E5E7EB] hover:border-[#CBB8EA] focus:border-[#475569]",
+                  "border-[#E5E7EB] hover:border-[var(--brand-primary-border)] focus:border-[#475569]",
         )}
       >
         <span
@@ -323,7 +323,7 @@ export function ListboxSelect({
                   "cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-medium text-slate-800",
                   option.placeholder && "font-normal text-slate-500",
                   isSelected
-                    ? "bg-[#F3ECFB]"
+                    ? "bg-[var(--brand-primary-soft)]"
                     : index === active
                       ? "bg-slate-50"
                       : "",
@@ -436,10 +436,10 @@ export function SlotLimitField({
           onBlur={() => setTouched(true)}
           className={cn(
             "h-11 min-w-0 flex-1 rounded-l-lg border border-r-0 bg-white px-3.5 text-[13px] font-medium text-slate-800 outline-none transition-colors placeholder:font-normal placeholder:text-slate-400",
-            "focus:relative focus:z-10 focus:border-[#5A32A3] focus:shadow-[1px_0_0_0_#5A32A3]",
+            "focus:relative focus:z-10 focus:border-[var(--brand-primary)] focus:shadow-[1px_0_0_0_var(--brand-primary)]",
             missing
               ? "border-rose-300"
-              : "border-[#E5E7EB] hover:border-[#CBB8EA]",
+              : "border-[#E5E7EB] hover:border-[var(--brand-primary-border)]",
           )}
         />
         <ListboxSelect
@@ -529,11 +529,11 @@ function LimitDayButton({
       {...props}
       className={cn(
         "relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-[13px] font-medium text-slate-700 transition-colors",
-        "hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5A32A3]/40",
+        "hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40",
         inRange && "text-[#3F2480] hover:bg-[#E7DAF7]",
-        showToday && !endpoint && "border-[#5A32A3] font-semibold text-[#5A32A3]",
+        showToday && !endpoint && "border-[var(--brand-primary)] font-semibold text-[var(--brand-primary)]",
         endpoint &&
-          "border-[#5A32A3] bg-[#5A32A3] font-semibold text-white hover:bg-[#4a2788]",
+          "border-[var(--brand-primary)] bg-[var(--brand-primary)] font-semibold text-white hover:bg-[#4a2788]",
         className,
       )}
     >
@@ -623,11 +623,11 @@ function RangeCalendar({
           defaults.caption_label,
         ),
         button_previous: cn(
-          "absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-slate-400 transition-colors hover:border-[#CBB8EA] hover:text-[#5A32A3] aria-disabled:opacity-40",
+          "absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-slate-400 transition-colors hover:border-[var(--brand-primary-border)] hover:text-[var(--brand-primary)] aria-disabled:opacity-40",
           defaults.button_previous,
         ),
         button_next: cn(
-          "absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-slate-400 transition-colors hover:border-[#CBB8EA] hover:text-[#5A32A3] aria-disabled:opacity-40",
+          "absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-slate-400 transition-colors hover:border-[var(--brand-primary-border)] hover:text-[var(--brand-primary)] aria-disabled:opacity-40",
           defaults.button_next,
         ),
         month_grid: cn("mt-2 w-full border-collapse", defaults.month_grid),
@@ -638,9 +638,9 @@ function RangeCalendar({
         ),
         week: cn("mb-1 grid w-full grid-cols-7", defaults.week),
         day: cn("flex h-9 items-center justify-center p-0 text-center", defaults.day),
-        range_start: cn("rounded-l-lg bg-[#F3ECFB]", defaults.range_start),
-        range_middle: cn("bg-[#F3ECFB]", defaults.range_middle),
-        range_end: cn("rounded-r-lg bg-[#F3ECFB]", defaults.range_end),
+        range_start: cn("rounded-l-lg bg-[var(--brand-primary-soft)]", defaults.range_start),
+        range_middle: cn("bg-[var(--brand-primary-soft)]", defaults.range_middle),
+        range_end: cn("rounded-r-lg bg-[var(--brand-primary-soft)]", defaults.range_end),
         hidden: cn("invisible", defaults.hidden),
         disabled: cn("opacity-40", defaults.disabled),
       }}
@@ -718,8 +718,8 @@ export function DateRangeField({
         className={cn(
           "flex h-11 w-full items-center gap-2 rounded-lg border bg-white px-3.5 text-left outline-none transition-colors",
           open
-            ? "border-[#5A32A3]"
-            : "border-[#E5E7EB] hover:border-[#CBB8EA] focus-visible:border-[#5A32A3]",
+            ? "border-[var(--brand-primary)]"
+            : "border-[#E5E7EB] hover:border-[var(--brand-primary-border)] focus-visible:border-[var(--brand-primary)]",
         )}
       >
         <span

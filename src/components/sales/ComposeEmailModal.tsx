@@ -164,7 +164,7 @@ function RecipientChipRow({
                   : "border-rose-200 bg-rose-50 text-rose-800",
               )}
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-[8px] font-bold text-white">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[8px] font-bold text-white">
                 {chipInitials(value)}
               </span>
               <span className="max-w-[180px] truncate">{value}</span>
@@ -476,7 +476,7 @@ export function ComposeEmailModal({
     <div className={shellClass} role="dialog" aria-label="Compose Email">
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#FAF9FC] px-3 py-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#5A32A3] text-white">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--brand-primary)] text-white">
             <Mail className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
@@ -548,7 +548,7 @@ export function ComposeEmailModal({
                     onClick={() => setShowCc((v) => !v)}
                     className={cn(
                       "text-[11px] font-semibold",
-                      showCc ? "text-[#5A32A3]" : "text-slate-400 hover:text-slate-700",
+                      showCc ? "text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-700",
                     )}
                   >
                     Cc
@@ -558,7 +558,7 @@ export function ComposeEmailModal({
                     onClick={() => setShowBcc((v) => !v)}
                     className={cn(
                       "text-[11px] font-semibold",
-                      showBcc ? "text-[#5A32A3]" : "text-slate-400 hover:text-slate-700",
+                      showBcc ? "text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-700",
                     )}
                   >
                     Bcc
@@ -624,7 +624,7 @@ export function ComposeEmailModal({
               <button
                 type="button"
                 onClick={() => setTemplatesOpen((v) => !v)}
-                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-[#5A32A3] hover:bg-violet-50"
+                className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50"
               >
                 <Sparkles className="h-3 w-3" />
               Templates
@@ -714,7 +714,7 @@ export function ComposeEmailModal({
                 className={cn(
                   "cursor-pointer rounded-lg border border-dashed py-2.5 text-center text-[11px] font-medium",
                 isDragOver
-                    ? "border-[#5A32A3] bg-violet-50 text-[#5A32A3]"
+                    ? "border-[var(--brand-primary)] bg-violet-50 text-[var(--brand-primary)]"
                     : "border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600",
                 )}
               >
@@ -762,7 +762,7 @@ export function ComposeEmailModal({
 
           {scheduleOpen ? (
             <div className="flex shrink-0 items-center gap-2 border-t border-slate-100 bg-violet-50/50 px-4 py-2">
-              <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+              <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
               <input
                 type="datetime-local"
                 value={scheduleAt}
@@ -775,7 +775,7 @@ export function ComposeEmailModal({
                   handleSend(scheduleAt);
                   setScheduleOpen(false);
                 }}
-                className="h-8 rounded-md bg-[#5A32A3] px-3 text-[11px] font-semibold text-white"
+                className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[11px] font-semibold text-white"
               >
                 Schedule
               </button>
@@ -825,7 +825,7 @@ export function ComposeEmailModal({
               >
                 Discard
               </button>
-              <div className="relative flex rounded-lg bg-[#5A32A3] text-white" ref={sendRef}>
+              <div className="relative flex rounded-lg bg-[var(--brand-primary)] text-white" ref={sendRef}>
                 <button
                   type="button"
                   disabled={sending}
@@ -858,7 +858,7 @@ export function ComposeEmailModal({
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-slate-700 hover:bg-slate-50"
                     >
-                      <SendIcon className="h-3.5 w-3.5 text-[#5A32A3]" />
+                      <SendIcon className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                       Send now
                     </button>
                     <button
@@ -869,7 +869,7 @@ export function ComposeEmailModal({
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-slate-700 hover:bg-slate-50"
                     >
-                      <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                      <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                       Schedule send
                     </button>
                     <button
@@ -880,7 +880,7 @@ export function ComposeEmailModal({
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-slate-700 hover:bg-slate-50"
                     >
-                      <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                      <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                       Tomorrow 9:00 AM
                     </button>
                   </div>

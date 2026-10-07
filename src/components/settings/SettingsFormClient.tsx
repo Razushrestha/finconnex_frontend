@@ -196,7 +196,7 @@ export function SettingsFormClient({
 
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="border-b border-slate-100 bg-[#F4F1FA]/70 px-5 py-4">
+      <div className="border-b border-slate-100 bg-[var(--brand-primary-soft)]/70 px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-[16px] font-bold tracking-tight text-slate-900">
@@ -587,7 +587,7 @@ function ColorField({
                 "h-7 w-7 rounded-full border shadow-sm transition",
                 light ? "border-slate-300" : "border-black/10",
                 active
-                  ? "ring-2 ring-[#5A32A3] ring-offset-2"
+                  ? "ring-2 ring-[var(--brand-primary)] ring-offset-2"
                   : "hover:scale-105",
               )}
               style={{ backgroundColor: hex }}

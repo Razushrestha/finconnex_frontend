@@ -9,7 +9,7 @@ import {
 import type { BookingPage } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 /* -------------------------------------------------------------------------- */
 /* Values                                                                      */
@@ -240,8 +240,8 @@ function Switch({
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative h-[22px] w-10 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#5A32A3]/40 focus-visible:ring-offset-2",
-        checked ? "bg-[#5A32A3]" : "bg-slate-300",
+        "relative h-[22px] w-10 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 focus-visible:ring-offset-2",
+        checked ? "bg-[var(--brand-primary)]" : "bg-slate-300",
       )}
     >
       <span
@@ -308,7 +308,7 @@ function NumberField({
           "h-11 w-14 rounded-lg border bg-white px-3.5 text-[13px] font-medium text-slate-800 outline-none transition-colors",
           invalid
             ? "border-rose-300 focus:border-rose-400"
-            : "border-[#E5E7EB] hover:border-[#CBB8EA] focus:border-[#5A32A3]",
+            : "border-[#E5E7EB] hover:border-[var(--brand-primary-border)] focus:border-[var(--brand-primary)]",
         )}
       />
       <span className="text-[13px] text-slate-600">{unit}</span>

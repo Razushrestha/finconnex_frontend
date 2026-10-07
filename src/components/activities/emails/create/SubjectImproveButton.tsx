@@ -58,7 +58,7 @@ export function SubjectImproveButton({
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : void load())}
-        className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50"
+        className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         Improve subject
@@ -83,12 +83,12 @@ export function SubjectImproveButton({
                 }}
                 className={cn(
                   "flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50",
-                  item.recommended && "bg-[#F8F4FC]",
+                  item.recommended && "bg-[var(--brand-primary-faint)]",
                 )}
               >
                 <span className="text-[12px] font-medium text-slate-800">{item.text}</span>
                 {item.recommended ? (
-                  <span className="mt-0.5 text-[10px] font-semibold text-[#5A32A3]">
+                  <span className="mt-0.5 text-[10px] font-semibold text-[var(--brand-primary)]">
                     Recommended{item.reason ? ` · ${item.reason}` : ""}
                   </span>
                 ) : item.reason ? (

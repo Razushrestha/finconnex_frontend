@@ -85,7 +85,7 @@ export type BookingSection =
   | "schedules"
   | "consultants";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 function ConsultantFace({
   name,
@@ -104,7 +104,7 @@ function ConsultantFace({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-full bg-[#F3ECFB] font-bold text-[#5A32A3]",
+        "inline-flex items-center justify-center rounded-full bg-[var(--brand-primary-soft)] font-bold text-[var(--brand-primary)]",
         className,
       )}
     >
@@ -145,8 +145,8 @@ const STATS: {
     label: "Upcoming",
     unit: "Appointments",
     icon: CalendarClock,
-    iconBg: "bg-[#F3ECFB] text-[#5A32A3]",
-    bar: "bg-[#5A32A3]",
+    iconBg: "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
+    bar: "bg-[var(--brand-primary)]",
   },
   {
     key: "confirmed",
@@ -177,7 +177,7 @@ const STATS: {
     label: "This Week",
     unit: "Appointments",
     icon: TrendingUp,
-    iconBg: "bg-[#E0E7FF] text-[#4F46E5]",
+    iconBg: "bg-[#E0E7FF] text-[var(--brand-primary)]",
     bar: "bg-[#6366F1]",
   },
   {
@@ -411,7 +411,7 @@ function HomeView({
               className={cn(
                 "overflow-hidden rounded-xl border bg-white text-left shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-shadow",
                 active
-                  ? "border-[#5A32A3] ring-2 ring-[#5A32A3]/20"
+                  ? "border-[var(--brand-primary)] ring-2 ring-[var(--brand-primary)]/20"
                   : "border-[#E5E7EB] hover:border-slate-300",
               )}
             >
@@ -910,7 +910,7 @@ function BookingStatusMenu({
                 }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-[#5B4FE8]" />
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary-strong)]" />
                 Edit
               </button>
               <button
@@ -1305,7 +1305,7 @@ function MiniCalendar({
                   isSelected
                     ? "text-white"
                     : isToday
-                      ? "font-bold text-[#5A32A3] ring-2 ring-[#5A32A3]/40"
+                      ? "font-bold text-[var(--brand-primary)] ring-2 ring-[var(--brand-primary)]/40"
                       : "text-slate-700 hover:bg-slate-100",
                 )}
                 style={isSelected ? { backgroundColor: BRAND } : undefined}
@@ -1748,7 +1748,7 @@ function AppointmentSummary({
                   className={cn(
                     "-mb-px border-b-2 px-2.5 py-3 text-[13px] font-medium",
                     tab === item.id
-                      ? "border-[#5B4FE8] text-[#5B4FE8]"
+                      ? "border-[var(--brand-primary-strong)] text-[var(--brand-primary-strong)]"
                       : "border-transparent text-slate-500 hover:text-slate-700",
                   )}
                 >
@@ -1845,7 +1845,7 @@ function CustomerInfoTab({
             className={cn(
               "-mb-px border-b-2 py-3 text-[13px] font-medium",
               section === item.id
-                ? "border-[#5B4FE8] text-[#5B4FE8]"
+                ? "border-[var(--brand-primary-strong)] text-[var(--brand-primary-strong)]"
                 : "border-transparent text-slate-500 hover:text-slate-700",
             )}
           >
@@ -1927,7 +1927,7 @@ function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string
         </div>
         <div className="pt-0.5">
           {valid ? (
-            <span className="inline-flex rounded-md bg-[#F3F0FF] px-2 py-0.5 text-[11px] font-medium tracking-wide text-[#7C6BF2]">
+            <span className="inline-flex rounded-md bg-[var(--brand-primary-faint)] px-2 py-0.5 text-[11px] font-medium tracking-wide text-[#7C6BF2]">
               {AUDIT_WEEKDAYS[when.getDay()]}
             </span>
           ) : null}
@@ -2028,7 +2028,7 @@ function RelatedRecordLink({ kind, id }: { kind: RelatedKind; id: string }) {
       href={crmRecordHref(kind, id)}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex max-w-full items-center gap-1 text-[#5A32A3] hover:underline"
+      className="inline-flex max-w-full items-center gap-1 text-[var(--brand-primary)] hover:underline"
       title={`Open this ${kind.toLowerCase()} in a new tab`}
     >
       <span className="truncate">
@@ -2087,7 +2087,7 @@ function PagesPanel({
             <tr
               key={p.id}
               onClick={() => onOpenPage(p.id)}
-              className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-[#F3ECFB]"
+              className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-[var(--brand-primary-soft)]"
             >
               <td className="px-5 py-3">
                 <p className="font-semibold text-slate-900">{p.title}</p>
@@ -2216,7 +2216,7 @@ function ConsultantsPanel({
               type="button"
               onClick={() => setOpenId(c.id)}
               aria-label={`${c.name}: ${counts.completed.length} completed and ${counts.upcoming.length} upcoming meetings`}
-              className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[#5A32A3]/30 hover:bg-[#FBF9FE] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
+              className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[var(--brand-primary)]/30 hover:bg-[#FBF9FE] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/25 focus-visible:outline-none"
             >
               <div className="flex items-center gap-3">
                 <ConsultantFace name={c.name} photo={c.photo} className="h-12 w-12 shrink-0 text-[13px]" />
@@ -2225,7 +2225,7 @@ function ConsultantsPanel({
                   <p className="truncate text-[12px] text-slate-500">{c.role}</p>
                   <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold">
                     <span className="text-emerald-600">{counts.completed.length} completed</span>
-                    <span className="text-[var(--brand-primary,#5A32A3)]">
+                    <span className="text-[var(--brand-primary,var(--brand-primary))]">
                       {counts.upcoming.length} upcoming
                     </span>
                   </p>
@@ -2289,7 +2289,7 @@ function ConsultantMeetingsModal({
               <p className="text-[12px] font-semibold">
                 <span className="text-emerald-600">{meetings.completed.length} completed</span>
                 <span className="text-slate-300"> · </span>
-                <span className="text-[var(--brand-primary,#5A32A3)]">
+                <span className="text-[var(--brand-primary,var(--brand-primary))]">
                   {meetings.upcoming.length} upcoming
                 </span>
               </p>
@@ -2306,7 +2306,7 @@ function ConsultantMeetingsModal({
           <div className="min-h-0 space-y-5 overflow-y-auto px-5 py-4">
             <MeetingList
               title="Upcoming"
-              tone="text-[var(--brand-primary,#5A32A3)]"
+              tone="text-[var(--brand-primary,var(--brand-primary))]"
               rows={meetings.upcoming}
               empty="No upcoming meetings."
             />

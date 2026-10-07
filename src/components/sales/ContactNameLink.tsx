@@ -12,7 +12,7 @@ export function ContactNameLink({
   return (
     <Link
       href={`/sales/contacts/detail/${contactId}`}
-      className="font-medium text-[#5A32A3] hover:underline"
+      className="font-medium text-[var(--brand-primary)] hover:underline"
       onClick={(event) => event.stopPropagation()}
     >
       {name}

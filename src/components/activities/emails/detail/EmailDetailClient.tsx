@@ -80,7 +80,7 @@ export function EmailDetailClient({ id }: { id: string }) {
         <button
           type="button"
           onClick={() => router.push("/activities/emails")}
-          className="rounded-xl bg-[#5A32A3] px-4 py-2 text-xs font-medium text-white"
+          className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-xs font-medium text-white"
         >
           Back to Emails
         </button>

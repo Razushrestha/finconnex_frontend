@@ -94,7 +94,7 @@ export function ComposeContextRail({
             <div className="mb-1.5 flex items-center gap-2">
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 {initials || "?"}
               </span>
@@ -165,7 +165,7 @@ export function ComposeContextRail({
               </Link>
               <Link
                 href={profile.href}
-                className="inline-flex h-7 items-center justify-center rounded-md border border-slate-200 text-[10px] font-semibold text-[#5A32A3] hover:bg-violet-50"
+                className="inline-flex h-7 items-center justify-center rounded-md border border-slate-200 text-[10px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50"
               >
                 View Contact
               </Link>
@@ -195,7 +195,7 @@ export function ComposeContextRail({
                 className="rounded-md border border-slate-100 bg-slate-50/70 px-2 py-1.5"
               >
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#F3ECFB] text-[#5A32A3]">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
                     {item.kind === "deal" ? <Home className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -203,7 +203,7 @@ export function ComposeContextRail({
                       <span
                         className={cn(
                           "inline-flex rounded px-1 py-px text-[8px] font-bold tracking-wide uppercase",
-                          item.kind === "deal" ? "bg-violet-50 text-[#5A32A3]" : "bg-sky-50 text-sky-700",
+                          item.kind === "deal" ? "bg-violet-50 text-[var(--brand-primary)]" : "bg-sky-50 text-sky-700",
                         )}
                       >
                         {item.kind === "deal" ? "Deal" : "Lead"}
@@ -216,7 +216,7 @@ export function ComposeContextRail({
                       <p className="truncate text-[11px] text-slate-500">Stage: {item.stage}</p>
                       <Link
                         href={item.href}
-                        className="shrink-0 text-[11px] font-semibold text-[#5A32A3] hover:underline"
+                        className="shrink-0 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
                       >
                         {item.kind === "deal" ? "View Deal" : "View Lead"} →
                       </Link>
@@ -232,7 +232,7 @@ export function ComposeContextRail({
       <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h2 className="text-[12px] font-semibold text-slate-800">Recent Communication</h2>
-          <Link href="/activities/emails" className="shrink-0 text-[10px] font-semibold text-[#5A32A3] hover:underline">
+          <Link href="/activities/emails" className="shrink-0 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline">
             View conversation →
           </Link>
         </div>

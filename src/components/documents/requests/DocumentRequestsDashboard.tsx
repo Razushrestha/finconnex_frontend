@@ -90,8 +90,8 @@ function KpiCard({
       className={cn(
         "rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm transition-colors",
         active
-          ? "border-[#5A32A3]/40 ring-2 ring-[#5A32A3]/15"
-          : "border-slate-200/80 hover:border-[#5A32A3]/25",
+          ? "border-[var(--brand-primary)]/40 ring-2 ring-[var(--brand-primary)]/15"
+          : "border-slate-200/80 hover:border-[var(--brand-primary)]/25",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -227,7 +227,7 @@ export function DocumentRequestsDashboard({
                     className={cn(
                       "rounded-md px-2.5 py-1 text-[11px] font-semibold capitalize",
                       chartMode === mode
-                        ? "bg-[#5A32A3] text-white"
+                        ? "bg-[var(--brand-primary)] text-white"
                         : "text-slate-500 hover:text-slate-800",
                     )}
                   >
@@ -399,7 +399,7 @@ export function DocumentRequestsDashboard({
         <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] px-4 py-3">
               <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-                <FileText className="h-4 w-4 shrink-0 text-[#5A32A3]" />
+                <FileText className="h-4 w-4 shrink-0 text-[var(--brand-primary)]" />
                 Recent Documents
               </h2>
               <div className="flex items-center gap-2">

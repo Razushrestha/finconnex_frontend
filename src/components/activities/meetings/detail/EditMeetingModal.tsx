@@ -150,7 +150,7 @@ export function EditMeetingModal({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -158,7 +158,7 @@ export function EditMeetingModal({
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as MeetingStatus)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
               >
                 {MEETING_STATUSES.map((item) => (
                   <option key={item} value={item}>
@@ -171,7 +171,7 @@ export function EditMeetingModal({
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as MeetingType)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
               >
                 {MEETING_TYPES.map((item) => (
                   <option key={item} value={item}>
@@ -187,7 +187,7 @@ export function EditMeetingModal({
                 type="datetime-local"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
               />
             </Field>
             <Field label="End">
@@ -195,7 +195,7 @@ export function EditMeetingModal({
                 type="datetime-local"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
               />
             </Field>
           </div>
@@ -203,14 +203,14 @@ export function EditMeetingModal({
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
             />
           </Field>
           <Field label="Meeting link">
             <input
               value={meetingLink}
               onChange={(e) => setMeetingLink(e.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
             />
           </Field>
           <Field label="Related to">
@@ -218,7 +218,7 @@ export function EditMeetingModal({
               value={relatedTo}
               onChange={(e) => setRelatedTo(e.target.value)}
               placeholder="Lead: Name"
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
             />
           </Field>
           <Field label="Host / organizer">
@@ -231,7 +231,7 @@ export function EditMeetingModal({
                 );
                 if (match) setRole(match.id, "Host");
               }}
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[#5A32A3]"
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[var(--brand-primary)]"
             >
               {ACTIVITY_OWNERS.map((name) => (
                 <option key={name} value={name}>
@@ -252,7 +252,7 @@ export function EditMeetingModal({
               value={agenda}
               onChange={(e) => setAgenda(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#5A32A3]"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"
             />
           </Field>
 
@@ -308,7 +308,7 @@ export function EditMeetingModal({
           <button
             type="button"
             onClick={handleSave}
-            className="h-9 rounded-lg bg-[#5A32A3] px-4 text-sm font-semibold text-white hover:opacity-90"
+            className="h-9 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white hover:opacity-90"
           >
             Save changes
           </button>

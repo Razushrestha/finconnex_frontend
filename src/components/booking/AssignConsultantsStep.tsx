@@ -13,7 +13,7 @@ import {
   type CalendarTypeChoice,
 } from "@/components/booking/ConsultationDetailsStep";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 function priorityLabel(priority: ConsultantPriority) {
   return `${priority} priority`;
@@ -137,7 +137,7 @@ export function AssignConsultantsStep({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search Consultants"
-                className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]/40"
+                className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]/40"
               />
             </label>
             <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-[13px] font-medium text-slate-600">
@@ -146,7 +146,7 @@ export function AssignConsultantsStep({
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={toggleAll}
-                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
               />
             </label>
           </div>
@@ -159,7 +159,7 @@ export function AssignConsultantsStep({
             return (
               <li key={owner.id || owner.email || name} className="px-5 py-3.5 sm:px-7">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F3ECFB] text-[11px] font-bold text-[#5A32A3]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-[11px] font-bold text-[var(--brand-primary)]">
                     {name.slice(0, 2).toUpperCase()}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -187,7 +187,7 @@ export function AssignConsultantsStep({
                       onChange={(e) =>
                         setPriority(name, e.target.value as ConsultantPriority)
                       }
-                      className="h-9 w-[148px] rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40"
+                      className="h-9 w-[148px] rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/40"
                     >
                       {CONSULTANT_PRIORITIES.map((priority) => (
                         <option key={priority} value={priority}>
@@ -199,7 +199,7 @@ export function AssignConsultantsStep({
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggle(name)}
-                      className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                      className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
                       aria-label={`Assign ${name}`}
                     />
                   </div>
@@ -216,11 +216,11 @@ export function AssignConsultantsStep({
           ) : null}
         </ul>
 
-        <div className="shrink-0 border-t border-[#E5E7EB] bg-gradient-to-b from-[#F3ECFB] to-white px-5 py-3 sm:px-7">
+        <div className="shrink-0 border-t border-[#E5E7EB] bg-gradient-to-b from-[var(--brand-primary-soft)] to-white px-5 py-3 sm:px-7">
           <p className="truncate text-[13px] font-semibold text-slate-700">
             Consultants Assigned:
             {selected.length ? (
-              <span className="ml-1.5 font-medium text-[#5A32A3]">
+              <span className="ml-1.5 font-medium text-[var(--brand-primary)]">
                 {selected
                   .map((name) => `${name} (${priorityOf(name)})`)
                   .join(", ")}

@@ -134,7 +134,7 @@ export function PerformanceDashboardView({
         {[
           { label: "Settlements", value: String(data.settlements), delta: data.settlementsDelta, spark: data.settlementsSpark, icon: Landmark, color: "#16A34A", bg: "bg-emerald-50 text-emerald-600" },
           { label: "Settlement Value", value: formatCompactMoney(data.settlementValue), delta: data.settlementValueDelta, spark: data.settlementValueSpark, icon: CircleDollarSign, color: "#2563EB", bg: "bg-sky-50 text-sky-600" },
-          { label: "Revenue / Commission", value: formatCompactMoney(data.commission), delta: data.commissionDelta, spark: data.commissionSpark, icon: Wallet, color: "#7C3AED", bg: "bg-violet-50 text-[#5A32A3]" },
+          { label: "Revenue / Commission", value: formatCompactMoney(data.commission), delta: data.commissionDelta, spark: data.commissionSpark, icon: Wallet, color: "#7C3AED", bg: "bg-violet-50 text-[var(--brand-primary)]" },
           { label: "Average Deal Size", value: formatCompactMoney(data.avgDealSize), delta: data.avgDealSizeDelta, spark: data.avgDealSpark, icon: Handshake, color: "#EA580C", bg: "bg-orange-50 text-orange-600" },
           { label: "Conversion Rate", value: `${data.conversion}%`, delta: data.conversionDelta, spark: data.conversionSpark, icon: Percent, color: "#0D9488", bg: "bg-teal-50 text-teal-700", suffix: "pp" },
           { label: "Avg. Time to Settlement", value: data.avgSettleDays ? String(data.avgSettleDays) : "—", delta: data.avgSettleDaysDelta, spark: data.avgSettleSpark, icon: Clock3, color: "#E11D48", bg: "bg-rose-50 text-rose-600", invert: true },
@@ -213,7 +213,7 @@ export function PerformanceDashboardView({
                   <span className="font-semibold">{formatCompactMoney(row.value)}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-[#5A32A3]" style={{ width: `${Math.max(6, (row.value / maxPipe) * 100)}%` }} />
+                  <div className="h-full rounded-full bg-[var(--brand-primary)]" style={{ width: `${Math.max(6, (row.value / maxPipe) * 100)}%` }} />
                 </div>
               </div>
             ))}

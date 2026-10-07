@@ -15,7 +15,7 @@ const labelClass =
   "text-[11px] font-medium uppercase tracking-wide text-slate-500";
 
 const fieldClass =
-  "h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20";
+  "h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20";
 
 interface ReminderCustomFrequencyFieldsProps {
   value: ReminderRepeatRule;
@@ -114,7 +114,7 @@ export function ReminderCustomFrequencyFields({
               <input
                 type="radio"
                 name="reminder-until"
-                className="h-4 w-4 accent-[#5A32A3]"
+                className="h-4 w-4 accent-[var(--brand-primary)]"
                 checked={until === option.id}
                 onChange={() => setUntil(option.id)}
               />

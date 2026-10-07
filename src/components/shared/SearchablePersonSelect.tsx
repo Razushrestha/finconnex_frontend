@@ -49,7 +49,7 @@ export function SearchablePersonSelect({
           setOpen((next) => !next);
           setQuery("");
         }}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 text-left text-sm text-slate-800 outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 text-left text-sm text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
       >
         <span className={cn("truncate", !value && "text-slate-400")}>
           {value || placeholder}
@@ -84,7 +84,7 @@ export function SearchablePersonSelect({
                   className={cn(
                     "flex w-full px-3 py-1.5 text-left text-sm",
                     name === value
-                      ? "bg-[#F3ECFB] font-medium text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] font-medium text-[var(--brand-primary)]"
                       : "text-slate-700 hover:bg-slate-50",
                   )}
                 >

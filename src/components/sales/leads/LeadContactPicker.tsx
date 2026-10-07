@@ -394,7 +394,7 @@ export function LeadContactPicker({
                     className={cn(
                       "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       index === 0
-                        ? "bg-[#5A32A3]/12 text-[#5A32A3]"
+                        ? "bg-[var(--brand-primary)]/12 text-[var(--brand-primary)]"
                         : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-slate-300",
                     )}
                   >
@@ -411,7 +411,7 @@ export function LeadContactPicker({
                   <button
                     type="button"
                     onClick={() => makePrimary(index)}
-                    className="mt-0.5 text-[11px] font-medium text-[#5A32A3] hover:underline"
+                    className="mt-0.5 text-[11px] font-medium text-[var(--brand-primary)] hover:underline"
                   >
                     Make primary
                   </button>
@@ -438,9 +438,9 @@ export function LeadContactPicker({
             setOpen(true);
             setQuery("");
           }}
-          className="inline-flex items-center gap-2 text-[12px] font-medium text-[#5A32A3] hover:text-[#4a2888]"
+          className="inline-flex items-center gap-2 text-[12px] font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-[#5A32A3]/45">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-[var(--brand-primary)]/45">
             <Plus className="h-3 w-3" strokeWidth={2.5} />
           </span>
           {addMoreLabel}
@@ -467,7 +467,7 @@ export function LeadContactPicker({
           {open ? (
             <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-full overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5 dark:bg-zinc-950">
               <div className="px-2 pt-2 pb-1">
-                <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3] dark:bg-zinc-900">
+                <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)] dark:bg-zinc-900">
                   <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                   <input
                     value={query}
@@ -519,7 +519,7 @@ export function LeadContactPicker({
                   event.preventDefault();
                   startAdd(query.trim());
                 }}
-                className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2.5 text-left text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50 dark:border-zinc-800"
+                className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2.5 text-left text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50 dark:border-zinc-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {query.trim()
@@ -541,7 +541,7 @@ export function LeadContactPicker({
               className={cn(
                 "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                 contacts.length === 0
-                  ? "bg-[#5A32A3]/12 text-[#5A32A3]"
+                  ? "bg-[var(--brand-primary)]/12 text-[var(--brand-primary)]"
                   : "bg-slate-100 text-slate-600",
               )}
             >
@@ -626,7 +626,7 @@ export function LeadContactPicker({
             <button
               type="button"
               onClick={saveNewContact}
-              className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888]"
+              className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
             >
               Save contact
             </button>

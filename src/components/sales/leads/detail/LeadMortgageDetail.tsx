@@ -95,7 +95,7 @@ export type LeadFieldPatch = {
   custom?: Record<string, string>;
 };
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 
 const STAGE_LABEL: Record<string, string> = {
   "New Lead": "New Lead",
@@ -425,7 +425,7 @@ export function LeadMortgageDetail({
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
                     aria-label="Lead name"
-                    className="h-8 w-full min-w-[220px] max-w-[320px] rounded-lg border border-[#5A32A3]/40 px-2.5 text-[15px] font-semibold text-slate-900 outline-none"
+                    className="h-8 w-full min-w-[220px] max-w-[320px] rounded-lg border border-[var(--brand-primary)]/40 px-2.5 text-[15px] font-semibold text-slate-900 outline-none"
                   />
                   <div>
                     <input
@@ -525,7 +525,7 @@ export function LeadMortgageDetail({
               }}
               className={
                 editingContact
-                  ? "border-[#5A32A3] bg-[#5A32A3] text-white hover:bg-[#4a278a]"
+                  ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white hover:bg-[#4a278a]"
                   : undefined
               }
             >
@@ -782,7 +782,7 @@ export function LeadMortgageDetail({
                         className={cn(
                           "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white",
                           current && "bg-orange-500 text-white",
-                          done && "bg-[#5A32A3] text-white",
+                          done && "bg-[var(--brand-primary)] text-white",
                           !current && !done && "bg-slate-200 text-slate-500",
                         )}
                       >

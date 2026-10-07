@@ -74,7 +74,7 @@ export function LeadInlineField({
         }
       }}
       className={cn(
-        "w-full rounded-md border border-[#5A32A3]/30 bg-white px-1.5 py-0.5 outline-none focus:border-[#5A32A3]",
+        "w-full rounded-md border border-[var(--brand-primary)]/30 bg-white px-1.5 py-0.5 outline-none focus:border-[var(--brand-primary)]",
         inputClassName,
       )}
     />

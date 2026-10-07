@@ -139,7 +139,7 @@ export function PlatformWorkspaces() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name or slug"
-              className="h-11 w-full rounded-full border border-slate-200 bg-white pr-4 pl-10 text-sm outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
+              className="h-11 w-full rounded-full border border-slate-200 bg-white pr-4 pl-10 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/15"
             />
           </form>
         </div>
@@ -214,7 +214,7 @@ export function PlatformWorkspaces() {
                               type="button"
                               disabled={busy}
                               onClick={() => void runAction(row, "enter")}
-                              className="inline-flex h-8 items-center rounded-full bg-[#5A32A3] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
+                              className="inline-flex h-8 items-center rounded-full bg-[var(--brand-primary)] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
                             >
                               Enter
                             </button>

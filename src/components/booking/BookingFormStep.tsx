@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 export type BookingFormFieldType =
   | "single_line"
@@ -220,7 +220,7 @@ function Toggle({
       onClick={() => onChange(!on)}
       className={cn(
         "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-        on ? "bg-[#5A32A3]" : "bg-slate-300",
+        on ? "bg-[var(--brand-primary)]" : "bg-slate-300",
       )}
     >
       <span
@@ -377,7 +377,7 @@ function AddFieldDrawer({
                     e.preventDefault();
                     submitField();
                   }}
-                  className="h-10 w-full rounded-md border border-[#D6D3E0] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/50"
+                  className="h-10 w-full rounded-md border border-[#D6D3E0] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/50"
                 />
               </label>
               {fieldHasOptions(picked) ? (
@@ -395,14 +395,14 @@ function AddFieldDrawer({
                             ),
                           );
                         }}
-                        className="h-10 min-w-0 flex-1 rounded-md border border-[#D6D3E0] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/50"
+                        className="h-10 min-w-0 flex-1 rounded-md border border-[#D6D3E0] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/50"
                       />
                       {index === options.length - 1 ? (
                         <button
                           type="button"
                           aria-label="Add option"
                           onClick={() => setOptions((prev) => [...prev, ""])}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center text-[20px] leading-none text-slate-700 hover:text-[#5A32A3]"
+                          className="flex h-10 w-10 shrink-0 items-center justify-center text-[20px] leading-none text-slate-700 hover:text-[var(--brand-primary)]"
                         >
                           +
                         </button>
@@ -447,7 +447,7 @@ function AddFieldDrawer({
                               ),
                             )
                           }
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#5A32A3]"
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[var(--brand-primary)]"
                         />
                         <input
                           value={part.label}
@@ -483,7 +483,7 @@ function AddFieldDrawer({
                   type="checkbox"
                   checked={mandatory}
                   onChange={(e) => setMandatory(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                  className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
                 />
                 Mandatory
               </label>
@@ -493,7 +493,7 @@ function AddFieldDrawer({
                     type="checkbox"
                     checked={ephi}
                     onChange={(e) => setEphi(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                    className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
                   />
                   Mark as ePHI/PII
                 </label>
@@ -544,7 +544,7 @@ function AddFieldDrawer({
                       setOptions([""]);
                       setAddressParts(defaultAddressParts());
                     }}
-                    className="flex flex-col items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-5 text-center transition hover:border-[#5A32A3]/35 hover:bg-[#F3ECFB]"
+                    className="flex flex-col items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-5 text-center transition hover:border-[var(--brand-primary)]/35 hover:bg-[var(--brand-primary-soft)]"
                   >
                     <Icon className="h-5 w-5 text-slate-500" strokeWidth={1.75} />
                     <span className="text-[12px] font-medium text-slate-700">
@@ -745,13 +745,13 @@ function TermsDrawer({
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://"
-                  className="h-8 min-w-0 flex-1 rounded border border-[#E5E7EB] px-2 text-[12px] outline-none focus:border-[#5A32A3]/40"
+                  className="h-8 min-w-0 flex-1 rounded border border-[#E5E7EB] px-2 text-[12px] outline-none focus:border-[var(--brand-primary)]/40"
                 />
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={applyLink}
-                  className="h-8 rounded px-2 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  className="h-8 rounded px-2 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
                 >
                   Add
                 </button>
@@ -923,7 +923,7 @@ export function BookingFormStep({
             <button
               type="button"
               onClick={() => setAddFieldOpen(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-[#5A32A3] px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--brand-primary)] px-3 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
             >
               <Plus className="h-3.5 w-3.5" />
               Add field
@@ -979,7 +979,7 @@ export function BookingFormStep({
                         );
                         setEditingId(null);
                       }}
-                      className="h-8 w-full rounded border border-[#5A32A3]/30 px-2 text-[13px] outline-none"
+                      className="h-8 w-full rounded border border-[var(--brand-primary)]/30 px-2 text-[13px] outline-none"
                     />
                   ) : (
                     <p className="flex flex-wrap items-center gap-x-3 text-[13px] font-medium text-slate-800">
@@ -1017,7 +1017,7 @@ export function BookingFormStep({
                       setEditingId(field.id);
                       setEditLabel(field.label);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                     aria-label="Edit"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -1032,7 +1032,7 @@ export function BookingFormStep({
                         ),
                       );
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
                     aria-label={field.hidden ? "Show" : "Hide"}
                   >
                     {field.hidden ? (
@@ -1105,7 +1105,7 @@ export function BookingFormStep({
             <input
               value={freeButton}
               onChange={(e) => setFreeButton(e.target.value)}
-              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40"
             />
           </label>
           <label className="block">
@@ -1115,7 +1115,7 @@ export function BookingFormStep({
             <input
               value={paidButton}
               onChange={(e) => setPaidButton(e.target.value)}
-              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40"
             />
           </label>
         </div>

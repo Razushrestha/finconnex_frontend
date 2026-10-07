@@ -41,7 +41,7 @@ export function AnalyticsLibrary() {
                 href={`/analytics/${section.id}`}
                 className="group flex flex-col rounded-[24px] border border-white bg-white p-5 shadow-[0_8px_24px_rgba(99,102,241,0.06)] transition hover:shadow-[0_12px_28px_rgba(99,102,241,0.1)]"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[var(--brand-primary)]">
                   <Icon className="h-4 w-4" />
                 </span>
                 <h3 className="mt-3 text-[14px] font-semibold text-slate-900">{section.name}</h3>

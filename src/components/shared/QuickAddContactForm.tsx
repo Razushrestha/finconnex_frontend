@@ -186,7 +186,7 @@ export function QuickAddContactForm({
         <button
           type="button"
           onClick={() => void save()}
-          className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888]"
+          className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
         >
           Save contact
         </button>

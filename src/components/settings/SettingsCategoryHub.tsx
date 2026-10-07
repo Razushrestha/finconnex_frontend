@@ -72,7 +72,7 @@ export function SettingsCategoryHub({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter this section"
-            className="h-10 w-full rounded-full border border-slate-200 bg-white pr-3 pl-9 text-[13px] outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
+            className="h-10 w-full rounded-full border border-slate-200 bg-white pr-3 pl-9 text-[13px] outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/15"
           />
         </label>
       </div>
@@ -92,7 +92,7 @@ export function SettingsCategoryHub({
           <button
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 hover:text-[#5A32A3]"
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 hover:text-[var(--brand-primary)]"
           >
             More in {category.title}
             <ChevronDown
@@ -133,7 +133,7 @@ function FeaturedTile({ link }: { link: SettingsNavLink }) {
   return (
     <Link
       href={link.href}
-      className="group rounded-3xl border border-slate-100 bg-white p-5 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[#5A32A3]/20"
+      className="group rounded-3xl border border-slate-100 bg-white p-5 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-[var(--brand-primary)]/20"
     >
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-slate-900">{link.title}</h2>
@@ -144,7 +144,7 @@ function FeaturedTile({ link }: { link: SettingsNavLink }) {
         ) : null}
       </div>
       <p className="mt-1 text-[12px] leading-relaxed text-slate-500">{link.blurb}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-semibold text-[#5A32A3]">
+      <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-primary)]">
         Open
         <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
       </span>

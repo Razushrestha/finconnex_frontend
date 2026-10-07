@@ -23,7 +23,7 @@ import { ReminderWhenPicker } from "@/components/activities/tasks/ReminderWhenPi
 import { cn } from "@/lib/utils";
 
 const fieldClass =
-  "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+  "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
 
 interface ReminderModalProps {
   open: boolean;
@@ -309,7 +309,7 @@ export default function ReminderModal({
               </select>
             </div>
             {draft.repeatType === "Custom" && draft.repeatRule ? (
-              <div className="rounded-xl border border-[#5A32A3]/15 bg-[#F3ECFB]/40 p-3">
+              <div className="rounded-xl border border-[var(--brand-primary)]/15 bg-[var(--brand-primary-soft)]/40 p-3">
                 <ReminderCustomFrequencyFields
                   value={draft.repeatRule}
                   start={firstReminder}
@@ -344,12 +344,12 @@ export default function ReminderModal({
                 className={cn(
                   "inline-flex h-10 min-w-[176px] items-center justify-between gap-3 rounded-xl border bg-white px-3 text-sm font-medium outline-none transition-all",
                   notifyOpen
-                    ? "border-[#5A32A3] text-slate-900 shadow-[0_0_0_3px_rgba(90,50,163,0.14)]"
-                    : "border-slate-200 text-slate-800 hover:border-[#5A32A3]/35",
+                    ? "border-[var(--brand-primary)] text-slate-900 shadow-[0_0_0_3px_rgba(90,50,163,0.14)]"
+                    : "border-slate-200 text-slate-800 hover:border-[var(--brand-primary)]/35",
                 )}
               >
                 <span className="inline-flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#F3ECFB] text-[#5A32A3]">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
                     <NotifyIcon className="h-3.5 w-3.5" />
                   </span>
                   {notify}
@@ -357,7 +357,7 @@ export default function ReminderModal({
                 <ChevronDown
                   className={cn(
                     "h-4 w-4 text-slate-400 transition-transform",
-                    notifyOpen && "rotate-180 text-[#5A32A3]",
+                    notifyOpen && "rotate-180 text-[var(--brand-primary)]",
                   )}
                 />
               </button>
@@ -382,17 +382,17 @@ export default function ReminderModal({
                         className={cn(
                           "flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors",
                           selected
-                            ? "bg-[#F3ECFB] text-[#5A32A3]"
+                            ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                             : index === activeIndex
                               ? "bg-slate-50 text-slate-800"
-                              : "text-slate-700 hover:bg-[#F3ECFB]/70",
+                              : "text-slate-700 hover:bg-[var(--brand-primary-soft)]/70",
                         )}
                       >
                         <span
                           className={cn(
                             "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
                             selected
-                              ? "bg-white text-[#5A32A3]"
+                              ? "bg-white text-[var(--brand-primary)]"
                               : "bg-slate-100 text-slate-500",
                           )}
                         >
@@ -405,14 +405,14 @@ export default function ReminderModal({
                           <span
                             className={cn(
                               "block text-[11px]",
-                              selected ? "text-[#5A32A3]/70" : "text-slate-400",
+                              selected ? "text-[var(--brand-primary)]/70" : "text-slate-400",
                             )}
                           >
                             {NOTIFY_META[option].hint}
                           </span>
                         </span>
                         {selected ? (
-                          <Check className="h-4 w-4 shrink-0 text-[#5A32A3]" />
+                          <Check className="h-4 w-4 shrink-0 text-[var(--brand-primary)]" />
                         ) : (
                           <span className="h-4 w-4 shrink-0" />
                         )}
@@ -425,7 +425,7 @@ export default function ReminderModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-[#F3ECFB]/40 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-[var(--brand-primary-soft)]/40 px-5 py-3">
           <button
             type="button"
             onClick={onCancel}
@@ -436,7 +436,7 @@ export default function ReminderModal({
           <button
             type="button"
             onClick={handleDone}
-            className="h-9 rounded-lg bg-[#5A32A3] px-4 text-sm font-semibold text-white shadow-sm shadow-[#5A32A3]/20 hover:opacity-90"
+            className="h-9 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm shadow-[var(--brand-primary)]/20 hover:opacity-90"
           >
             Done
           </button>

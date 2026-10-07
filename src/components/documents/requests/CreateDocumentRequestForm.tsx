@@ -112,7 +112,7 @@ export function SenderOnBehalfField({
           "relative mt-2 flex h-11 w-full items-center rounded-lg border bg-white px-3.5 pr-10 text-left text-[14px] outline-none focus:ring-2",
           invalid
             ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-            : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-[#5A32A3]/12",
+            : "border-slate-200 focus:border-[var(--brand-primary)]/45 focus:ring-[var(--brand-primary)]/12",
           !selected && !value.trim() ? "text-slate-400" : "text-slate-800",
         )}
       >
@@ -144,7 +144,7 @@ export function SenderOnBehalfField({
                     className={cn(
                       "flex w-full px-3 py-2 text-left text-[13px] hover:bg-violet-50",
                       active
-                        ? "font-semibold text-[#5A32A3]"
+                        ? "font-semibold text-[var(--brand-primary)]"
                         : "text-slate-800",
                     )}
                     onClick={() => {
@@ -353,7 +353,7 @@ function MoneyMonthField({
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ""))}
-        className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-[4.5rem] pl-7 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+        className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-[4.5rem] pl-7 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
       />
       <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12px] text-slate-400">
         / month
@@ -559,7 +559,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
       />
     </div>
   );
@@ -578,8 +578,8 @@ export function Stepper({ step }: { step: number }) {
                 className={cn(
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold",
                   active || done
-                    ? "bg-[#5A32A3] text-white"
-                    : "bg-[#EDE4FB] text-[#5A32A3]",
+                    ? "bg-[var(--brand-primary)] text-white"
+                    : "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
                 )}
               >
                 {s.id}
@@ -594,7 +594,7 @@ export function Stepper({ step }: { step: number }) {
               </span>
             </div>
             {index < STEPS.length - 1 ? (
-              <div className="mx-3 h-px min-w-[24px] flex-1 border-t border-dashed border-[#5A32A3]/45" />
+              <div className="mx-3 h-px min-w-[24px] flex-1 border-t border-dashed border-[var(--brand-primary)]/45" />
             ) : null}
           </li>
         );
@@ -1227,7 +1227,7 @@ export function CreateDocumentRequestForm({
     <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/25 px-3 py-4 sm:px-5 sm:py-6 lg:pl-[12rem]">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#5A32A3] text-white">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-primary)] text-white">
             <FileText className="h-4 w-4" />
           </span>
           <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900">
@@ -1340,7 +1340,7 @@ export function CreateDocumentRequestForm({
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Anything they should know before uploading…"
-                        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+                        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
                       />
                     </div>
                   </div>

@@ -401,7 +401,7 @@ export function CreditReportDrawer({
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.07em] text-[#5A32A3] uppercase">
+            <p className="text-[11px] font-semibold tracking-[0.07em] text-[var(--brand-primary)] uppercase">
               {roleLabel}
             </p>
             <p className="truncate text-[16px] font-semibold text-slate-900">

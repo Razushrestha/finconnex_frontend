@@ -61,7 +61,7 @@ export function formatCustomReminder(config: CustomReminderConfig): string {
 const labelClass =
   "text-[11px] font-medium uppercase tracking-wide text-gray-500";
 const inputClass =
-  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12";
+  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12";
 
 export function parseDatetimeLocal(value: string): Date | null {
   if (!value.trim()) return null;

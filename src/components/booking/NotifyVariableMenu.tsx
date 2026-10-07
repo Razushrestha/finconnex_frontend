@@ -176,10 +176,10 @@ export function NotifyVariableMenu({
           }
         }}
         className={cn(
-          "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-semibold text-[#5A32A3] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5A32A3]/30",
+          "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-semibold text-[var(--brand-primary)] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/30",
           open
-            ? "border-[#5A32A3]/40 bg-[#F3ECFB]"
-            : "border-[#E5E7EB] bg-white hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB]",
+            ? "border-[var(--brand-primary)]/40 bg-[var(--brand-primary-soft)]"
+            : "border-[#E5E7EB] bg-white hover:border-[var(--brand-primary)]/40 hover:bg-[var(--brand-primary-soft)]",
         )}
       >
         {label}
@@ -206,8 +206,8 @@ export function NotifyVariableMenu({
               }}
               className="fixed z-[70] overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white pb-2 shadow-[0_8px_28px_rgba(15,23,42,0.16)] [scrollbar-color:#94A3B8_transparent] [scrollbar-width:thin]"
             >
-              <p className="sticky top-0 z-10 bg-white px-3 pt-2.5 pb-1 text-[13px] font-bold text-[#5A32A3]">
-                <span className="inline-block border-b-2 border-[#5A32A3] pb-0.5">
+              <p className="sticky top-0 z-10 bg-white px-3 pt-2.5 pb-1 text-[13px] font-bold text-[var(--brand-primary)]">
+                <span className="inline-block border-b-2 border-[var(--brand-primary)] pb-0.5">
                   Variables
                 </span>
               </p>
@@ -226,7 +226,7 @@ export function NotifyVariableMenu({
                         onInsert(item.token);
                         close();
                       }}
-                      className="block w-full px-5 py-1.5 text-left text-[13px] text-slate-600 outline-none hover:bg-[#F3ECFB] hover:text-[#5A32A3] focus-visible:bg-[#F3ECFB] focus-visible:text-[#5A32A3]"
+                      className="block w-full px-5 py-1.5 text-left text-[13px] text-slate-600 outline-none hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] focus-visible:bg-[var(--brand-primary-soft)] focus-visible:text-[var(--brand-primary)]"
                     >
                       {item.label}
                     </button>

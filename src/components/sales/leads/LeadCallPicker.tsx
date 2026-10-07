@@ -130,9 +130,9 @@ function LeadCallPicker({
           type="button"
           role="menuitem"
           onClick={() => onSelect(target)}
-          className="flex w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-[#F3ECFB]"
+          className="flex w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-[var(--brand-primary-soft)]"
         >
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F3ECFB] text-[#5A32A3]">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
             <Phone className="h-3.5 w-3.5" />
           </span>
           <span className="min-w-0">

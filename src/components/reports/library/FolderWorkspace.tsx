@@ -24,7 +24,7 @@ export function FolderWorkspace({ folderId }: { folderId: string }) {
   if (!folder) {
     return (
       <div className="p-6 text-sm text-slate-500">
-        Folder not found. <Link href="/reports" className="text-[#5A32A3] underline">Back to reports</Link>
+        Folder not found. <Link href="/reports" className="text-[var(--brand-primary)] underline">Back to reports</Link>
       </div>
     );
   }
@@ -88,7 +88,7 @@ export function FolderWorkspace({ folderId }: { folderId: string }) {
                     <td className="px-4 py-3">
                       <Link
                         href={`/reports/library/${report!.category}/${report!.id}`}
-                        className="font-semibold text-slate-900 hover:text-[#5A32A3]"
+                        className="font-semibold text-slate-900 hover:text-[var(--brand-primary)]"
                       >
                         {report!.name}
                       </Link>

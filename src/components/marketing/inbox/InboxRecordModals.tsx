@@ -18,7 +18,7 @@ import { createLead } from "@/lib/leads/store";
 import { LEAD_PIPELINE_STAGES, LEAD_SOURCES, type LeadSource } from "@/lib/leads/types";
 import { getRulesActor } from "@/lib/rules/actor";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 export function splitPersonName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -90,7 +90,7 @@ function Field({
 }
 
 const inputClass =
-  "h-9 w-full rounded-lg border border-slate-200 px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15";
+  "h-9 w-full rounded-lg border border-slate-200 px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/15";
 
 export function InboxLinkContactModal({
   open,
@@ -236,7 +236,7 @@ export function InboxLinkContactModal({
           </form>
         ) : (
           <div className="px-4 py-3">
-            <label className="flex h-9 items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+            <label className="flex h-9 items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)]">
               <Search className="h-3.5 w-3.5 text-slate-400" />
               <input
                 autoFocus
@@ -260,7 +260,7 @@ export function InboxLinkContactModal({
                       }
                       setCreating(true);
                     }}
-                    className="mt-2 text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                    className="mt-2 text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
                     Create a new contact
                   </button>
@@ -271,7 +271,7 @@ export function InboxLinkContactModal({
                     key={contact.id}
                     type="button"
                     onClick={() => onLinked(contact)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-[#F8F4FC]"
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-[var(--brand-primary-faint)]"
                   >
                     <span
                       className={cn(
@@ -318,7 +318,7 @@ export function InboxLinkContactModal({
                 }
                 setCreating(true);
               }}
-              className="h-9 rounded-lg px-3 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+              className="h-9 rounded-lg px-3 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
             >
               Create contact
             </button>

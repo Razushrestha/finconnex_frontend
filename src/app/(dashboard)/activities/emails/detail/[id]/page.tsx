@@ -73,7 +73,7 @@ export default function EmailDetailsPage({
           <p className="text-sm font-medium text-slate-700">Email not found</p>
           <Link
             href={back.href}
-            className="mt-3 inline-flex rounded-lg bg-[#5A32A3] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-3 inline-flex rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white"
           >
             {back.label}
           </Link>

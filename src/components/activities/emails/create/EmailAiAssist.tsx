@@ -247,7 +247,7 @@ export function EmailAiAssist({
           type="button"
           onClick={() => setOpen(true)}
           className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
-          style={{ backgroundColor: "#5A32A3" }}
+          style={{ backgroundColor: "var(--brand-primary)" }}
         >
           <Sparkles className="h-3.5 w-3.5" />
           AI
@@ -275,7 +275,7 @@ export function EmailAiAssist({
           Shorten
         </button>
         {flash ? (
-          <span className="text-[11px] font-medium text-[#5A32A3]">{flash}</span>
+          <span className="text-[11px] font-medium text-[var(--brand-primary)]">{flash}</span>
         ) : null}
       </div>
 
@@ -283,7 +283,7 @@ export function EmailAiAssist({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3]">
+              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Write with AI
               </p>
@@ -300,7 +300,7 @@ export function EmailAiAssist({
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe the email you want… e.g. Ask Olivia for the latest payslips and confirm we can lodge this week."
-                className="min-h-[110px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#5A32A3]/20"
+                className="min-h-[110px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               />
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -317,7 +317,7 @@ export function EmailAiAssist({
                         className={cn(
                           "h-8 rounded-lg border px-2.5 text-[11px] font-semibold",
                           tone === id
-                            ? "border-violet-200 bg-violet-50 text-[#5A32A3]"
+                            ? "border-violet-200 bg-violet-50 text-[var(--brand-primary)]"
                             : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
                         )}
                       >
@@ -333,7 +333,7 @@ export function EmailAiAssist({
                     key={item}
                     type="button"
                     onClick={() => setPrompt(item)}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:border-violet-200 hover:bg-[#F8F4FC]"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:border-violet-200 hover:bg-[var(--brand-primary-faint)]"
                   >
                     {item}
                   </button>
@@ -353,7 +353,7 @@ export function EmailAiAssist({
                 disabled={busy || !prompt.trim()}
                 onClick={() => writeFromPrompt(prompt)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-40"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 Write email

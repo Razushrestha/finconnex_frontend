@@ -126,7 +126,7 @@ export function ConsultationWizardLayout({
                         className={cn(
                           "h-4 w-4 shrink-0 text-slate-400 transition-transform",
                           (step.id === "availability" ? availabilityOpen : notifyOpen) &&
-                            "rotate-180 text-[#5A32A3]",
+                            "rotate-180 text-[var(--brand-primary)]",
                         )}
                       />
                     ) : undefined
@@ -206,7 +206,7 @@ function SidebarItem({
         "flex w-full items-center gap-2.5 rounded-lg text-left transition",
         nested ? "py-2 pr-2.5 pl-12" : "h-11 px-2.5",
         active
-          ? "bg-[#F3ECFB]"
+          ? "bg-[var(--brand-primary-soft)]"
           : reached
             ? "hover:bg-slate-50"
             : "cursor-default opacity-55",
@@ -216,7 +216,7 @@ function SidebarItem({
         className={cn(
           "flex shrink-0 items-center justify-center rounded-md",
           nested ? "h-7 w-7" : "h-8 w-8",
-          active ? "bg-white text-[#5A32A3]" : "bg-slate-100 text-slate-500",
+          active ? "bg-white text-[var(--brand-primary)]" : "bg-slate-100 text-slate-500",
         )}
       >
         <Icon className={nested ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={2} />
@@ -225,7 +225,7 @@ function SidebarItem({
         className={cn(
           "min-w-0 flex-1 font-semibold leading-snug",
           nested ? "text-[12px]" : "truncate text-[13px]",
-          active ? "text-[#5A32A3]" : nested ? "text-slate-600" : "text-slate-800",
+          active ? "text-[var(--brand-primary)]" : nested ? "text-slate-600" : "text-slate-800",
         )}
       >
         {title}

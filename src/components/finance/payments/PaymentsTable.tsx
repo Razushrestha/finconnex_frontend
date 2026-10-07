@@ -100,7 +100,7 @@ export function PaymentsTable({ data }: { data: Payment[] }) {
             className={cn(
               "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold",
               statusTab === tab
-                ? "bg-[#6D5AE6] text-white"
+                ? "bg-[var(--brand-primary)] text-white"
                 : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
             )}
           >

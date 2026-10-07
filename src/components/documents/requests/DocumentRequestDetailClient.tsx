@@ -1000,7 +1000,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 type="checkbox"
                 checked={notifyCancel}
                 onChange={(e) => setNotifyCancel(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
               />
               Notify client
               <span

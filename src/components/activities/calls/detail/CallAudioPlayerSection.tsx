@@ -97,14 +97,14 @@ export function CallAudioPlayerSection({
           <button
             type="button"
             onClick={() => skip(-15)}
-            className="hover:text-[#5A32A3]"
+            className="hover:text-[var(--brand-primary)]"
           >
             −15s
           </button>
           <button
             type="button"
             onClick={() => skip(15)}
-            className="hover:text-[#5A32A3]"
+            className="hover:text-[var(--brand-primary)]"
           >
             +15s
           </button>
@@ -115,7 +115,7 @@ export function CallAudioPlayerSection({
         <button
           type="button"
           onClick={togglePlay}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#5A32A3] text-white hover:opacity-90"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white hover:opacity-90"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (
@@ -140,7 +140,7 @@ export function CallAudioPlayerSection({
               style={{ height: `${bar.h}%` }}
               className={cn(
                 "w-[3px] flex-1 rounded-full",
-                bar.filled ? "bg-[#5A32A3]" : "bg-slate-200",
+                bar.filled ? "bg-[var(--brand-primary)]" : "bg-slate-200",
               )}
             />
           ))}
@@ -155,7 +155,7 @@ export function CallAudioPlayerSection({
             <button
               type="button"
               onClick={() => setMuted((v) => !v)}
-              className="text-slate-400 hover:text-[#5A32A3]"
+              className="text-slate-400 hover:text-[var(--brand-primary)]"
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted || volume === 0 ? (
@@ -175,7 +175,7 @@ export function CallAudioPlayerSection({
                 setVolume(next);
                 if (next > 0) setMuted(false);
               }}
-              className="h-1 w-16 accent-[#5A32A3]"
+              className="h-1 w-16 accent-[var(--brand-primary)]"
               aria-label="Volume"
             />
           </div>

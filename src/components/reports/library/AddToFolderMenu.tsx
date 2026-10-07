@@ -42,7 +42,7 @@ export function AddToFolderMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "inline-flex items-center gap-1 text-[11px] font-semibold text-[#5A32A3] outline-none",
+          "inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--brand-primary)] outline-none",
           triggerClassName,
         )}
       >

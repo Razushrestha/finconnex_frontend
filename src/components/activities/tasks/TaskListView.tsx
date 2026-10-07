@@ -626,7 +626,7 @@ export function TaskListView({
                   }}
                   onChange={togglePageSelected}
                   aria-label="Select all tasks on this page"
-                  className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
+                  className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
                 />
               </th>
               {orderedVisibleColumns.map((col) => {
@@ -698,7 +698,7 @@ export function TaskListView({
                     checked={selectedIds.includes(task.taskId)}
                     onChange={() => toggleTaskSelected(task.taskId)}
                     aria-label={`Select ${task.title}`}
-                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
                   />
                 </td>
                 {orderedVisibleColumns.map((col) => {

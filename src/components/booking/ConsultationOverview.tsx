@@ -109,7 +109,7 @@ import {
 import { cn } from "@/lib/utils";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 function consultationInitials(title: string) {
   const words = title
@@ -185,7 +185,7 @@ function NestedNavLinks<T extends string>({
   onSelect: (id: T) => void;
 }) {
   return (
-    <div className="mb-1.5 ml-[3.25rem] mr-1 space-y-0.5 border-l border-[#EDE4F7] pl-2.5">
+    <div className="mb-1.5 ml-[3.25rem] mr-1 space-y-0.5 border-l border-[var(--brand-primary-muted)] pl-2.5">
       {items.map((panel) => {
         const Icon = panel.icon;
         const selected = panel.id === activeId;
@@ -197,7 +197,7 @@ function NestedNavLinks<T extends string>({
             className={cn(
               "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] font-medium leading-snug",
               selected
-                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                 : "text-slate-600 hover:bg-slate-50",
             )}
           >
@@ -344,7 +344,7 @@ function Segment({
           className={cn(
             "h-9 min-w-[4.5rem] px-3 text-[13px] font-semibold",
             value === option
-              ? "bg-[#F3ECFB] text-[#5A32A3]"
+              ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
               : "bg-white text-slate-600 hover:bg-slate-50",
           )}
         >
@@ -422,7 +422,7 @@ function PaymentTypeField({
                   className={cn(
                     "flex w-full px-3 py-2 text-left text-[13px]",
                     item === value
-                      ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                       : "text-slate-700 hover:bg-slate-50",
                   )}
                 >
@@ -621,7 +621,7 @@ export function EventTypeEditForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/45"
+            className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/45"
           />
         </label>
 
@@ -983,7 +983,7 @@ function AssignedUsersEditForm({
                 type="checkbox"
                 checked={allChecked}
                 onChange={toggleAll}
-                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
               />
               Select All
             </label>
@@ -1024,7 +1024,7 @@ function AssignedUsersEditForm({
                       : [...current, row.name],
                   )
                 }
-                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                className="h-4 w-4 rounded border-slate-300 accent-[var(--brand-primary)]"
                 aria-label={`Select ${row.name}`}
               />
             ) : null}
@@ -1051,7 +1051,7 @@ function AssignedUsersEditForm({
                     }))
                   }
                   aria-label={`Load share for ${row.name}`}
-                  className="h-9 w-[72px] rounded-lg border border-[#E5E7EB] bg-white px-2 text-right text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/45"
+                  className="h-9 w-[72px] rounded-lg border border-[#E5E7EB] bg-white px-2 text-right text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/45"
                 />
                 <span className="text-[13px] text-slate-500">%</span>
               </label>
@@ -1271,7 +1271,7 @@ export function ConsultationOverview({
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#5A32A3]/40 bg-white px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F6F1FC]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--brand-primary)]/40 bg-white px-3 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[#F6F1FC]"
           >
             <Share2 className="h-3.5 w-3.5" />
             Share
@@ -1382,7 +1382,7 @@ export function ConsultationOverview({
                     active &&
                       !(item.id === "availability" && availabilityOpen) &&
                       !(item.id === "notify" && notifyOpen)
-                      ? "bg-[#F3ECFB]"
+                      ? "bg-[var(--brand-primary-soft)]"
                       : "hover:bg-slate-50",
                   )}
                 >
@@ -1390,7 +1390,7 @@ export function ConsultationOverview({
                     className={cn(
                       "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
                       active
-                        ? "bg-[#F3ECFB] text-[#5A32A3]"
+                        ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                         : "bg-slate-100 text-slate-500",
                     )}
                   >
@@ -1400,7 +1400,7 @@ export function ConsultationOverview({
                     <span
                       className={cn(
                         "block text-[13px] font-semibold",
-                        active ? "text-[#5A32A3]" : "text-slate-800",
+                        active ? "text-[var(--brand-primary)]" : "text-slate-800",
                       )}
                     >
                       {item.title}
@@ -1414,7 +1414,7 @@ export function ConsultationOverview({
                       className={cn(
                         "mt-2 h-4 w-4 shrink-0 text-slate-400 transition-transform",
                         (item.id === "availability" ? availabilityOpen : notifyOpen) &&
-                          "rotate-180 text-[#5A32A3]",
+                          "rotate-180 text-[var(--brand-primary)]",
                       )}
                     />
                   ) : null}
@@ -1462,7 +1462,7 @@ export function ConsultationOverview({
                 {current.title}
               </h2>
               {section === "consultants" ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#F3ECFB] px-1.5 text-[11px] font-bold text-[#5A32A3]">
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] px-1.5 text-[11px] font-bold text-[var(--brand-primary)]">
                   {people.length}
                 </span>
               ) : null}
@@ -1545,7 +1545,7 @@ export function ConsultationOverview({
                 <Field label="Description">
                   {page.description?.trim() ? (
                     <div
-                      className="fc-rich-editor font-normal [&_a]:text-[#5A32A3] [&_a]:underline [&_p]:m-0"
+                      className="fc-rich-editor font-normal [&_a]:text-[var(--brand-primary)] [&_a]:underline [&_p]:m-0"
                       dangerouslySetInnerHTML={{
                         __html: sanitizeDescriptionHtml(page.description),
                       }}

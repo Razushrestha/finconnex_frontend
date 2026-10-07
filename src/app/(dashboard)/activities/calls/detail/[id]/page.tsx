@@ -57,7 +57,7 @@ export default function CallDetailPage({ params }: PageProps) {
         <button
           type="button"
           onClick={() => router.push(back.href)}
-          className="rounded-xl bg-[#5A32A3] px-4 py-2 text-xs font-medium text-white hover:opacity-90"
+          className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-xs font-medium text-white hover:opacity-90"
         >
           {back.label}
         </button>

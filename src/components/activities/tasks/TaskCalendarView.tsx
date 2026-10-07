@@ -276,7 +276,7 @@ export function TaskCalendarView({
                 className={cn(
                   "h-7 rounded-md px-2.5 text-[12px] font-semibold capitalize",
                   range === id
-                    ? "bg-white text-[#5A32A3] shadow-sm"
+                    ? "bg-white text-[var(--brand-primary)] shadow-sm"
                     : "text-slate-500 hover:text-slate-800",
                 )}
               >
@@ -445,7 +445,7 @@ function DayCell({
         className={cn(
           "mb-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums",
           isToday
-            ? "bg-[#5A32A3] text-white"
+            ? "bg-[var(--brand-primary)] text-white"
             : inMonth
               ? "text-slate-800"
               : "text-slate-300",
@@ -465,7 +465,7 @@ function DayCell({
           />
         ))}
         {items.length > maxVisible ? (
-          <li className="shrink-0 px-1 text-[10px] font-semibold leading-4 text-[#5A32A3]">
+          <li className="shrink-0 px-1 text-[10px] font-semibold leading-4 text-[var(--brand-primary)]">
             +{items.length - maxVisible}
           </li>
         ) : null}
@@ -522,7 +522,7 @@ function DayTimeGrid({
         <span
           className={cn(
             "flex h-6 min-w-6 items-center justify-center rounded-md text-[12px] font-bold tabular-nums",
-            isToday ? "bg-[#5A32A3] text-white" : "text-slate-800",
+            isToday ? "bg-[var(--brand-primary)] text-white" : "text-slate-800",
           )}
         >
           {day.getDate()}
@@ -627,7 +627,7 @@ function WeekTimeGrid({
               <span
                 className={cn(
                   "flex h-6 min-w-6 items-center justify-center rounded-md text-[12px] font-bold tabular-nums",
-                  isToday ? "bg-[#5A32A3] text-white" : "text-slate-800",
+                  isToday ? "bg-[var(--brand-primary)] text-white" : "text-slate-800",
                 )}
               >
                 {day.getDate()}
@@ -728,7 +728,7 @@ function TaskChip({
         title={`${task.title} — click to open`}
         className={cn(
           "flex items-center gap-1 rounded-md px-1 outline-none transition-shadow",
-          "cursor-pointer hover:shadow-[inset_0_0_0_1.5px_#5A32A3] hover:brightness-[0.93]",
+          "cursor-pointer hover:shadow-[inset_0_0_0_1.5px_var(--brand-primary)] hover:brightness-[0.93]",
           compact ? "h-5" : "items-start gap-1.5 px-1.5 py-1",
           tone.chip,
           dragging && "opacity-50",

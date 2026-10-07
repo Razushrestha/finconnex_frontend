@@ -79,7 +79,7 @@ export function ActivityTimelineView({
                 <div
                   className={cn(
                     "absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full",
-                    row.overdue ? "bg-rose-500" : "bg-[#5A32A3]",
+                    row.overdue ? "bg-rose-500" : "bg-[var(--brand-primary)]",
                   )}
                   style={{ left: `${left}%` }}
                   title={row.at ? row.at.toDateString() : "No date"}

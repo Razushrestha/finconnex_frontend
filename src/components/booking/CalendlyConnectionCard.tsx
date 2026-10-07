@@ -220,7 +220,7 @@ export function CalendlyConnectionCard({
             value={token}
             onChange={(event) => setToken(event.target.value)}
             placeholder="Calendly personal access token"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
           />
           <button
             type="button"
@@ -282,7 +282,7 @@ export function CalendlyConnectionCard({
                   <span className="flex gap-2">
                     <button
                       type="button"
-                      className="font-semibold text-[#5A32A3]"
+                      className="font-semibold text-[var(--brand-primary)]"
                       onClick={() =>
                         void run(`sync-${row.id}`, async () => {
                           await syncCalendarConnection(row.id);

@@ -49,15 +49,15 @@ export const KANBAN_WELL = "border-slate-200/60 bg-slate-100/60";
 
 /** Kanban column header — brand light purple. */
 export const KANBAN_HEADER =
-  "flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs border border-[#5A32A3]/12 bg-[#F3ECFB] p-1.5";
+  "flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs border border-[var(--brand-primary)]/12 bg-[var(--brand-primary-soft)] p-1.5";
 
 /** Collapsed kanban rail tint (no fixed height). */
 export const KANBAN_HEADER_RAIL =
-  "rounded-xs border border-[#5A32A3]/12 bg-[#F3ECFB]";
+  "rounded-xs border border-[var(--brand-primary)]/12 bg-[var(--brand-primary-soft)]";
 
 /** Count pill on kanban headers. */
 export const KANBAN_HEADER_COUNT =
-  "inline-flex shrink-0 items-center rounded-full bg-[#5A32A3]/15 px-2.5 py-0.5 text-xs font-medium text-[#5A32A3]";
+  "inline-flex shrink-0 items-center rounded-full bg-[var(--brand-primary)]/15 px-2.5 py-0.5 text-xs font-medium text-[var(--brand-primary)]";
 
 /**
  * Expanded kanban column. Stays at least 272px; grows equally to fill

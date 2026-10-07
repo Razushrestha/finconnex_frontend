@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 const VIEW = 280;
 const OUT = 256;
 
@@ -210,7 +210,7 @@ function CoverAdjustModal({
             step={0.05}
             value={zoom}
             onChange={(e) => setZoom(Number(e.target.value))}
-            className="mt-1 w-full accent-[#5A32A3]"
+            className="mt-1 w-full accent-[var(--brand-primary)]"
           />
         </label>
         <p className="mt-1 text-[11px] text-slate-400">
@@ -223,7 +223,7 @@ function CoverAdjustModal({
           <button
             type="button"
             onClick={onReplace}
-            className="h-10 rounded-lg px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+            className="h-10 rounded-lg px-3 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
           >
             Choose another
           </button>

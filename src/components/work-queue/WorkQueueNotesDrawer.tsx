@@ -334,7 +334,7 @@ export function WorkQueueNotesDrawer({
               type="button"
               disabled={!canSave}
               onClick={save}
-              className="rounded-md bg-[#4F46E5] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="rounded-md bg-[var(--brand-primary)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {editingId ? "Update note" : "Add note"}
             </button>
@@ -415,7 +415,7 @@ export function WorkQueueNotesDrawer({
                           <button
                             type="button"
                             onClick={() => toggleExpanded(note.id)}
-                            className="ml-1 font-medium text-[#4F46E5] hover:underline"
+                            className="ml-1 font-medium text-[var(--brand-primary)] hover:underline"
                           >
                             {open ? "Show less" : "Show more"}
                           </button>
@@ -445,7 +445,7 @@ export function WorkQueueNotesDrawer({
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                className="text-[13px] font-medium text-[#4F46E5] hover:underline"
+                className="text-[13px] font-medium text-[var(--brand-primary)] hover:underline"
               >
                 {showAll ? "Show fewer notes" : "View all notes"}
               </button>

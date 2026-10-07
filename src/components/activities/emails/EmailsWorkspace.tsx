@@ -267,7 +267,7 @@ export function EmailsWorkspace({
               type="button"
               onClick={() => compose()}
               className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl text-[13px] font-semibold text-white"
-              style={{ backgroundColor: "#5A32A3" }}
+              style={{ backgroundColor: "var(--brand-primary)" }}
             >
               <Plus className="h-4 w-4" />
               Compose Mail
@@ -291,7 +291,7 @@ export function EmailsWorkspace({
                   className={cn(
                     "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px]",
                     active
-                      ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                       : "text-slate-600 hover:bg-slate-50",
                   )}
                 >
@@ -322,7 +322,7 @@ export function EmailsWorkspace({
               <button
                 type="button"
                 onClick={() => setCreatingFolder((v) => !v)}
-                className="text-[10px] font-semibold text-[#5A32A3]"
+                className="text-[10px] font-semibold text-[var(--brand-primary)]"
               >
                 + New
               </button>
@@ -344,7 +344,7 @@ export function EmailsWorkspace({
                 <button
                   type="submit"
                   className="h-8 rounded-lg px-2 text-[11px] font-semibold text-white"
-                  style={{ backgroundColor: "#5A32A3" }}
+                  style={{ backgroundColor: "var(--brand-primary)" }}
                 >
                   Add
                 </button>
@@ -358,7 +358,7 @@ export function EmailsWorkspace({
                 className={cn(
                   "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px]",
                   customFolderId === item.id
-                    ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                    ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                     : "text-slate-600 hover:bg-slate-50",
                 )}
               >
@@ -383,7 +383,7 @@ export function EmailsWorkspace({
                 className={cn(
                   "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px]",
                   labelFilter === item.id
-                    ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                    ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                     : "text-slate-600 hover:bg-slate-50",
                 )}
               >
@@ -418,7 +418,7 @@ export function EmailsWorkspace({
               <button
                 type="submit"
                 className="inline-flex h-full items-center gap-1.5 px-5 text-[12px] font-semibold text-white"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 <Search className="h-3.5 w-3.5" />
                 Search
@@ -430,14 +430,14 @@ export function EmailsWorkspace({
               className={cn(
                 "inline-flex h-11 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-semibold",
                 filterOpen || filterCount
-                  ? "border-violet-200 bg-violet-50 text-[#5A32A3]"
+                  ? "border-violet-200 bg-violet-50 text-[var(--brand-primary)]"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
               )}
             >
               <Filter className="h-3.5 w-3.5" />
               Filter
               {filterCount ? (
-                <span className="rounded-full bg-[#5A32A3] px-1.5 text-[10px] text-white">
+                <span className="rounded-full bg-[var(--brand-primary)] px-1.5 text-[10px] text-white">
                   {filterCount}
                 </span>
               ) : null}
@@ -469,7 +469,7 @@ export function EmailsWorkspace({
                   className={cn(
                     "rounded-full px-3 py-1 text-[12px] font-semibold",
                     focusView === id
-                      ? "bg-[#5A32A3] text-white"
+                      ? "bg-[var(--brand-primary)] text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200",
                   )}
                 >

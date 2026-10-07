@@ -68,7 +68,7 @@ function BrandSwitch({
       className={cn(
         "relative shrink-0 rounded-full transition-colors",
         small ? "h-4 w-7" : "h-6 w-11",
-        checked ? "bg-[#5A32A3]" : "bg-slate-300",
+        checked ? "bg-[var(--brand-primary)]" : "bg-slate-300",
       )}
     >
       <span
@@ -125,7 +125,7 @@ function SettingsPopup({
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
           {children}
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 bg-[#F3ECFB]/40 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-slate-100 bg-[var(--brand-primary-soft)]/40 px-5 py-3">
           <button
             type="button"
             onClick={onCancel}
@@ -136,7 +136,7 @@ function SettingsPopup({
           <button
             type="button"
             onClick={onDone}
-            className="h-9 rounded-lg bg-[#5A32A3] px-4 text-sm font-semibold text-white shadow-sm shadow-[#5A32A3]/20 hover:opacity-90"
+            className="h-9 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm shadow-[var(--brand-primary)]/20 hover:opacity-90"
           >
             Done
           </button>
@@ -192,7 +192,7 @@ function CompactSettingRow({
           <button
             type="button"
             onClick={onEdit}
-            className="min-w-0 flex-1 text-left text-[13px] text-slate-600 hover:text-[#5A32A3]"
+            className="min-w-0 flex-1 text-left text-[13px] text-slate-600 hover:text-[var(--brand-primary)]"
           >
             {summary}
           </button>
@@ -620,7 +620,7 @@ export function ReminderSettingsCard({
                     className={cn(
                       "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-colors",
                       active
-                        ? "border-[#5A32A3] bg-white text-[#5A32A3]"
+                        ? "border-[var(--brand-primary)] bg-white text-[var(--brand-primary)]"
                         : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
                     )}
                   >
@@ -646,7 +646,7 @@ export function ReminderSettingsCard({
                     ),
                   )
                 }
-                className="h-10 min-w-[148px] rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
+                className="h-10 min-w-[148px] rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
               >
                 {frequencyOptions.map((option) => (
                   <option key={option} value={option}>
@@ -656,7 +656,7 @@ export function ReminderSettingsCard({
               </select>
             </div>
             {repeatType === "Custom" ? (
-              <div className="mt-3 rounded-lg border border-[#5A32A3]/15 bg-[#F8F3FC] p-3">
+              <div className="mt-3 rounded-lg border border-[var(--brand-primary)]/15 bg-[#F8F3FC] p-3">
                 <ReminderCustomFrequencyFields
                   value={draftRepeat}
                   start={parsed}
@@ -666,7 +666,7 @@ export function ReminderSettingsCard({
               </div>
             ) : null}
             {upcoming.length > 1 ? (
-              <ul className="mt-3 space-y-1 rounded-lg border border-[#5A32A3]/10 bg-[#F8F3FC] px-3 py-2">
+              <ul className="mt-3 space-y-1 rounded-lg border border-[var(--brand-primary)]/10 bg-[#F8F3FC] px-3 py-2">
                 {upcoming.slice(0, 8).map((date, index) => {
                   const isFinal =
                     index === Math.min(upcoming.length, 8) - 1 &&

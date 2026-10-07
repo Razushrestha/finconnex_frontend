@@ -294,8 +294,8 @@ export function RelatedInternalNotes({
           className={cn(
             "h-8 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-40",
             compact
-              ? "bg-white text-[#5A32A3] ring-1 ring-slate-200 hover:bg-[#F3ECFB]"
-              : "bg-[#5A32A3] text-white hover:bg-[#4a2888]",
+              ? "bg-white text-[var(--brand-primary)] ring-1 ring-slate-200 hover:bg-[var(--brand-primary-soft)]"
+              : "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-strong)]",
             compact && !editingId && "w-full",
           )}
         >
@@ -321,7 +321,7 @@ export function RelatedInternalNotes({
               >
                 {note.body.includes("<") ? (
                   <div
-                    className="text-[12px] leading-relaxed text-slate-800 [&_a]:text-[#5A32A3] [&_a]:underline [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
+                    className="text-[12px] leading-relaxed text-slate-800 [&_a]:text-[var(--brand-primary)] [&_a]:underline [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
                     dangerouslySetInnerHTML={{ __html: note.body }}
                   />
                 ) : (
@@ -347,7 +347,7 @@ export function RelatedInternalNotes({
                       title="Edit note"
                       aria-label="Edit note"
                       onClick={() => startEdit(note)}
-                      className="rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-[#5A32A3]"
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-[var(--brand-primary)]"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>

@@ -161,7 +161,7 @@ function SortHeader({
       onClick={onClick}
       className={cn(
         "inline-flex items-center gap-1 font-semibold tracking-wide uppercase",
-        active ? "text-[#5A32A3]" : "text-slate-400 hover:text-slate-600",
+        active ? "text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-600",
       )}
     >
       {label}
@@ -423,7 +423,7 @@ function RowActions({
                   type="checkbox"
                   checked={notifyCancel}
                   onChange={(e) => setNotifyCancel(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-300 accent-[#5A32A3]"
+                  className="h-3.5 w-3.5 rounded border-slate-300 accent-[var(--brand-primary)]"
                 />
                 Notify client
                 <span
@@ -455,7 +455,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={!hasFiles}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
                 onClick={downloadDocs}
               >
                 Download documents
@@ -463,7 +463,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
                 onClick={resendInvite}
               >
                 Resend invitation link
@@ -471,7 +471,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed || request.status !== "Pending"}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
                 onClick={markReceived}
               >
                 Mark received
@@ -479,7 +479,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed || request.status !== "Received"}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
                 onClick={approveRequest}
               >
                 Approve
@@ -495,7 +495,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
                 onClick={() => {
                   setOpen(false);
                   setEditingReminders(true);
@@ -837,7 +837,7 @@ export function DocumentRequestCard({
   return (
     <Link
       href={`/documents/requests/${request.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-[#5A32A3]/30"
+      className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-[var(--brand-primary)]/30"
     >
       <p className="truncate pr-7 text-[13px] font-semibold text-slate-900">
         {request.requestedFrom}

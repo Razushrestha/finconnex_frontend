@@ -160,8 +160,8 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
                   className={cn(
                     "block rounded-2xl px-3 py-2 text-[12px] transition-colors",
                     active
-                      ? "bg-[#5A32A3] font-semibold text-white shadow-sm shadow-[#5A32A3]/20"
-                      : "font-medium text-slate-600 hover:bg-[#F4F1FA] hover:text-[#5A32A3]",
+                      ? "bg-[var(--brand-primary)] font-semibold text-white shadow-sm shadow-[var(--brand-primary)]/20"
+                      : "font-medium text-slate-600 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]",
                   )}
                 >
                   {navItem.title}

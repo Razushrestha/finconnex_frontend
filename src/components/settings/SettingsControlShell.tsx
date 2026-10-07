@@ -48,8 +48,8 @@ export function SettingsControlShell({
   const results = useMemo(() => searchSettingsNav(query), [query]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F4F1FA]">
-      <header className="z-20 shrink-0 border-b border-[#5A32A3]/10 bg-white/90 backdrop-blur-md">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--brand-primary-soft)]">
+      <header className="z-20 shrink-0 border-b border-[var(--brand-primary)]/10 bg-white/90 backdrop-blur-md">
         <div className="flex items-center justify-end gap-4 px-4 py-3 sm:px-6">
           <label className="relative hidden min-w-[220px] max-w-sm flex-1 md:block">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -57,7 +57,7 @@ export function SettingsControlShell({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search settings…"
-              className="h-10 w-full rounded-full border border-slate-200 bg-slate-50/80 pr-3 pl-9 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/15"
+              className="h-10 w-full rounded-full border border-slate-200 bg-slate-50/80 pr-3 pl-9 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/15"
             />
             {query.trim() ? (
               <ul className="absolute top-[calc(100%+8px)] right-0 left-0 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
@@ -91,7 +91,7 @@ export function SettingsControlShell({
           </label>
           <Link
             href="/settings/my-preferences"
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#5A32A3] px-3.5 text-[12px] font-semibold text-white shadow-sm shadow-[#5A32A3]/25 hover:brightness-95"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-3.5 text-[12px] font-semibold text-white shadow-sm shadow-[var(--brand-primary)]/25 hover:brightness-95"
           >
             <UserRound className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">My preferences</span>
@@ -109,7 +109,7 @@ export function SettingsControlShell({
               className={cn(
                 "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap",
                 active
-                  ? "bg-[#5A32A3] text-white"
+                  ? "bg-[var(--brand-primary)] text-white"
                   : "bg-slate-100 text-slate-600",
               )}
             >
@@ -120,14 +120,14 @@ export function SettingsControlShell({
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-[248px] shrink-0 overflow-y-auto border-r border-[#5A32A3]/10 bg-white px-3 py-4 md:block">
+        <aside className="hidden w-[248px] shrink-0 overflow-y-auto border-r border-[var(--brand-primary)]/10 bg-white px-3 py-4 md:block">
           <Link
             href="/settings"
             className={cn(
               "mb-2 flex items-center rounded-xl px-3 py-2 text-[12px] font-semibold",
               pathname === "/settings"
-                ? "bg-[#5A32A3] text-white"
-                : "text-slate-500 hover:bg-violet-50 hover:text-[#5A32A3]",
+                ? "bg-[var(--brand-primary)] text-white"
+                : "text-slate-500 hover:bg-violet-50 hover:text-[var(--brand-primary)]",
             )}
           >
             All settings
@@ -143,14 +143,14 @@ export function SettingsControlShell({
                   className={cn(
                     "flex items-start gap-2.5 rounded-xl px-3 py-2.5 transition-colors",
                     active
-                      ? "bg-[color-mix(in_srgb,var(--brand-primary,#5A32A3)_12%,white)] text-[#5A32A3]"
+                      ? "bg-[color-mix(in_srgb,var(--brand-primary,var(--brand-primary))_12%,white)] text-[var(--brand-primary)]"
                       : "text-slate-600 hover:bg-slate-50",
                   )}
                 >
                   <span
                     className={cn(
                       "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                      active ? "bg-[#5A32A3] text-white" : "bg-slate-100 text-slate-500",
+                      active ? "bg-[var(--brand-primary)] text-white" : "bg-slate-100 text-slate-500",
                     )}
                   >
                     <Icon className="h-4 w-4" />

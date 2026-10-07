@@ -197,7 +197,7 @@ export default function RelatedRecordCombobox({
               <button
                 type="button"
                 onClick={addCustomRecord}
-                className="flex w-full px-3 py-2 text-left text-sm font-medium text-[#5A32A3] hover:bg-violet-50"
+                className="flex w-full px-3 py-2 text-left text-sm font-medium text-[var(--brand-primary)] hover:bg-violet-50"
               >
                 {onAddNew
                   ? customName

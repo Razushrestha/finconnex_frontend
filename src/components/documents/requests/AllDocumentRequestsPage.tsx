@@ -112,7 +112,7 @@ export function AllDocumentRequestsPage({
                 onClick={() => setFiltersOpen((v) => !v)}
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] text-slate-500 hover:bg-slate-50",
-                  filtersOpen && "border-[#5A32A3]/40 bg-[#F3ECFB] text-[#5A32A3]",
+                  filtersOpen && "border-[var(--brand-primary)]/40 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
                 )}
                 aria-label="Filter"
               >
@@ -165,7 +165,7 @@ export function AllDocumentRequestsPage({
                   className={cn(
                     "rounded-md px-2.5 py-1 text-[11px] font-semibold",
                     viewMode === "list"
-                      ? "bg-[#5A32A3] text-white"
+                      ? "bg-[var(--brand-primary)] text-white"
                       : "text-slate-500",
                   )}
                 >
@@ -177,7 +177,7 @@ export function AllDocumentRequestsPage({
                   className={cn(
                     "rounded-md px-2.5 py-1 text-[11px] font-semibold",
                     viewMode === "grid"
-                      ? "bg-[#5A32A3] text-white"
+                      ? "bg-[var(--brand-primary)] text-white"
                       : "text-slate-500",
                   )}
                 >
@@ -212,7 +212,7 @@ export function AllDocumentRequestsPage({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#5A32A3] text-[12px] font-semibold text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--brand-primary)] text-[12px] font-semibold text-white">
                 {safePage}
               </span>
               <button

@@ -20,7 +20,7 @@ export default function MyPreferencesPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-4">
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#5A32A3] uppercase">
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--brand-primary)] uppercase">
           Just for you
         </p>
         <h2 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">

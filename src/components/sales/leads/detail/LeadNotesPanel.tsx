@@ -42,7 +42,7 @@ import type { Note, NoteType } from "@/lib/notes/types";
 import type { LeadCardData } from "@/lib/leads/types";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 const PAGE_SIZE = 5;
 
 type TabId = "all" | "internal" | "meeting" | "followup";
@@ -571,7 +571,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
                   setPage(1);
                 }}
                 placeholder="Search notes..."
-                className="h-8 w-48 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-[12px] outline-none focus:ring-1 focus:ring-[#5A32A3]"
+                className="h-8 w-48 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-[12px] outline-none focus:ring-1 focus:ring-[var(--brand-primary)]"
               />
             </label>
             <div className="relative">
@@ -624,7 +624,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
               className={cn(
                 "border-b-2 py-2 text-[13px] font-medium",
                 tab === item.id
-                  ? "border-[#5A32A3] text-[#5A32A3]"
+                  ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                   : "border-transparent text-slate-500 hover:text-slate-700",
               )}
             >
@@ -788,7 +788,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
                 className={cn(
                   "h-6 min-w-6 rounded px-1.5 text-[11px] font-semibold",
                   n === safePage
-                    ? "bg-[#5A32A3] text-white"
+                    ? "bg-[var(--brand-primary)] text-white"
                     : "text-slate-600 hover:bg-slate-50",
                 )}
               >
@@ -822,7 +822,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
           <select
             value={composeType}
             onChange={(e) => setComposeType(e.target.value as ComposeType)}
-            className="fc-select-caret h-9 w-full appearance-none rounded-lg border border-slate-200 bg-white pl-8 pr-8 text-[12px] outline-none focus:ring-1 focus:ring-[#5A32A3]"
+            className="fc-select-caret h-9 w-full appearance-none rounded-lg border border-slate-200 bg-white pl-8 pr-8 text-[12px] outline-none focus:ring-1 focus:ring-[var(--brand-primary)]"
           >
             {COMPOSE_TYPES.map((item) => (
               <option key={item} value={item}>
@@ -840,7 +840,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Note title"
-          className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-[12px] outline-none focus:ring-1 focus:ring-[#5A32A3]"
+          className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-[12px] outline-none focus:ring-1 focus:ring-[var(--brand-primary)]"
         />
 
         <div className="relative mt-3 min-h-0 flex-1">
@@ -856,7 +856,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
             onKeyUp={syncEditor}
             onKeyDown={onBodyKeyDown}
             className={cn(
-              "h-full min-h-[140px] overflow-y-auto rounded-lg border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none focus:ring-1 focus:ring-[#5A32A3]",
+              "h-full min-h-[140px] overflow-y-auto rounded-lg border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none focus:ring-1 focus:ring-[var(--brand-primary)]",
               "[&:empty]:before:pointer-events-none [&:empty]:before:text-slate-400 [&:empty]:before:content-[attr(data-placeholder)]",
               "[&_b]:font-bold [&_strong]:font-bold [&_u]:underline [&_i]:italic [&_em]:italic",
             )}
@@ -874,7 +874,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px]",
                     i === mentionIndex
-                      ? "bg-violet-50 font-medium text-[#5A32A3]"
+                      ? "bg-violet-50 font-medium text-[var(--brand-primary)]"
                       : "text-slate-700 hover:bg-slate-50",
                   )}
                 >

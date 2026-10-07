@@ -33,7 +33,7 @@ import { onRulesChange } from "@/lib/rules/storage";
 import type { LeadCardData } from "@/lib/leads/types";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 const PAGE = 8;
 
 type ChipKey =
@@ -94,7 +94,7 @@ const FAMILIES: {
   { id: "document", label: "Documents", icon: FileText, tone: "bg-rose-50 text-rose-700", badge: "bg-rose-50 text-rose-700" },
   { id: "stage", label: "Stage Changes", icon: RefreshCcw, tone: "bg-slate-100 text-slate-600", badge: "bg-slate-100 text-slate-600" },
   { id: "automation", label: "Automations", icon: Zap, tone: "bg-indigo-50 text-indigo-700", badge: "bg-indigo-50 text-indigo-700" },
-  { id: "system", label: "System Activity", icon: Sparkles, tone: "bg-purple-50 text-[#5A32A3]", badge: "bg-purple-50 text-[#5A32A3]" },
+  { id: "system", label: "System Activity", icon: Sparkles, tone: "bg-purple-50 text-[var(--brand-primary)]", badge: "bg-purple-50 text-[var(--brand-primary)]" },
 ];
 
 const RANGES: { id: RangeKey; label: string }[] = [
@@ -477,7 +477,7 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
                   className={cn(
                     "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium",
                     filterOpen || chip !== "all"
-                      ? "border-purple-200 bg-purple-50 text-[#5A32A3]"
+                      ? "border-purple-200 bg-purple-50 text-[var(--brand-primary)]"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
                   )}
                 >
@@ -506,7 +506,7 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
                           className={cn(
                             "flex w-full px-3 py-1.5 text-left text-[12px]",
                             chip === item.id
-                              ? "font-semibold text-[#5A32A3]"
+                              ? "font-semibold text-[var(--brand-primary)]"
                               : "text-slate-700 hover:bg-slate-50",
                           )}
                         >
@@ -543,7 +543,7 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
                         className={cn(
                           "flex w-full px-3 py-1.5 text-left text-[12px]",
                           range === item.id
-                            ? "font-semibold text-[#5A32A3]"
+                            ? "font-semibold text-[var(--brand-primary)]"
                             : "text-slate-700 hover:bg-slate-50",
                         )}
                       >

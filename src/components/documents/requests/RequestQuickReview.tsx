@@ -21,7 +21,7 @@ function ReviewRow({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[#5A32A3] shadow-sm">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--brand-primary)] shadow-sm">
         <Icon className="h-3.5 w-3.5" />
       </span>
       <div className="min-w-0">
@@ -76,7 +76,7 @@ export function RequestQuickReview({
       </h2>
       <p className="mt-1 shrink-0 text-[13px] text-slate-500">
         Document request to{" "}
-        <span className="font-semibold text-[#5A32A3]">{clientName}</span>
+        <span className="font-semibold text-[var(--brand-primary)]">{clientName}</span>
       </p>
 
       <label className="mt-4 shrink-0 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -86,7 +86,7 @@ export function RequestQuickReview({
         value={requestTitle}
         onChange={(e) => onRequestTitleChange(e.target.value)}
         placeholder="Template name - First client, Second client"
-        className="mt-1 h-10 w-full shrink-0 rounded-xl border border-slate-200 bg-slate-50/80 px-3 text-[13px] font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]/45 focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/12"
+        className="mt-1 h-10 w-full shrink-0 rounded-xl border border-slate-200 bg-slate-50/80 px-3 text-[13px] font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]/45 focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/12"
       />
       <p className="mt-1 shrink-0 text-[11px] text-slate-400">
         Fills automatically from the template and client first names. You can
@@ -144,8 +144,8 @@ export function RequestQuickReview({
                 key={group.applicant}
                 className="rounded-xl border border-slate-200"
               >
-                <div className="border-b border-slate-100 bg-[#F8F4FC] px-3 py-1.5">
-                  <p className="text-[13px] font-semibold text-[#5A32A3]">
+                <div className="border-b border-slate-100 bg-[var(--brand-primary-faint)] px-3 py-1.5">
+                  <p className="text-[13px] font-semibold text-[var(--brand-primary)]">
                     {group.applicant}
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export function RequestQuickReview({
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
           placeholder="Add a note the client will see with this request…"
-          className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]/45 focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/12"
+          className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]/45 focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/12"
         />
         <p className="mt-1 text-[11px] text-slate-400">
           This note is visible to the client.

@@ -38,7 +38,7 @@ export function LeadDetailsPanel({
             <button
               type="button"
               onClick={() => saveCustom(LEAD_FIELD_KEYS.secondaryApplicant, "Yes")}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white"
             >
               <Plus className="h-3.5 w-3.5" />
               Add applicant
@@ -61,7 +61,7 @@ export function LeadDetailsPanel({
           {hasSecondary ? (
             <div className="border-t border-slate-200 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold tracking-[0.07em] text-[#5A32A3] uppercase">
+                <p className="text-[11px] font-semibold tracking-[0.07em] text-[var(--brand-primary)] uppercase">
                   Secondary applicant
                 </p>
                 <button
@@ -109,7 +109,7 @@ function ApplicantFactFind({
   return (
     <div>
       {label ? (
-        <p className="mb-3 text-[11px] font-semibold tracking-[0.07em] text-[#5A32A3] uppercase">
+        <p className="mb-3 text-[11px] font-semibold tracking-[0.07em] text-[var(--brand-primary)] uppercase">
           {label}
         </p>
       ) : null}

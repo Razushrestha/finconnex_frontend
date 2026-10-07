@@ -520,7 +520,7 @@ export default function TimeTrackingPage() {
             className={cn(
               "rounded-full px-3 py-1.5 text-sm font-semibold",
               statusTab === "All"
-                ? "bg-[#6D5AE6] text-white"
+                ? "bg-[var(--brand-primary)] text-white"
                 : "text-slate-500 hover:bg-white hover:text-slate-800",
             )}
           >
@@ -534,7 +534,7 @@ export default function TimeTrackingPage() {
               className={cn(
                 "rounded-full px-3 py-1.5 text-sm font-medium",
                 statusTab === s
-                  ? "bg-[#6D5AE6] font-semibold text-white"
+                  ? "bg-[var(--brand-primary)] font-semibold text-white"
                   : "text-slate-500 hover:bg-white hover:text-slate-800",
               )}
             >

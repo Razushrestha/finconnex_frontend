@@ -721,7 +721,7 @@ export function CreateEmailForm({
                         <Check
                           className={`mt-0.5 h-4 w-4 shrink-0 ${
                             form.from === item.email
-                              ? "text-[#5A32A3]"
+                              ? "text-[var(--brand-primary)]"
                               : "text-transparent"
                           }`}
                         />
@@ -765,7 +765,7 @@ export function CreateEmailForm({
               <button
                 type="button"
                 onClick={() => setTemplatesOpen((v) => !v)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50"
               >
                 <LayoutTemplate className="h-3.5 w-3.5" />
                 {form.template || "Templates"}

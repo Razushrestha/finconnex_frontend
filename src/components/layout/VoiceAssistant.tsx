@@ -167,7 +167,7 @@ export function VoiceAssistant({
         onClick={() => (open ? onClose() : onOpen())}
         className={cn(
           "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white shadow-sm",
-          "bg-gradient-to-br from-[#7C5CFF] via-[#5A32A3] to-[#2DD4BF]",
+          "bg-gradient-to-br from-[#7C5CFF] via-[var(--brand-primary)] to-[#2DD4BF]",
           open && "ring-2 ring-violet-300",
         )}
       >
@@ -201,8 +201,8 @@ export function VoiceAssistant({
                   className="relative mx-auto flex h-28 w-28 items-center justify-center"
                 >
                   <span className="absolute inset-0 animate-ping rounded-full bg-[#7C5CFF]/30" />
-                  <span className="absolute inset-2 animate-pulse rounded-full bg-gradient-to-br from-[#A78BFA] via-[#5A32A3] to-[#2DD4BF] opacity-80" />
-                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#5A32A3] shadow-lg">
+                  <span className="absolute inset-2 animate-pulse rounded-full bg-gradient-to-br from-[#A78BFA] via-[var(--brand-primary)] to-[#2DD4BF] opacity-80" />
+                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white text-[var(--brand-primary)] shadow-lg">
                     <Mic className="h-7 w-7" />
                   </span>
                 </button>

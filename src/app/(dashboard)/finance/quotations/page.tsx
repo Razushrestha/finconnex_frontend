@@ -293,7 +293,7 @@ export function QuotationsPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#5B4BDB] via-[#6E5AE8] to-[#8B6CF6] p-5 text-white shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--brand-primary-strong)] via-[#6E5AE8] to-[#8B6CF6] p-5 text-white shadow-sm">
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 opacity-30">
             <svg viewBox="0 0 320 56" className="h-full w-full" preserveAspectRatio="none">
               <path d="M0 40 C40 36 60 18 110 22 C160 26 180 38 230 28 C270 20 300 16 320 20 L320 56 L0 56 Z" fill="white" />

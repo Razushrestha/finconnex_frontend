@@ -16,7 +16,7 @@ export function AnalyticsSection({
     return (
       <div className="p-6 text-sm text-slate-500">
         Unknown section.{" "}
-        <Link href="/analytics" className="text-[#5A32A3] underline">
+        <Link href="/analytics" className="text-[var(--brand-primary)] underline">
           Back to analytics
         </Link>
       </div>

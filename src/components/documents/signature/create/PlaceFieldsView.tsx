@@ -759,7 +759,7 @@ export function PlaceFieldsView({
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
           </button>
-          <div className="inline-flex h-8 overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
+          <div className="inline-flex h-8 overflow-hidden rounded-full bg-[var(--brand-primary)] text-white shadow-md shadow-violet-500/20">
             <button
               type="button"
               onClick={(e) => {
@@ -770,7 +770,7 @@ export function PlaceFieldsView({
               disabled={isSubmitting}
               className={cn(
                 FINANCE_PRIMARY_BUTTON_SM,
-                "h-8 rounded-none bg-transparent px-4 text-[12px] shadow-none hover:bg-[#5B4BD4] disabled:opacity-70",
+                "h-8 rounded-none bg-transparent px-4 text-[12px] shadow-none hover:bg-[var(--brand-primary-strong)] disabled:opacity-70",
               )}
             >
               {isSubmitting ? (
@@ -791,7 +791,7 @@ export function PlaceFieldsView({
             <button
               type="button"
               onClick={() => setIsConfirmOpen(true)}
-              className="flex h-8 w-7 items-center justify-center border-l border-white/25 hover:bg-[#5B4BD4]"
+              className="flex h-8 w-7 items-center justify-center border-l border-white/25 hover:bg-[var(--brand-primary-strong)]"
               aria-label="Confirm and send"
             >
               <ChevronDown className="h-3.5 w-3.5" />

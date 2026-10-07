@@ -153,7 +153,7 @@ export function OfflineLocationFields({
                   "h-10 w-full rounded-lg border bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none",
                   invalid
                     ? "border-rose-300 focus:border-rose-400"
-                    : "border-[#E5E7EB] focus:border-[#5A32A3]/45",
+                    : "border-[#E5E7EB] focus:border-[var(--brand-primary)]/45",
                 )}
               />
             </div>
@@ -161,7 +161,7 @@ export function OfflineLocationFields({
               type="button"
               onClick={fillFromCurrentLocation}
               disabled={locating}
-              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3] hover:underline disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-60"
             >
               <LocateFixed className="h-3.5 w-3.5" />
               {locating ? "Finding location…" : "Use current location"}

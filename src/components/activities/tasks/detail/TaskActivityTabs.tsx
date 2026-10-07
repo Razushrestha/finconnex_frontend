@@ -74,21 +74,21 @@ export function TaskActivityTabs({
         <button
           type="button"
           onClick={() => setActiveTab("notes")}
-          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "notes" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
+          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "notes" ? "font-semibold text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-700"}`}
         >
           Notes ({notes.length})
           {activeTab === "notes" && (
-            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
+            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[var(--brand-primary)]" />
           )}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("attachments")}
-          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "attachments" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
+          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "attachments" ? "font-semibold text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-700"}`}
         >
           Attachments ({attachments.length})
           {activeTab === "attachments" && (
-            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
+            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[var(--brand-primary)]" />
           )}
         </button>
       </div>
@@ -140,7 +140,7 @@ export function TaskActivityTabs({
                 type="button"
                 onClick={handleSaveNote}
                 disabled={!newNote.trim()}
-                className="bg-[#5A32A3] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="bg-[var(--brand-primary)] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Save Note
               </button>

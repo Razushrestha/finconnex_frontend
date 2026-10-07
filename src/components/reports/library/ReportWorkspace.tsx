@@ -115,7 +115,7 @@ const DATE_OPTIONS: { value: DashboardDateRange; label: string }[] = [
 
 const CHART_COLORS = ["#5A32A3", "#2563EB", "#0D9488", "#EA580C", "#DB2777", "#64748B"];
 const FUNNEL_KEYS = [
-  { id: "leads", label: "Leads", color: "#5A32A3" },
+  { id: "leads", label: "Leads", color: "var(--brand-primary)" },
   { id: "qualified", label: "Qualified", color: "#7C5CBF" },
   { id: "appointments", label: "Appointments", color: "#A78BFA" },
   { id: "deals", label: "Deals", color: "#DDD6FE" },
@@ -185,7 +185,7 @@ export function ReportWorkspace({
     return (
       <div className="p-6 text-sm text-slate-500">
         Report not found.{" "}
-        <Link href="/reports" className="text-[#5A32A3] underline">Back to reports</Link>
+        <Link href="/reports" className="text-[var(--brand-primary)] underline">Back to reports</Link>
       </div>
     );
   }
@@ -318,7 +318,7 @@ export function ReportWorkspace({
                 <button
                   type="button"
                   onClick={() => setExportOpen((v) => !v)}
-                  className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#5A32A3] px-2.5 text-[11px] font-semibold text-white"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-white"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Export
@@ -360,10 +360,10 @@ export function ReportWorkspace({
               onClick={() => setMoreOpen((open) => !open)}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600"
             >
-              <ListFilter className="h-3.5 w-3.5 text-[#5A32A3]" />
+              <ListFilter className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
               More Filters
               {appliedFilters ? (
-                <span className="rounded-full bg-[#5A32A3] px-1.5 text-[10px] font-semibold text-white">
+                <span className="rounded-full bg-[var(--brand-primary)] px-1.5 text-[10px] font-semibold text-white">
                   {appliedFilters}
                 </span>
               ) : null}
@@ -430,7 +430,7 @@ export function ReportWorkspace({
                 className={cn(
                   "-mb-px border-b-2 px-0.5 pb-2 text-[13px] font-semibold",
                   tab === id
-                    ? "border-[#5A32A3] text-[#5A32A3]"
+                    ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                     : "border-transparent text-slate-500 hover:text-slate-800",
                 )}
               >
@@ -445,7 +445,7 @@ export function ReportWorkspace({
                 onClick={() => setViz("chart")}
                 className={cn(
                   "inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold",
-                  viz === "chart" ? "bg-[#5A32A3] text-white" : "text-slate-500",
+                  viz === "chart" ? "bg-[var(--brand-primary)] text-white" : "text-slate-500",
                 )}
               >
                 <BarChart3 className="h-3.5 w-3.5" />
@@ -456,7 +456,7 @@ export function ReportWorkspace({
                 onClick={() => setViz("table")}
                 className={cn(
                   "inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold",
-                  viz === "table" ? "bg-[#5A32A3] text-white" : "text-slate-500",
+                  viz === "table" ? "bg-[var(--brand-primary)] text-white" : "text-slate-500",
                 )}
               >
                 <Table2 className="h-3.5 w-3.5" />
@@ -478,7 +478,7 @@ export function ReportWorkspace({
                 <div key={item.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-[#5A32A3]">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-[var(--brand-primary)]">
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                   </div>
@@ -608,7 +608,7 @@ export function ReportWorkspace({
             </span>
             <div className="flex items-center gap-1.5">
               <button type="button" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-md border border-slate-200 px-2 py-1 disabled:opacity-40">Prev</button>
-              <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-[#5A32A3] px-2 font-semibold text-white">{safePage}</span>
+              <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-[var(--brand-primary)] px-2 font-semibold text-white">{safePage}</span>
               <button type="button" disabled={safePage >= pages} onClick={() => setPage((p) => p + 1)} className="rounded-md border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

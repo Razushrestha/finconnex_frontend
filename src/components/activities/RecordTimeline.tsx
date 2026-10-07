@@ -33,7 +33,7 @@ const KIND_META: Record<
   modified: {
     label: "Changed",
     icon: Pencil,
-    tone: "bg-[#F3ECFB] text-[#5A32A3]",
+    tone: "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
   },
   status: {
     label: "Status",
@@ -122,7 +122,7 @@ export function RecordTimeline({
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 filter === item.id
-                  ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
+                  ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
               )}
             >
@@ -166,7 +166,7 @@ export function RecordTimeline({
                     </h2>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F3ECFB] text-[9px] font-bold text-[#5A32A3]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-[9px] font-bold text-[var(--brand-primary)]">
                       {initials(item.actor)}
                     </span>
                     <span>{item.actor}</span>

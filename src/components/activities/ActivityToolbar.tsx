@@ -489,13 +489,13 @@ export function ActivityToolbar({
           )}
 
           <div className="relative">
-            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
+            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[var(--brand-primary)] text-white shadow-md shadow-violet-500/20">
               <button
                 type="button"
                 onClick={goToCreate}
                 aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
                 aria-haspopup={hasCreateMenu ? "menu" : undefined}
-                className="inline-flex items-center whitespace-nowrap px-4 text-sm font-semibold hover:bg-[#5B4BD4]"
+                className="inline-flex items-center whitespace-nowrap px-4 text-sm font-semibold hover:bg-[var(--brand-primary-strong)]"
               >
                 Create <span className="hidden md:inline">{entityLabel}</span>
               </button>
@@ -505,7 +505,7 @@ export function ActivityToolbar({
                 aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
                 aria-haspopup={hasCreateMenu ? "menu" : undefined}
                 onClick={goToCreate}
-                className="flex w-9 items-center justify-center border-l border-white/25 hover:bg-[#5B4BD4]"
+                className="flex w-9 items-center justify-center border-l border-white/25 hover:bg-[var(--brand-primary-strong)]"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -527,7 +527,7 @@ export function ActivityToolbar({
                       type="button"
                       role="menuitem"
                       onClick={() => selectCreateItem(item)}
-                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                     >
                       {item.label}
                     </button>

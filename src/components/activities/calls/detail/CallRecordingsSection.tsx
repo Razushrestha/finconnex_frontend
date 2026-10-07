@@ -86,8 +86,8 @@ export function CallRecordingsSection({ call }: { call: Call }) {
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
                     active
-                      ? "bg-[#5A32A3] text-white"
-                      : "bg-slate-100 text-slate-500 hover:text-[#5A32A3]",
+                      ? "bg-[var(--brand-primary)] text-white"
+                      : "bg-slate-100 text-slate-500 hover:text-[var(--brand-primary)]",
                   )}
                 >
                   <Play className="ml-0.5 h-3 w-3 fill-current" />
@@ -118,7 +118,7 @@ export function CallRecordingsSection({ call }: { call: Call }) {
                 </button>
                 <Link
                   href={`/activities/calls/detail/${encodeURIComponent(item.id)}`}
-                  className="shrink-0 text-xs font-medium text-[#5A32A3] hover:underline"
+                  className="shrink-0 text-xs font-medium text-[var(--brand-primary)] hover:underline"
                 >
                   Open
                 </Link>

@@ -588,7 +588,7 @@ function ClientDetailsSection({
             className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-left"
           >
             {applicants.length > 1 ? (
-              <p className="mb-3 text-[11px] font-semibold tracking-[0.06em] text-[#5A32A3] uppercase">
+              <p className="mb-3 text-[11px] font-semibold tracking-[0.06em] text-[var(--brand-primary)] uppercase">
                 {person.role} applicant
               </p>
             ) : null}
@@ -602,7 +602,7 @@ function ClientDetailsSection({
               <button
                 type="button"
                 onClick={openLeadOverview}
-                className="mt-3 text-[11px] font-medium text-[#5A32A3] hover:underline"
+                className="mt-3 text-[11px] font-medium text-[var(--brand-primary)] hover:underline"
               >
                 View all lead details
               </button>
@@ -1702,7 +1702,7 @@ function AttachmentsSection({
           <ul className="divide-y divide-slate-100">
             {files.map((item) => (
               <li key={item.id} className="flex items-start gap-2.5 py-2.5">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-[#5A32A3]">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-[var(--brand-primary)]">
                   <Paperclip className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">

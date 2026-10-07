@@ -68,7 +68,7 @@ function FormSelect({
         className={cn(
           "flex h-10 w-full items-center justify-between rounded-lg border bg-slate-50 px-3 text-left text-[13px] outline-none",
           open
-            ? "border-[#5A32A3] bg-[#F3ECFB]"
+            ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]"
             : "border-slate-200 text-slate-800",
           !value && "text-slate-400",
         )}
@@ -77,7 +77,7 @@ function FormSelect({
         <span
           className={cn(
             "ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-            open ? "bg-[#EDE4FB] text-[#5A32A3]" : "text-slate-400",
+            open ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]" : "text-slate-400",
           )}
         >
           <ChevronDown
@@ -95,7 +95,7 @@ function FormSelect({
                 onChange(opt);
                 onOpenChange(false);
               }}
-              className="block w-full px-3 py-2 text-left text-[13px] text-slate-800 hover:bg-[#F3ECFB]"
+              className="block w-full px-3 py-2 text-left text-[13px] text-slate-800 hover:bg-[var(--brand-primary-soft)]"
             >
               {opt}
             </button>
@@ -162,7 +162,7 @@ export function PropertyDetailsEditor({
     <div className="rounded-xl bg-white px-1 py-1 sm:px-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
             <House className="h-4 w-4" />
           </span>
           <div>
@@ -179,10 +179,10 @@ export function PropertyDetailsEditor({
               onClick={() =>
                 setOpenMenu((v) => (v === "assets" ? null : "assets"))
               }
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#5A32A3] bg-white px-3 text-[12px] font-semibold text-slate-800"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--brand-primary)] bg-white px-3 text-[12px] font-semibold text-slate-800"
             >
               Pre-fill from assets
-              <ChevronDown className="h-3.5 w-3.5 text-[#5A32A3]" />
+              <ChevronDown className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
             </button>
             {openMenu === "assets" ? (
               <div className="absolute right-0 z-20 mt-1 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
@@ -192,7 +192,7 @@ export function PropertyDetailsEditor({
                     set("address", "12 Example Street, Melbourne VIC 3000");
                     setOpenMenu(null);
                   }}
-                  className="block w-full px-3 py-2 text-left text-[12px] hover:bg-[#F3ECFB]"
+                  className="block w-full px-3 py-2 text-left text-[12px] hover:bg-[var(--brand-primary-soft)]"
                 >
                   Use saved asset address
                 </button>
@@ -202,9 +202,9 @@ export function PropertyDetailsEditor({
           <button
             type="button"
             onClick={() => set("address", "")}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#F3ECFB] px-3 text-[12px] font-semibold text-slate-800"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-primary-soft)] px-3 text-[12px] font-semibold text-slate-800"
           >
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-white">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--brand-primary)] text-white">
               <Plus className="h-2.5 w-2.5" strokeWidth={3} />
             </span>
             Add a new address
@@ -219,7 +219,7 @@ export function PropertyDetailsEditor({
               value={value.address}
               onChange={(e) => set("address", e.target.value)}
               placeholder="Search address"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-10 pl-3 text-[13px] outline-none placeholder:text-slate-400 focus:border-[#5A32A3]/45 focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-10 pl-3 text-[13px] outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]/45 focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
             <Search className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
@@ -227,7 +227,7 @@ export function PropertyDetailsEditor({
 
         <div className="overflow-hidden rounded-xl border border-slate-100 sm:ml-[224px]">
           <div className="flex items-stretch">
-            <div className="flex w-16 shrink-0 items-center justify-center bg-[#F3ECFB] text-[#5A32A3] sm:w-20">
+            <div className="flex w-16 shrink-0 items-center justify-center bg-[var(--brand-primary-soft)] text-[var(--brand-primary)] sm:w-20">
               <House className="h-7 w-7" />
             </div>
             <p className="px-3 py-2.5 text-[12px] leading-snug text-slate-600">
@@ -249,7 +249,7 @@ export function PropertyDetailsEditor({
               onChange={(e) =>
                 set("value", e.target.value.replace(/[^\d.]/g, ""))
               }
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-7 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-7 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </div>
         </FormRow>
@@ -292,7 +292,7 @@ export function PropertyDetailsEditor({
               onChange={(e) =>
                 set("ownership", e.target.value.replace(/[^\d.]/g, ""))
               }
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-10 pl-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:bg-white focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pr-10 pl-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
             <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[13px] text-slate-400">
               %

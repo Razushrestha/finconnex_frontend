@@ -145,8 +145,8 @@ export function RelatedCrmMessages({
         className={cn(
           "mt-2 h-8 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-40",
           compact
-            ? "w-full bg-white text-[#5A32A3] ring-1 ring-slate-200 hover:bg-[#F3ECFB]"
-            : "bg-[#5A32A3] text-white hover:bg-[#4a2888]",
+            ? "w-full bg-white text-[var(--brand-primary)] ring-1 ring-slate-200 hover:bg-[var(--brand-primary-soft)]"
+            : "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-strong)]",
         )}
       >
         Send message

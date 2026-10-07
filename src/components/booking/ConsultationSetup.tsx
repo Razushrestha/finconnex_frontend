@@ -40,7 +40,7 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 const MODE_META: Record<
   ConsultationMode,
@@ -376,7 +376,7 @@ export function ConsultationSetup({
                         });
                       }}
                       placeholder="150"
-                      className="h-10 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] px-2.5 text-[13px] outline-none focus:border-[#5A32A3]/45"
+                      className="h-10 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] px-2.5 text-[13px] outline-none focus:border-[var(--brand-primary)]/45"
                     />
                   </>
                 ) : null}
@@ -427,7 +427,7 @@ export function ConsultationSetup({
                   Assign consultant{multi ? "s" : ""}
                 </p>
                 {value.consultants.length > 0 ? (
-                  <span className="text-[11px] font-semibold text-[#5A32A3]">
+                  <span className="text-[11px] font-semibold text-[var(--brand-primary)]">
                     {value.consultants.length} selected
                   </span>
                 ) : null}
@@ -458,7 +458,7 @@ export function ConsultationSetup({
                           key={c.id}
                           className={cn(
                             "flex items-center gap-2 px-2 py-1.5",
-                            selected && "bg-[#F3ECFB]/70",
+                            selected && "bg-[var(--brand-primary-soft)]/70",
                           )}
                         >
                           <button
@@ -510,7 +510,7 @@ export function ConsultationSetup({
                               "flex h-4 w-4 shrink-0 items-center justify-center border",
                               multi ? "rounded" : "rounded-full",
                               selected
-                                ? "border-[#5A32A3] bg-[#5A32A3] text-white"
+                                ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white"
                                 : "border-slate-300 bg-white",
                             )}
                             aria-label={`Assign ${c.name}`}

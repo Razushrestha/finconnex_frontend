@@ -75,6 +75,17 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
     [crm.settings, crm.previewBrand],
   );
 
+  // On <html>, so the whole app — including dialogs portalled to <body> —
+  // and the brand-derived Tailwind palette in globals.css follow it.
+  useEffect(() => {
+    const root = document.documentElement;
+    const vars = workspaceBrandCssVars(brand) as Record<string, string>;
+    for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
+    return () => {
+      for (const name of Object.keys(vars)) root.style.removeProperty(name);
+    };
+  }, [brand]);
+
   useEffect(() => {
     setUser(shellUserFromSession(session));
   }, [

@@ -244,7 +244,7 @@ export function DescriptionEditor({
   const activeSet = active ? active.split(",") : [];
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white focus-within:border-[#5A32A3]/50">
+    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white focus-within:border-[var(--brand-primary)]/50">
       <div
         role="toolbar"
         aria-label="Description formatting"
@@ -270,7 +270,7 @@ export function DescriptionEditor({
                   className={cn(
                     "flex h-7 w-7 items-center justify-center rounded transition-colors",
                     on
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                       : "hover:bg-slate-100 hover:text-slate-700",
                   )}
                 >
@@ -301,7 +301,7 @@ export function DescriptionEditor({
             onChange={(event) => setLink({ ...link, url: event.target.value, error: "" })}
             onKeyDown={onLinkKeyDown}
             className={cn(
-              "h-8 min-w-[180px] flex-1 rounded-md border bg-white px-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]",
+              "h-8 min-w-[180px] flex-1 rounded-md border bg-white px-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]",
               link.error ? "border-red-300" : "border-[#E5E7EB]",
             )}
           />
@@ -314,13 +314,13 @@ export function DescriptionEditor({
               value={link.text}
               onChange={(event) => setLink({ ...link, text: event.target.value })}
               onKeyDown={onLinkKeyDown}
-              className="h-8 w-40 rounded-md border border-[#E5E7EB] bg-white px-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]"
+              className="h-8 w-40 rounded-md border border-[#E5E7EB] bg-white px-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[var(--brand-primary)]"
             />
           ) : null}
           <button
             type="button"
             onClick={applyLink}
-            className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4b2889]"
+            className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[#4b2889]"
           >
             {link.editing ? "Update" : "Apply"}
           </button>
@@ -355,7 +355,7 @@ export function DescriptionEditor({
         aria-label="Description"
         contentEditable
         suppressContentEditableWarning
-        className="fc-rich-editor min-h-[120px] px-3 py-2 text-[13px] leading-5 text-slate-800 outline-none [&_a]:text-[#5A32A3] [&_a]:underline"
+        className="fc-rich-editor min-h-[120px] px-3 py-2 text-[13px] leading-5 text-slate-800 outline-none [&_a]:text-[var(--brand-primary)] [&_a]:underline"
         onInput={commit}
         onFocus={() => {
           // Clicking back into the text means the link was abandoned.

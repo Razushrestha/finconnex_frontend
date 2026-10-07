@@ -143,7 +143,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 }
               }}
               aria-label="Document name"
-              className="min-w-0 flex-1 rounded-md border border-[#5A32A3]/40 bg-white px-1.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
+              className="min-w-0 flex-1 rounded-md border border-[var(--brand-primary)]/40 bg-white px-1.5 py-1 text-xs font-medium text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
             />
             <button
               type="button"
@@ -172,7 +172,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                 type="button"
                 onClick={startRename}
                 aria-label="Rename document"
-                className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>

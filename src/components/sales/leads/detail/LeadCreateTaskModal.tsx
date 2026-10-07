@@ -74,10 +74,10 @@ import {
 import { buildRemindersFromSchedule } from "@/lib/tasks/reminder-series";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 
 const inputClass =
-  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#5A32A3] focus:outline-none focus:ring-2 focus:ring-[#5A32A3]/20";
+  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20";
 const labelClass = "mb-1 block text-[12px] font-medium text-slate-600";
 
 type View = "main" | "more";
@@ -176,7 +176,7 @@ function PurpleSwitch({
       onClick={() => onChange(!checked)}
       className={cn(
         "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-        checked ? "bg-[#5A32A3]" : "bg-slate-200",
+        checked ? "bg-[var(--brand-primary)]" : "bg-slate-200",
       )}
     >
       <span
@@ -794,7 +794,7 @@ export function LeadCreateTaskModal({
                     <button
                       type="button"
                       onClick={() => setAddingCollaborator((v) => !v)}
-                      className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 text-[11px] font-medium text-slate-500 hover:border-[#5A32A3] hover:text-[#5A32A3]"
+                      className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 text-[11px] font-medium text-slate-500 hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
                     >
                       <Plus className="h-3 w-3" />
                       Add
@@ -808,7 +808,7 @@ export function LeadCreateTaskModal({
                             value={collaboratorSearch}
                             onChange={(e) => setCollaboratorSearch(e.target.value)}
                             placeholder="Search…"
-                            className="w-full rounded-md border border-slate-200 py-1.5 pr-2 pl-8 text-[12px] focus:border-[#5A32A3] focus:outline-none"
+                            className="w-full rounded-md border border-slate-200 py-1.5 pr-2 pl-8 text-[12px] focus:border-[var(--brand-primary)] focus:outline-none"
                           />
                         </div>
                         {filteredCollaborators.map((owner) => (
@@ -1008,7 +1008,7 @@ export function LeadCreateTaskModal({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => addActionLine(item.id)}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#5A32A3]"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[var(--brand-primary)]"
                         aria-label="Add action item"
                       >
                         <Plus className="h-4 w-4" />

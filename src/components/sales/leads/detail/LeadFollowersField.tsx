@@ -196,7 +196,7 @@ export function LeadFollowersField({
             title={addLabel}
             aria-label={addLabel}
             onClick={() => setOpen((isOpen) => !isOpen)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-[#5A32A3] hover:text-[#5A32A3]"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
           >
             <Plus className="h-3 w-3" strokeWidth={2.5} />
           </button>
@@ -208,7 +208,7 @@ export function LeadFollowersField({
             {addLabel}
           </p>
           <div className="px-2 pb-2">
-            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)]">
               <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <input
                 ref={searchRef}

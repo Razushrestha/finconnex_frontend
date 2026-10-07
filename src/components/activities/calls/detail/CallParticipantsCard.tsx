@@ -35,7 +35,7 @@ export function CallParticipantsCard({
       <div className="space-y-3">
         {people.map((person) => (
           <div key={`${person.role}-${person.name}`} className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3ECFB] text-xs font-bold text-[#5A32A3]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-xs font-bold text-[var(--brand-primary)]">
               {initials(person.name || "P")}
             </span>
             <div className="min-w-0 flex-1 border-b border-slate-100 pb-2">

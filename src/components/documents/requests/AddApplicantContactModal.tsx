@@ -92,7 +92,7 @@ export function AddApplicantContactModal({
               autoFocus
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </label>
           <label className="block">
@@ -102,7 +102,7 @@ export function AddApplicantContactModal({
             <input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </label>
           <label className="col-span-2 block">
@@ -113,7 +113,7 @@ export function AddApplicantContactModal({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </label>
           <label className="col-span-2 block">
@@ -123,7 +123,7 @@ export function AddApplicantContactModal({
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </label>
         </div>
@@ -162,10 +162,10 @@ export function AddClientButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-xl border border-dashed border-[#5A32A3] bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-800 hover:bg-[#F3ECFB]",
+        "inline-flex items-center gap-2 rounded-xl border border-dashed border-[var(--brand-primary)] bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-800 hover:bg-[var(--brand-primary-soft)]",
       )}
     >
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#EDE4FB] text-[#5A32A3]">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
         +
       </span>
       Add client

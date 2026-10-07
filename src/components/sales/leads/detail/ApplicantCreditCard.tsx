@@ -143,7 +143,7 @@ export function ApplicantCreditCard({
 
   return (
     <div className="min-w-0">
-      <p className="text-[11px] font-semibold tracking-[0.07em] text-[#5A32A3] uppercase">
+      <p className="text-[11px] font-semibold tracking-[0.07em] text-[var(--brand-primary)] uppercase">
         {roleLabel}
       </p>
       <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">

@@ -244,7 +244,7 @@ export function RichEditorTableResize({
         className="absolute"
         style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
       >
-        <div className="absolute inset-0 ring-2 ring-[#5A32A3]" />
+        <div className="absolute inset-0 ring-2 ring-[var(--brand-primary)]" />
         <Handle
           kind="width"
           className="absolute top-0 right-0 h-full w-2 cursor-ew-resize"
@@ -257,7 +257,7 @@ export function RichEditorTableResize({
         />
         <Handle
           kind="both"
-          className="absolute right-0 bottom-0 h-3.5 w-3.5 cursor-nwse-resize rounded-[2px] border-2 border-[#5A32A3] bg-white"
+          className="absolute right-0 bottom-0 h-3.5 w-3.5 cursor-nwse-resize rounded-[2px] border-2 border-[var(--brand-primary)] bg-white"
           onPointerDown={(event) => beginDrag(table, "both", 0, event)}
         />
       </div>

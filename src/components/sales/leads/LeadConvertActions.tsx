@@ -61,7 +61,7 @@ export function LeadConvertActions({
         type="button"
         onClick={onConvert}
         className="inline-flex h-8 items-center gap-1.5 rounded-l-xl px-3 text-[12px] font-semibold text-white hover:opacity-90"
-        style={{ backgroundColor: "#5A32A3" }}
+        style={{ backgroundColor: "var(--brand-primary)" }}
       >
         <Send className="h-3.5 w-3.5" />
         Convert to Deal
@@ -72,7 +72,7 @@ export function LeadConvertActions({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex h-8 w-7 items-center justify-center rounded-r-xl border-l border-white/20 text-white hover:opacity-90"
-        style={{ backgroundColor: "#5A32A3" }}
+        style={{ backgroundColor: "var(--brand-primary)" }}
       >
         <ChevronDown className="h-3.5 w-3.5" />
       </button>

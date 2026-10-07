@@ -40,7 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS =
-  "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40";
+  "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/40";
 
 const SELECT_BG = {
   backgroundImage:
@@ -139,7 +139,7 @@ function InsertVariable({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-8 items-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-2.5 text-[12px] font-medium text-[#5A32A3] hover:bg-[#F8F5FC]"
+        className="inline-flex h-8 items-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-2.5 text-[12px] font-medium text-[var(--brand-primary)] hover:bg-[#F8F5FC]"
       >
         Insert Variable
         <ChevronDown className="h-3.5 w-3.5" />
@@ -150,7 +150,7 @@ function InsertVariable({
             <button
               key={item.token}
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[#F3ECFB]"
+              className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
               onClick={() => {
                 onInsert(item.token);
                 setOpen(false);
@@ -269,7 +269,7 @@ function CalendarInvitesEditor({
               }}
               className={cn(
                 "relative h-5 w-9 rounded-full",
-                includeBuffer ? "bg-[#5A32A3]" : "bg-slate-300",
+                includeBuffer ? "bg-[var(--brand-primary)]" : "bg-slate-300",
               )}
             >
               <span
@@ -303,7 +303,7 @@ function CalendarInvitesEditor({
               setTitle(next);
               save({ eventTitle: next });
             }}
-            className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 pr-36 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+            className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 pr-36 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40"
           />
           <div className="absolute top-1 right-1">
             <InsertVariable onInsert={insertTitleToken} />
@@ -539,7 +539,7 @@ export function ConsultationNotifyPanel({
                 className={cn(
                   "-mb-px border-b-2 pb-2",
                   audience === item
-                    ? "border-[#5A32A3] text-[#5A32A3]"
+                    ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                     : "border-transparent text-slate-500",
                 )}
               >
@@ -567,7 +567,7 @@ export function ConsultationNotifyPanel({
                       className={cn(
                         "flex h-[92px] w-[112px] flex-col items-center justify-center gap-2 rounded-xl border text-[12px] font-medium",
                         on
-                          ? "border-[#5A32A3]/35 bg-[#F3ECFB] text-[#5A32A3]"
+                          ? "border-[var(--brand-primary)]/35 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                           : "border-dashed border-slate-200 bg-white text-slate-400",
                       )}
                     >
@@ -598,7 +598,7 @@ export function ConsultationNotifyPanel({
                       >
                         <button
                           type="button"
-                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[#F3ECFB]"
+                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
                           onClick={() => {
                             toggleTile(tile.id);
                             setMenuId(null);
@@ -608,7 +608,7 @@ export function ConsultationNotifyPanel({
                         </button>
                         <button
                           type="button"
-                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[#F3ECFB]"
+                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
                           onClick={() => {
                             const row = rows.find((item) => item.id === tile.id);
                             if (row) setEditing(row);
@@ -685,7 +685,7 @@ export function ConsultationNotifyPanel({
                   setReminders(next);
                   persist(rows, next);
                 }}
-                className="mb-1 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+                className="mb-1 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
               >
                 + Add Reminders
               </button>

@@ -717,12 +717,12 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
             }}
             className={cn(
               "relative h-9 px-2.5 text-[12px] font-semibold",
-              tab === item.id ? "text-[#5A32A3]" : "text-slate-500 hover:text-slate-700",
+              tab === item.id ? "text-[var(--brand-primary)]" : "text-slate-500 hover:text-slate-700",
             )}
           >
             {item.label}
             {tab === item.id ? (
-              <span className="absolute inset-x-1 bottom-0 h-0.5 bg-[#5A32A3]" />
+              <span className="absolute inset-x-1 bottom-0 h-0.5 bg-[var(--brand-primary)]" />
             ) : null}
           </button>
         ))}
@@ -777,7 +777,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                         className={cn(
                           "flex w-full px-3 py-1.5 text-left text-[12px]",
                           fileCategory === item
-                            ? "font-semibold text-[#5A32A3]"
+                            ? "font-semibold text-[var(--brand-primary)]"
                             : "text-slate-700 hover:bg-slate-50",
                         )}
                       >
@@ -812,7 +812,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Document
@@ -840,7 +840,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                         });
                       }}
                       aria-label="Select all files on this page"
-                      className="h-3.5 w-3.5 accent-[#5A32A3]"
+                      className="h-3.5 w-3.5 accent-[var(--brand-primary)]"
                     />
                   </th>
                   <th className="px-4 py-2.5">File Name</th>
@@ -873,7 +873,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                           checked={selectedIds.has(row.id)}
                           onChange={() => toggleFile(row.id)}
                           aria-label={`Select ${row.name}`}
-                          className="h-3.5 w-3.5 accent-[#5A32A3]"
+                          className="h-3.5 w-3.5 accent-[var(--brand-primary)]"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -930,7 +930,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                           <button
                             type="button"
                             onClick={() => notify(`Preview ${row.name}`)}
-                            className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                            className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Preview
@@ -983,7 +983,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                     className={cn(
                       "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5",
                       page === n
-                        ? "bg-[#5A32A3] font-semibold text-white"
+                        ? "bg-[var(--brand-primary)] font-semibold text-white"
                         : "border border-slate-200 text-slate-600",
                     )}
                   >
@@ -1054,7 +1054,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                         className={cn(
                           "flex w-full px-3 py-1.5 text-left text-[12px]",
                           requestStatus === item.value
-                            ? "font-semibold text-[#5A32A3]"
+                            ? "font-semibold text-[var(--brand-primary)]"
                             : "text-slate-700 hover:bg-slate-50",
                         )}
                       >
@@ -1083,7 +1083,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                   )
                 }
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Request Document
@@ -1127,7 +1127,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                       className={cn(
                         "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5",
                         page === n
-                          ? "bg-[#5A32A3] font-semibold text-white"
+                          ? "bg-[var(--brand-primary)] font-semibold text-white"
                           : "border border-slate-200 text-slate-600",
                       )}
                     >
@@ -1196,7 +1196,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                 router.push(leadSendHref("/signature/request/new?type=send", card))
               }
               className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
-              style={{ backgroundColor: "#5A32A3" }}
+              style={{ backgroundColor: "var(--brand-primary)" }}
             >
               <Plus className="h-3.5 w-3.5" />
               Request E-Sign
@@ -1294,7 +1294,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                             {row.href && action === "View" ? (
                               <Link
                                 href={row.href}
-                                className="text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                                className="text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
                               >
                                 View
                               </Link>
@@ -1308,7 +1308,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                                       : `${action} sent for ${row.name}`,
                                   )
                                 }
-                                className="text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                                className="text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
                               >
                                 {action}
                               </button>
@@ -1393,7 +1393,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                   )
                 }
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
-                style={{ backgroundColor: "#5A32A3" }}
+                style={{ backgroundColor: "var(--brand-primary)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 {tab === "proposals"
@@ -1460,7 +1460,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                       <td className="px-4 py-3 text-right">
                         <Link
                           href={row.href}
-                          className="text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                          className="text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
                         >
                           View
                         </Link>
@@ -1504,7 +1504,7 @@ function Empty({
       {href && action ? (
         <Link
           href={href}
-          className="mt-3 text-[12px] font-semibold text-[#5A32A3] hover:underline"
+          className="mt-3 text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
         >
           {action}
         </Link>
@@ -1512,7 +1512,7 @@ function Empty({
         <button
           type="button"
           onClick={onClick}
-          className="mt-3 text-[12px] font-semibold text-[#5A32A3] hover:underline"
+          className="mt-3 text-[12px] font-semibold text-[var(--brand-primary)] hover:underline"
         >
           {action}
         </button>

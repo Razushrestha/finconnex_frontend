@@ -35,7 +35,7 @@ export default function MessageTimelinePage({
           <button
             type="button"
             onClick={() => router.push("/activities/messages")}
-            className="mt-3 rounded-lg bg-[#5A32A3] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-3 rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white"
           >
             Back to Messages
           </button>

@@ -37,12 +37,12 @@ import type { LucideIcon } from "lucide-react";
 const SOURCE_COLORS = ["#5B6CFF", "#F59E0B", "#22D3EE", "#22C55E", "#8B5CF6", "#F43F5E"];
 
 export const ANALYTICS_KPI_WRAP = [
-  "bg-[#EDE9FE] text-[#6D5CE7]",
+  "bg-[#EDE9FE] text-[var(--brand-primary)]",
   "bg-[#E0F2FE] text-[#0EA5E9]",
   "bg-[#DCFCE7] text-[#16A34A]",
   "bg-[#FFEDD5] text-[#EA580C]",
   "bg-[#F3E8FF] text-[#9333EA]",
-  "bg-[#E0E7FF] text-[#4F46E5]",
+  "bg-[#E0E7FF] text-[var(--brand-primary)]",
 ];
 
 function Delta({
@@ -114,7 +114,7 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
       <div className="relative mb-3">
-        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F3F0FF] text-[#B4A7F5]">
+        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--brand-primary-faint)] text-[#B4A7F5]">
           <span className="relative">
             <span className="block h-9 w-8 rounded-md border-2 border-current" />
             <Search className="absolute -bottom-1 -right-2 h-5 w-5" />
@@ -146,13 +146,13 @@ export function AnalyticsPageLayout({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/analytics"
-            className="inline-flex w-fit items-center gap-1 text-[12px] font-semibold text-[#6D5CE7] hover:text-[#4F46E5]"
+            className="inline-flex w-fit items-center gap-1 text-[12px] font-semibold text-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to Analytics
           </Link>
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1.5 rounded-full border border-violet-100 bg-white px-3 text-[12px] font-semibold text-[#6D5CE7] outline-none hover:bg-violet-50">
+            <DropdownMenuTrigger className="inline-flex h-9 items-center gap-1.5 rounded-full border border-violet-100 bg-white px-3 text-[12px] font-semibold text-[var(--brand-primary)] outline-none hover:bg-violet-50">
               <Funnel className="h-3.5 w-3.5" />
               Filter
             </DropdownMenuTrigger>
@@ -204,11 +204,11 @@ export function AnalyticsPageLayout({
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.85fr)_minmax(0,0.85fr)]">
           <Card
             title={data.trendTitle}
-            icon={<TrendingUp className="h-4 w-4 text-[#6D5CE7]" />}
+            icon={<TrendingUp className="h-4 w-4 text-[var(--brand-primary)]" />}
             action={
               <div className="flex items-center gap-3 text-[11px] text-slate-400">
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-[#6D5CE7]" /> {data.primaryLegend}
+                  <span className="h-2 w-2 rounded-full bg-[var(--brand-primary)]" /> {data.primaryLegend}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-[#22C55E]" /> {data.secondaryLegend}
@@ -237,7 +237,7 @@ export function AnalyticsPageLayout({
             </div>
           </Card>
 
-          <Card title={data.sliceTitle} icon={<BadgePercent className="h-4 w-4 text-[#6D5CE7]" />}>
+          <Card title={data.sliceTitle} icon={<BadgePercent className="h-4 w-4 text-[var(--brand-primary)]" />}>
             {data.sliceTotal ? (
               <div className="flex h-[220px] flex-col items-center">
                 <div className="relative h-36 w-36">
@@ -287,7 +287,7 @@ export function AnalyticsPageLayout({
             )}
           </Card>
 
-          <Card title={data.funnelTitle} icon={<Funnel className="h-4 w-4 text-[#6D5CE7]" />}>
+          <Card title={data.funnelTitle} icon={<Funnel className="h-4 w-4 text-[var(--brand-primary)]" />}>
             <div className="space-y-3">
               {data.funnel.map((row) => (
                 <div key={row.label}>
@@ -299,7 +299,7 @@ export function AnalyticsPageLayout({
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-violet-50">
                     <div
-                      className="h-full rounded-full bg-[#6D5CE7]"
+                      className="h-full rounded-full bg-[var(--brand-primary)]"
                       style={{ width: `${Math.max(row.pct, row.value ? 8 : 0)}%` }}
                     />
                   </div>
@@ -308,7 +308,7 @@ export function AnalyticsPageLayout({
             </div>
             <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 text-[12px] text-slate-500">
               <span className="inline-flex items-center gap-2">
-                <Handshake className="h-4 w-4 text-[#6D5CE7]" />
+                <Handshake className="h-4 w-4 text-[var(--brand-primary)]" />
                 {data.funnelFooterLabel}
               </span>
               <span className="font-semibold text-slate-800">{data.funnelFooterValue}</span>
@@ -316,7 +316,7 @@ export function AnalyticsPageLayout({
           </Card>
         </div>
 
-        <Card title={data.listTitle} icon={<Users className="h-4 w-4 text-[#6D5CE7]" />}>
+        <Card title={data.listTitle} icon={<Users className="h-4 w-4 text-[var(--brand-primary)]" />}>
           {data.list.length ? (
             <div className="space-y-3">
               {data.list.map((row) => (
@@ -327,7 +327,7 @@ export function AnalyticsPageLayout({
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-violet-50">
                     <div
-                      className="h-full rounded-full bg-[#6D5CE7]"
+                      className="h-full rounded-full bg-[var(--brand-primary)]"
                       style={{ width: `${Math.max(8, row.bar)}%` }}
                     />
                   </div>
@@ -336,7 +336,7 @@ export function AnalyticsPageLayout({
             </div>
           ) : (
             <div className="flex min-h-[120px] flex-col items-center justify-center py-6">
-              <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#F3F0FF] text-[#C4B5FD]">
+              <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--brand-primary-faint)] text-[#C4B5FD]">
                 <Users className="h-5 w-5" />
               </span>
               <p className="text-[12px] text-slate-400">{data.listEmpty}</p>

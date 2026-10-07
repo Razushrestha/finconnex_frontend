@@ -41,9 +41,9 @@ export function TaskSidebarContext() {
       </div>
 
       <div className="flex items-start gap-1.5">
-        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#5A32A3]" />
+        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" />
         <div>
-          <p className="text-xs font-semibold text-[#5A32A3]">AI Suggestion</p>
+          <p className="text-xs font-semibold text-[var(--brand-primary)]">AI Suggestion</p>
           <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
             Best time to contact Acme Corp stakeholders is tomorrow between
             10:00 AM - 11:30 AM EST.

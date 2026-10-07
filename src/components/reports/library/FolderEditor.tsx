@@ -67,7 +67,7 @@ export function FolderEditor({
       <div className="flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2">
-            <FolderPlus className="h-4 w-4 text-[#5A32A3]" />
+            <FolderPlus className="h-4 w-4 text-[var(--brand-primary)]" />
             <h2 className="text-[15px] font-semibold text-slate-900">
               {folder ? (lockedName ? "Add reports" : "Edit folder") : "New folder"}
             </h2>
@@ -127,7 +127,7 @@ export function FolderEditor({
                     <button
                       type="button"
                       onClick={() => toggleCategory(ids)}
-                      className="px-10 pb-1 text-[11px] font-semibold text-[#5A32A3]"
+                      className="px-10 pb-1 text-[11px] font-semibold text-[var(--brand-primary)]"
                     >
                       {ids.every((id) => selected.includes(id)) ? "Clear category" : "Add all in category"}
                     </button>
@@ -140,7 +140,7 @@ export function FolderEditor({
                           type="checkbox"
                           checked={selected.includes(report.id)}
                           onChange={() => toggle(report.id)}
-                          className="mt-0.5 accent-[#5A32A3]"
+                          className="mt-0.5 accent-[var(--brand-primary)]"
                         />
                         <span className="min-w-0">
                           <span className="block text-[13px] font-medium text-slate-900">{report.name}</span>
@@ -161,7 +161,7 @@ export function FolderEditor({
           <button
             type="button"
             onClick={save}
-            className="h-8 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white"
+            className="h-8 rounded-lg bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white"
           >
             {folder ? "Save folder" : "Create folder"}
           </button>

@@ -46,7 +46,7 @@ export function NextStepsSidebarCard({
       {steps.length > 0 ? (
         <div className="mb-4 h-px w-full bg-slate-100">
           <div
-            className="h-px bg-[#5A32A3] transition-all duration-300"
+            className="h-px bg-[var(--brand-primary)] transition-all duration-300"
             style={{
               width: `${(completedCount / steps.length) * 100}%`,
             }}
@@ -66,7 +66,7 @@ export function NextStepsSidebarCard({
               type="checkbox"
               checked={step.completed}
               onChange={() => onToggleStep?.(step.id)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
             />
             <span className="min-w-0">
               <span
@@ -111,7 +111,7 @@ export function NextStepsSidebarCard({
           type="button"
           onClick={addItem}
           disabled={!draft.trim()}
-          className="inline-flex items-center gap-1 text-xs font-medium text-[#5A32A3] hover:opacity-80 disabled:opacity-40"
+          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--brand-primary)] hover:opacity-80 disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Item

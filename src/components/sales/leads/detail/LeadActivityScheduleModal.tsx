@@ -34,9 +34,9 @@ import { SearchablePersonSelect } from "@/components/shared/SearchablePersonSele
 import { LeadScheduleMeetingModal } from "@/components/sales/leads/detail/LeadScheduleMeetingModal";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "#5A32A3";
+const PURPLE = "var(--brand-primary)";
 const inputClass =
-  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#5A32A3] focus:outline-none focus:ring-2 focus:ring-[#5A32A3]/20";
+  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20";
 const labelClass = "mb-1 block text-[12px] font-medium text-slate-600";
 
 export type ScheduleKind = "call" | "meeting";

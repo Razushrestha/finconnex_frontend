@@ -101,7 +101,7 @@ const CHANNEL_SOFT: Record<InboxChannel, string> = {
   SMS: "bg-sky-100 text-sky-700",
 };
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 const STATUS_STYLE: Record<InboxStatus, string> = {
   Open: "bg-sky-50 text-sky-700",
@@ -1153,7 +1153,7 @@ export function UnifiedInboxClient() {
                   : "Demo"}
             </span>
             {unreadTotal > 0 ? (
-              <span className="rounded-full bg-[#F3ECFB] px-2 py-0.5 text-[11px] font-semibold text-[#5A32A3]">
+              <span className="rounded-full bg-[var(--brand-primary-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--brand-primary)]">
                 {unreadTotal} unread
               </span>
             ) : null}
@@ -1172,7 +1172,7 @@ export function UnifiedInboxClient() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search conversations…"
-                className="h-9 w-full rounded-lg border border-slate-200/90 bg-white pr-2.5 pl-8 text-[12px] outline-none focus:border-[#5A32A3] focus:shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
+                className="h-9 w-full rounded-lg border border-slate-200/90 bg-white pr-2.5 pl-8 text-[12px] outline-none focus:border-[var(--brand-primary)] focus:shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1221,7 +1221,7 @@ export function UnifiedInboxClient() {
                     <Icon
                       className={cn(
                         "h-4 w-4",
-                        active ? "text-[#5A32A3]" : "text-slate-400",
+                        active ? "text-[var(--brand-primary)]" : "text-slate-400",
                       )}
                       strokeWidth={1.75}
                     />
@@ -1269,7 +1269,7 @@ export function UnifiedInboxClient() {
                 className={cn(
                   "group flex w-full min-w-0 cursor-pointer gap-2.5 overflow-hidden border-b border-slate-50 px-3 py-2.5 text-left transition-colors",
                   activeId === c.id
-                    ? "bg-[#F8F4FC]"
+                    ? "bg-[var(--brand-primary-faint)]"
                     : "hover:bg-slate-50/80",
                 )}
               >
@@ -1278,7 +1278,7 @@ export function UnifiedInboxClient() {
                   <div className="flex items-center gap-2">
                     <p className="flex min-w-0 flex-1 items-center gap-1 truncate text-[13px] font-semibold text-slate-900">
                       {c.pinned ? (
-                        <Pin className="h-3 w-3 shrink-0 fill-[#5A32A3] text-[#5A32A3]" />
+                        <Pin className="h-3 w-3 shrink-0 fill-[var(--brand-primary)] text-[var(--brand-primary)]" />
                       ) : null}
                       <span className="truncate">{c.contactName}</span>
                       {c.starred ? (
@@ -1303,14 +1303,14 @@ export function UnifiedInboxClient() {
                           className={cn(
                             "flex h-6 w-6 items-center justify-center rounded-md hover:bg-white",
                             c.pinned
-                              ? "text-[#5A32A3]"
-                              : "text-slate-400 hover:text-[#5A32A3]",
+                              ? "text-[var(--brand-primary)]"
+                              : "text-slate-400 hover:text-[var(--brand-primary)]",
                           )}
                         >
                           <Pin
                             className={cn(
                               "h-3.5 w-3.5",
-                              c.pinned && "fill-[#5A32A3]",
+                              c.pinned && "fill-[var(--brand-primary)]",
                             )}
                           />
                         </button>
@@ -1427,7 +1427,7 @@ export function UnifiedInboxClient() {
                       icon={Pin}
                       iconClassName={
                         active.pinned
-                          ? "fill-[#5A32A3] text-[#5A32A3]"
+                          ? "fill-[var(--brand-primary)] text-[var(--brand-primary)]"
                           : undefined
                       }
                     />
@@ -1664,7 +1664,7 @@ export function UnifiedInboxClient() {
                                     "inline-flex items-center gap-0.5 font-semibold opacity-80 transition-opacity sm:opacity-0 sm:group-hover:opacity-100",
                                     m.outbound
                                       ? "text-white hover:text-violet-100"
-                                      : "text-[#5A32A3] hover:text-[#472880]",
+                                      : "text-[var(--brand-primary)] hover:text-[#472880]",
                                   )}
                                 >
                                   <Reply className="h-3 w-3" />
@@ -1686,7 +1686,7 @@ export function UnifiedInboxClient() {
                   {suggestedReplies.length > 0 ? (
                     <div className="mb-2">
                       <p className="mb-1 inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                        <Sparkles className="h-3 w-3 text-[#5A32A3]" />
+                        <Sparkles className="h-3 w-3 text-[var(--brand-primary)]" />
                         Suggested for their last message
                       </p>
                       <div className="flex flex-wrap gap-1">
@@ -1696,7 +1696,7 @@ export function UnifiedInboxClient() {
                             type="button"
                             title={q}
                             onClick={() => insertQuickReply(q)}
-                            className="max-w-[280px] rounded-2xl border border-violet-100 bg-[#F8F4FC] px-2.5 py-1 text-left text-[10px] font-medium text-[#5A32A3] hover:border-violet-200 hover:bg-[#F3ECFB]"
+                            className="max-w-[280px] rounded-2xl border border-violet-100 bg-[var(--brand-primary-faint)] px-2.5 py-1 text-left text-[10px] font-medium text-[var(--brand-primary)] hover:border-violet-200 hover:bg-[var(--brand-primary-soft)]"
                           >
                             <span className="line-clamp-2">{q}</span>
                           </button>
@@ -1911,8 +1911,8 @@ export function UnifiedInboxClient() {
                             setAiOpen(true);
                           }}
                           className={cn(
-                            "ml-0.5 inline-flex h-8 items-center gap-1 rounded-full bg-[#F3ECFB] px-2.5 text-[11px] font-semibold text-[#5A32A3] hover:bg-[#EDE4F7]",
-                            aiOpen && "ring-1 ring-[#5A32A3]/25",
+                            "ml-0.5 inline-flex h-8 items-center gap-1 rounded-full bg-[var(--brand-primary-soft)] px-2.5 text-[11px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-muted)]",
+                            aiOpen && "ring-1 ring-[var(--brand-primary)]/25",
                           )}
                         >
                           <Sparkles className="h-3.5 w-3.5 text-sky-400" />
@@ -1934,7 +1934,7 @@ export function UnifiedInboxClient() {
                             type="button"
                             onClick={() => sendReply()}
                             disabled={!draft.trim() && pendingFiles.length === 0}
-                            className="inline-flex h-9 items-center gap-1.5 px-3.5 text-[12px] font-semibold text-white hover:bg-[#4a2888] disabled:pointer-events-none"
+                            className="inline-flex h-9 items-center gap-1.5 px-3.5 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)] disabled:pointer-events-none"
                           >
                             <Send className="h-3.5 w-3.5" />
                             Send
@@ -1952,7 +1952,7 @@ export function UnifiedInboxClient() {
                               setSendOpen(next);
                               setScheduleOpen(false);
                             }}
-                            className="border-l border-white/20 px-2 text-white hover:bg-[#4a2888] disabled:pointer-events-none"
+                            className="border-l border-white/20 px-2 text-white hover:bg-[var(--brand-primary-strong)] disabled:pointer-events-none"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </button>
@@ -1962,9 +1962,9 @@ export function UnifiedInboxClient() {
                             <button
                               type="button"
                               onClick={() => sendReply()}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                             >
-                              <Send className="h-3.5 w-3.5 text-[#5A32A3]" />
+                              <Send className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                               Send now
                             </button>
                             <button
@@ -1974,25 +1974,25 @@ export function UnifiedInboxClient() {
                                 setScheduleOpen(true);
                                 setSendOpen(false);
                               }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                             >
-                              <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                              <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                               Schedule send
                             </button>
                             <button
                               type="button"
                               onClick={() => sendReply(tomorrowNine())}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                             >
-                              <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                              <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                               Tomorrow 9:00 AM
                             </button>
                             <button
                               type="button"
                               onClick={() => sendReply(nextMondayNine())}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                             >
-                              <Clock className="h-3.5 w-3.5 text-[#5A32A3]" />
+                              <Clock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
                               Next Monday 9:00 AM
                             </button>
                           </div>
@@ -2010,7 +2010,7 @@ export function UnifiedInboxClient() {
                               min={toLocalInput(new Date())}
                               value={scheduleAt}
                               onChange={(e) => setScheduleAt(e.target.value)}
-                              className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]"
+                              className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]"
                             />
                             {!scheduleValid ? (
                               <p className="mt-1 text-[11px] text-red-600">
@@ -2072,7 +2072,7 @@ export function UnifiedInboxClient() {
         >
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3]">
+              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Write with AI
               </p>
@@ -2093,7 +2093,7 @@ export function UnifiedInboxClient() {
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="Describe the reply you want… e.g. Ask them to send payslips and confirm we can call today."
-                  className="min-h-[120px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#5A32A3]/20"
+                  className="min-h-[120px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20"
                 />
                 <p className="mt-1.5 text-[11px] text-slate-400">
                   {aiReady
@@ -2110,7 +2110,7 @@ export function UnifiedInboxClient() {
                     type="button"
                     disabled={aiBusy || !active}
                     onClick={suggestInboxReply}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-50"
                   >
                     <Sparkles className="h-3 w-3" />
                     Suggest reply
@@ -2135,7 +2135,7 @@ export function UnifiedInboxClient() {
                         type="button"
                         disabled={aiBusy}
                         onClick={() => refineInboxDraft(id)}
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-violet-200 hover:bg-[#F8F4FC] hover:text-[#5A32A3] disabled:opacity-50"
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-violet-200 hover:bg-[var(--brand-primary-faint)] hover:text-[var(--brand-primary)] disabled:opacity-50"
                       >
                         {label}
                       </button>
@@ -2160,7 +2160,7 @@ export function UnifiedInboxClient() {
                         }
                         writeInboxFromPrompt(item);
                       }}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:border-violet-200 hover:bg-[#F8F4FC] disabled:opacity-50"
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:border-violet-200 hover:bg-[var(--brand-primary-faint)] disabled:opacity-50"
                     >
                       {item}
                     </button>
@@ -2180,7 +2180,7 @@ export function UnifiedInboxClient() {
                 type="button"
                 disabled={aiBusy || !active || !aiPrompt.trim()}
                 onClick={() => writeInboxFromPrompt(aiPrompt)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-40"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-40"
               >
                 {aiBusy ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2535,7 +2535,7 @@ function InboxDetailsRail({
                     className={cn(
                       "truncate text-[12px] font-semibold text-slate-800",
                       item.href &&
-                        "decoration-[#5A32A3] underline-offset-2 group-hover:underline",
+                        "decoration-[var(--brand-primary)] underline-offset-2 group-hover:underline",
                     )}
                   >
                     {item.name}
@@ -2691,7 +2691,7 @@ function InboxAgentPicker({
         className={cn(
           "flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-lg border bg-white py-0 pr-2 pl-2.5 text-left text-[12px] font-semibold normal-case text-slate-700 outline-none",
           open
-            ? "border-[#5A32A3] shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
+            ? "border-[var(--brand-primary)] shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
             : "border-slate-200",
         )}
       >
@@ -2701,7 +2701,7 @@ function InboxAgentPicker({
       {open ? (
         <div className="absolute top-[calc(100%+4px)] left-0 z-50 w-56 overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5">
           <div className="px-2 pt-2 pb-1.5">
-            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)]">
               <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <input
                 ref={searchRef}
@@ -2760,7 +2760,7 @@ function FilterSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
-        className="fc-select-caret h-8 w-full min-w-[120px] appearance-none rounded-lg border border-slate-200 bg-white py-0 pr-7 pl-2.5 text-[12px] font-semibold normal-case text-slate-700 outline-none focus:border-[#5A32A3] focus:shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
+        className="fc-select-caret h-8 w-full min-w-[120px] appearance-none rounded-lg border border-slate-200 bg-white py-0 pr-7 pl-2.5 text-[12px] font-semibold normal-case text-slate-700 outline-none focus:border-[var(--brand-primary)] focus:shadow-[0_0_0_3px_rgba(90,50,163,0.12)]"
       >
         {children}
       </select>
@@ -2793,7 +2793,7 @@ function IconBtn({
         "flex h-8 w-8 items-center justify-center rounded-lg border bg-white",
         active
           ? (activeClassName ??
-            "border-violet-200 bg-violet-50 text-[#5A32A3]")
+            "border-violet-200 bg-violet-50 text-[var(--brand-primary)]")
           : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-violet-700",
       )}
     >

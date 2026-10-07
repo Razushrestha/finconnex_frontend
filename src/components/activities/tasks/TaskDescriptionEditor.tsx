@@ -917,7 +917,7 @@ function ColorDropdown({
               }}
               className={cn(
                 "h-6 w-6 rounded-sm border border-slate-200 hover:scale-110",
-                option.value === currentColor && "ring-2 ring-[#5A32A3] ring-offset-1",
+                option.value === currentColor && "ring-2 ring-[var(--brand-primary)] ring-offset-1",
                 option.value === "transparent" &&
                   "bg-[linear-gradient(135deg,#fff_46%,#ef4444_46%,#ef4444_54%,#fff_54%)]",
               )}
@@ -1389,7 +1389,7 @@ function TableInsertButton({
                   className={cn(
                     "h-[14px] w-[14px] rounded-[2px] border",
                     active
-                      ? "border-[#5A32A3] bg-[#F3ECFB]"
+                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]"
                       : "border-slate-300 bg-white",
                   )}
                 />
@@ -2703,7 +2703,7 @@ export function TaskDescriptionEditor({
           <button
             type="submit"
             onMouseDown={(event) => event.preventDefault()}
-            className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white"
+            className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white"
           >
             Insert
           </button>

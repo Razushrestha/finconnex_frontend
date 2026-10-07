@@ -134,7 +134,7 @@ function Card({
       <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold text-slate-900">{title}</h3>
         {action ? (
-          <Link href={action.href} className="text-[11px] font-semibold text-[#5A32A3] hover:underline">
+          <Link href={action.href} className="text-[11px] font-semibold text-[var(--brand-primary)] hover:underline">
             {action.label}
           </Link>
         ) : null}
@@ -204,7 +204,7 @@ export function SalesDashboardView({
           delta={data.appointmentsDelta}
           spark={data.appointmentsSpark}
           icon={CalendarCheck}
-          iconClass="bg-violet-50 text-[#5A32A3]"
+          iconClass="bg-violet-50 text-[var(--brand-primary)]"
           sparkColor="#7C3AED"
           vs={vs}
         />

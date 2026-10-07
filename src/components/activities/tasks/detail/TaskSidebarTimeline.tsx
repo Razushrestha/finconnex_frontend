@@ -17,7 +17,7 @@ export function TaskSidebarTimeline({ task }: { task: Task }) {
         </h2>
         <Link
           href={href}
-          className="text-[11px] font-medium text-[#5A32A3] hover:underline"
+          className="text-[11px] font-medium text-[var(--brand-primary)] hover:underline"
         >
           View all
         </Link>
@@ -42,7 +42,7 @@ export function TaskSidebarTimeline({ task }: { task: Task }) {
 
       <Link
         href={href}
-        className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[#5A32A3] hover:underline"
+        className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--brand-primary)] hover:underline"
       >
         <History className="h-3.5 w-3.5" />
         Open full timeline

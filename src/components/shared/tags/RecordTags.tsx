@@ -39,7 +39,7 @@ function TagColorDots({
           className={cn(
             "h-5 w-5 rounded-full",
             value === tone.id
-              ? "ring-2 ring-[#5A32A3] ring-offset-2"
+              ? "ring-2 ring-[var(--brand-primary)] ring-offset-2"
               : "hover:scale-110",
           )}
           style={{ backgroundColor: tone.color }}
@@ -246,17 +246,17 @@ export function RecordTagPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "inline-flex items-center gap-1.5 text-[13px] font-medium text-[#5A32A3] transition-opacity hover:opacity-80",
+          "inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--brand-primary)] transition-opacity hover:opacity-80",
           open && "opacity-90",
         )}
       >
-        <Tag className="h-3.5 w-3.5 fill-[#5A32A3] text-[#5A32A3]" />
+        <Tag className="h-3.5 w-3.5 fill-[var(--brand-primary)] text-[var(--brand-primary)]" />
         {label}
       </button>
       {open ? (
         <div className="absolute top-[calc(100%+4px)] left-0 z-50 w-56 overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5">
           <div className="px-2 pt-2 pb-1.5">
-            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)]">
               <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <input
                 ref={searchRef}
@@ -326,7 +326,7 @@ export function RecordTagPicker({
                 <button
                   type="button"
                   onClick={() => pick(q, createTone)}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#5A32A3] px-2.5 py-1.5 text-[12px] font-semibold text-white"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-2.5 py-1.5 text-[12px] font-semibold text-white"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Create “{q}”

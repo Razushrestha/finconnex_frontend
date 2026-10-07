@@ -20,7 +20,7 @@ const SCROLLBAR =
   "[scrollbar-color:#d4d4d8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300";
 
 const inputClass =
-  "h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[#5A32A3] focus:ring-1 focus:ring-[#5A32A3]/30";
+  "h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]/30";
 
 type SectionId = "system" | "website" | "fields" | `group:${string}`;
 
@@ -191,7 +191,7 @@ export function DeepFilterPanel({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
-            className="w-full rounded-lg border border-slate-200 py-1.5 pr-3 pl-8 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-[#5A32A3] focus:ring-1 focus:ring-[#5A32A3]/20"
+            className="w-full rounded-lg border border-slate-200 py-1.5 pr-3 pl-8 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]/20"
           />
         </div>
       </div>
@@ -277,7 +277,7 @@ export function DeepFilterPanel({
         <button
           type="button"
           onClick={() => onApply(cloneValue(draft))}
-          className="flex h-9 w-full items-center justify-center rounded-lg bg-[#5A32A3] text-[13px] font-semibold text-white hover:bg-[#4c2a8a]"
+          className="flex h-9 w-full items-center justify-center rounded-lg bg-[var(--brand-primary)] text-[13px] font-semibold text-white hover:bg-[#4c2a8a]"
         >
           Apply Filter
         </button>
@@ -347,7 +347,7 @@ function OptionList({
             type="checkbox"
             checked={selected.includes(option)}
             onChange={() => onToggle(option)}
-            className="h-3.5 w-3.5 rounded border-slate-300 accent-[#5A32A3]"
+            className="h-3.5 w-3.5 rounded border-slate-300 accent-[var(--brand-primary)]"
           />
           {option}
         </label>
@@ -378,7 +378,7 @@ function FieldRow({
           type="checkbox"
           checked={selected}
           onChange={onToggle}
-          className="h-3.5 w-3.5 rounded border-slate-300 accent-[#5A32A3]"
+          className="h-3.5 w-3.5 rounded border-slate-300 accent-[var(--brand-primary)]"
         />
         {field.label}
       </label>
@@ -402,7 +402,7 @@ function FieldRow({
         <button
           type="button"
           onClick={onAddCondition}
-          className="mt-1.5 ml-6 inline-flex items-center gap-1 text-[11px] font-semibold text-[#5A32A3] hover:underline"
+          className="mt-1.5 ml-6 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
         >
           <Plus className="h-3 w-3" />
           Add condition

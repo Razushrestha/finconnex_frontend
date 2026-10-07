@@ -882,7 +882,7 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
                       className={cn(
                         "inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium",
                         on && item.id === "whatsapp" && "bg-white text-[#25D366] shadow-sm",
-                        on && item.id === "sms" && "bg-white text-[#5A32A3] shadow-sm",
+                        on && item.id === "sms" && "bg-white text-[var(--brand-primary)] shadow-sm",
                         !on && item.id === "whatsapp" && "text-[#25D366]/80 hover:text-[#25D366]",
                         !on && item.id === "sms" && "text-slate-500 hover:text-slate-700",
                       )}
@@ -911,7 +911,7 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
                   type="button"
                   disabled={overLimit || (!draft.trim() && !attachment)}
                   onClick={() => send()}
-                  className="inline-flex h-6 items-center gap-1 rounded-md bg-[#7C5CB5] px-2 text-[11px] font-semibold text-white hover:bg-[#5A32A3] disabled:opacity-40"
+                  className="inline-flex h-6 items-center gap-1 rounded-md bg-[#7C5CB5] px-2 text-[11px] font-semibold text-white hover:bg-[var(--brand-primary)] disabled:opacity-40"
                 >
                   Send
                   <Send className="h-3 w-3" />
@@ -1316,7 +1316,7 @@ function EmailFullPage({
         </button>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888]"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
         >
           <Reply className="h-3.5 w-3.5" />
           Reply

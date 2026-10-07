@@ -29,7 +29,7 @@ import { sendNotifyTest } from "@/lib/booking/notify";
 export type { NotificationRow, NotifyChannel };
 export { DEFAULT_NOTIFICATIONS };
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 function Pill({
   label,
@@ -47,7 +47,7 @@ function Pill({
       className={cn(
         "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
         on
-          ? "border-[#5A32A3]/40 bg-[#F3ECFB] text-[#5A32A3]"
+          ? "border-[var(--brand-primary)]/40 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
           : "border-slate-200 bg-white text-slate-400",
       )}
     >
@@ -114,7 +114,7 @@ export function BookingNotificationsStep({
               <button
                 type="button"
                 onClick={() => setEditing(row)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)]"
                 aria-label={`Edit ${row.title}`}
               >
                 <Pencil className="h-4 w-4" />
@@ -166,7 +166,7 @@ export function BookingNotificationsStep({
 const LABEL = "text-[12px] font-semibold text-slate-700";
 
 const INPUT =
-  "h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/10";
+  "h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/10";
 
 const SECONDARY_BUTTON =
   "h-10 shrink-0 rounded-lg border border-[#E5E7EB] bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
@@ -201,12 +201,12 @@ function MessageBox({
 }) {
   const words = value.trim().split(/\s+/).filter(Boolean).length;
   return (
-    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white transition-colors focus-within:border-[#5A32A3] focus-within:ring-2 focus-within:ring-[#5A32A3]/10">
+    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white transition-colors focus-within:border-[var(--brand-primary)] focus-within:ring-2 focus-within:ring-[var(--brand-primary)]/10">
       <div className="flex items-center justify-between gap-2 border-b border-[#E5E7EB] bg-slate-50 px-2 py-1.5">
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-slate-500 transition-colors hover:bg-white hover:text-[#5A32A3]"
+          className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-slate-500 transition-colors hover:bg-white hover:text-[var(--brand-primary)]"
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden />
           Reset to default
@@ -419,7 +419,7 @@ export function NotificationEditModal({
                   className={cn(
                     "-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors",
                     tab === c
-                      ? "border-[#5A32A3] text-[#5A32A3]"
+                      ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
                       : "border-transparent text-slate-500 hover:text-slate-800",
                   )}
                 >
@@ -440,8 +440,8 @@ export function NotificationEditModal({
                   }))
                 }
                 className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#5A32A3]/40 focus-visible:ring-offset-2",
-                  enabled ? "bg-[#5A32A3]" : "bg-slate-300",
+                  "relative h-6 w-11 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 focus-visible:ring-offset-2",
+                  enabled ? "bg-[var(--brand-primary)]" : "bg-slate-300",
                 )}
               >
                 <span

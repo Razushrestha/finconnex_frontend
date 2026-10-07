@@ -17,7 +17,7 @@ import {
   type OnlineMeetingPlatform,
 } from "@/lib/booking/meeting-platforms";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 export type CalendarTypeChoice = {
   mode: ConsultationMode;
@@ -222,7 +222,7 @@ export function ConsultationDetailsStep({
                 "h-11 w-full rounded-lg border bg-white px-3 text-[13px] text-slate-800 outline-none",
                 error && !name.trim()
                   ? "border-rose-300"
-                  : "border-[#E5E7EB] focus:border-[#5A32A3]/45",
+                  : "border-[#E5E7EB] focus:border-[var(--brand-primary)]/45",
               )}
             />
           </label>
@@ -235,7 +235,7 @@ export function ConsultationDetailsStep({
               <select
                 value={hours}
                 onChange={(e) => setHours(Number(e.target.value))}
-                className="h-11 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
+                className="h-11 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/45"
                 style={{
                   backgroundImage:
                     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
@@ -250,7 +250,7 @@ export function ConsultationDetailsStep({
               <select
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
-                className="h-11 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
+                className="h-11 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/45"
                 style={{
                   backgroundImage:
                     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
@@ -281,7 +281,7 @@ export function ConsultationDetailsStep({
                   className={cn(
                     "h-11 min-w-[88px] px-5 text-[13px] font-semibold",
                     isFree
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                       : "text-slate-500 hover:bg-slate-50",
                   )}
                 >
@@ -296,7 +296,7 @@ export function ConsultationDetailsStep({
                   className={cn(
                     "h-11 min-w-[88px] border-l border-[#E5E7EB] px-5 text-[13px] font-semibold",
                     !isFree
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
+                      ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                       : "text-slate-500 hover:bg-slate-50",
                   )}
                 >
@@ -331,7 +331,7 @@ export function ConsultationDetailsStep({
                     const next = Number(raw);
                     if (Number.isFinite(next) && next >= 0) setPrice(next);
                   }}
-                  className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-7 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-7 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/45 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
             </div>
@@ -362,7 +362,7 @@ export function ConsultationDetailsStep({
                       "h-11 min-w-[88px] px-5 text-[13px] font-semibold",
                       i > 0 && "border-l border-[#E5E7EB]",
                       meetingPlace === value
-                        ? "bg-[#F3ECFB] text-[#5A32A3]"
+                        ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
                         : "text-slate-500 hover:bg-slate-50",
                     )}
                   >
@@ -421,7 +421,7 @@ export function ConsultationDetailsStep({
                                 className={cn(
                                   "flex w-full px-3 py-2 text-left text-[13px]",
                                   item === platform
-                                    ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                                    ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                                     : "text-slate-700 hover:bg-slate-50",
                                 )}
                               >

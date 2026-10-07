@@ -185,7 +185,7 @@ export function WorkQueuePersonBar() {
             <span
               className={cn(
                 "absolute inset-x-2 bottom-0 h-[2px] rounded-full transition-colors",
-                active ? "bg-[#4F46E5]" : "bg-transparent",
+                active ? "bg-[var(--brand-primary)]" : "bg-transparent",
               )}
             />
           </div>

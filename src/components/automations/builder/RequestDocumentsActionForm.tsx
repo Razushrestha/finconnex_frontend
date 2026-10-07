@@ -242,7 +242,7 @@ export function RequestDocumentsActionForm({
                   type="number"
                   min={1}
                   aria-label="Due in amount"
-                  className="h-10 w-20 rounded-lg border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-[#5A32A3]/45"
+                  className="h-10 w-20 rounded-lg border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45"
                   value={form.dueIn.amount}
                   onChange={(e) =>
                     update("dueIn", { ...formRef.current.dueIn, amount: Math.max(0, Number(e.target.value) || 0) })
@@ -272,7 +272,7 @@ export function RequestDocumentsActionForm({
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="datetime-local"
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] outline-none focus:border-[#5A32A3]/45"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-[13px] outline-none focus:border-[var(--brand-primary)]/45"
                   value={form.dueDate}
                   onChange={(e) => update("dueDate", e.target.value)}
                 />
@@ -309,7 +309,7 @@ export function RequestDocumentsActionForm({
               value={form.notes}
               onChange={(e) => update("notes", e.target.value)}
               placeholder="Anything they should know before uploading…"
-              className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+              className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[var(--brand-primary)]/45 focus:ring-2 focus:ring-[var(--brand-primary)]/12"
             />
           </div>
         </div>

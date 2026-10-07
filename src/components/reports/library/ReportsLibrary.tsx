@@ -104,7 +104,7 @@ export function ReportsLibrary() {
                   href={`/reports/folders/${folder.id}`}
                   className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 hover:border-violet-200 hover:shadow-sm"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[var(--brand-primary)]">
                     <Folder className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">
@@ -128,7 +128,7 @@ export function ReportsLibrary() {
             href={`/reports/folders/${MY_FAVOURITES_FOLDER_ID}`}
             className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-200 hover:shadow-sm"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[var(--brand-primary)]">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
             </span>
             <h3 className="mt-3 text-[14px] font-semibold text-slate-900">My Favourites</h3>
@@ -149,7 +149,7 @@ export function ReportsLibrary() {
                 href={`/reports/library/${category.id}`}
                 className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-200 hover:shadow-sm"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[var(--brand-primary)]">
                   <Icon className="h-4 w-4" />
                 </span>
                 <h3 className="mt-3 text-[14px] font-semibold text-slate-900">{category.name}</h3>

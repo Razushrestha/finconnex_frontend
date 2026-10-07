@@ -107,7 +107,7 @@ export function BrokerHubBuilder({
                 `${FINANCE_PRIMARY_BUTTON_SM} rounded-md px-3 py-1.5 text-xs disabled:opacity-60`,
                 published
                   ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20"
-                  : "bg-[#6D5AE6] text-white hover:bg-[#5B4BD4]",
+                  : "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-strong)]",
               )}
             >
               {saving ? (

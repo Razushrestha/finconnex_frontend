@@ -178,7 +178,7 @@ export default function ProductsPage() {
           <button
             type="button"
             onClick={goCreate}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#6D5AE6] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 hover:bg-[#5B4BD4]"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 hover:bg-[var(--brand-primary-strong)]"
           >
             <Plus className="h-4 w-4" />
             Add Item
@@ -198,7 +198,7 @@ export default function ProductsPage() {
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold",
                   active
-                    ? "bg-[#6D5AE6] text-white shadow-sm"
+                    ? "bg-[var(--brand-primary)] text-white shadow-sm"
                     : "border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700",
                 )}
               >
@@ -310,7 +310,7 @@ export default function ProductsPage() {
                       <button
                         type="button"
                         onClick={goCreate}
-                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#6D5AE6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5B4BD4]"
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         Add Item
@@ -319,7 +319,7 @@ export default function ProductsPage() {
                       <button
                         type="button"
                         onClick={() => setListFilter("all")}
-                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#6D5AE6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#5B4BD4]"
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
                       >
                         Show all items
                       </button>

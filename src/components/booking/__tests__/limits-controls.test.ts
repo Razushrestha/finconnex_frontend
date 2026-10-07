@@ -215,7 +215,7 @@ describe("limit controls markup", () => {
 
     // Today (Oct 2) is outlined in purple with the small triangle under the number.
     expect(html).toContain('data-today="true"');
-    expect(html).toContain("border-bottom:4px solid #5A32A3");
+    expect(html).toContain("border-bottom:4px solid var(--brand-primary)");
   });
 
   it("highlights every day in the chosen range", () => {

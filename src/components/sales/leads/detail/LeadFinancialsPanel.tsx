@@ -63,15 +63,15 @@ export function LeadFinancialsPanel({
           onClick={() => setOpen((value) => !value)}
           className="flex w-full items-center justify-between gap-2 px-1"
         >
-          <span className="inline-flex items-center gap-2 text-[14px] font-semibold text-[#5A32A3]">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#5A32A3] text-[11px] font-bold text-white">
+          <span className="inline-flex items-center gap-2 text-[14px] font-semibold text-[var(--brand-primary)]">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[11px] font-bold text-white">
               2
             </span>
             Your finances
           </span>
           <ChevronDown
             className={cn(
-              "h-4 w-4 text-[#5A32A3] transition-transform",
+              "h-4 w-4 text-[var(--brand-primary)] transition-transform",
               open && "rotate-180",
             )}
           />
@@ -90,7 +90,7 @@ export function LeadFinancialsPanel({
                     className={cn(
                       "relative z-10 block w-full rounded-xl px-3 py-2 text-left text-[13px] font-medium",
                       active
-                        ? "border border-[#5A32A3]/30 bg-white text-[#5A32A3] shadow-[0_1px_2px_rgba(90,50,163,0.08)]"
+                        ? "border border-[var(--brand-primary)]/30 bg-white text-[var(--brand-primary)] shadow-[0_1px_2px_rgba(90,50,163,0.08)]"
                         : "text-slate-600 hover:bg-white/70",
                     )}
                   >
@@ -214,7 +214,7 @@ function ApplicantFinanceColumn({
   return (
     <div className="min-w-0 [&_.mt-6]:mt-0 [&_.mt-7]:mt-0">
       {label ? (
-        <p className="mb-3 text-[11px] font-semibold tracking-[0.07em] text-[#5A32A3] uppercase">
+        <p className="mb-3 text-[11px] font-semibold tracking-[0.07em] text-[var(--brand-primary)] uppercase">
           {label}
         </p>
       ) : null}

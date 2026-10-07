@@ -111,7 +111,7 @@ export function HubPreviewScreen({
         className,
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-[#6d5efc] via-[#4f46e5] to-[#312e81]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#6d5efc] via-[var(--brand-primary)] to-[#312e81]" />
       <svg
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%] w-full"
         viewBox="0 0 375 220"

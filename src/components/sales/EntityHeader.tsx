@@ -437,7 +437,7 @@ export function EntityHeader({
           </button>
 
           <div className="relative" ref={importMenuRef}>
-            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
+            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[var(--brand-primary)] text-white shadow-md shadow-violet-500/20">
           <button
             type="button"
             onClick={() => {
@@ -449,7 +449,7 @@ export function EntityHeader({
                 `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
               );
             }}
-                className="inline-flex items-center gap-1.5 px-4 text-sm font-semibold hover:bg-[#5B4BD4]"
+                className="inline-flex items-center gap-1.5 px-4 text-sm font-semibold hover:bg-[var(--brand-primary-strong)]"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Create {entityLabel}</span>
@@ -465,7 +465,7 @@ export function EntityHeader({
                     aria-label={`${entityLabel} import options`}
                     aria-haspopup="true"
                     aria-expanded={isImportMenuOpen}
-                    className="flex w-9 items-center justify-center hover:bg-[#5B4BD4]"
+                    className="flex w-9 items-center justify-center hover:bg-[var(--brand-primary-strong)]"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>

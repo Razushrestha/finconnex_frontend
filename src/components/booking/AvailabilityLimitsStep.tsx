@@ -26,7 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 
-const BRAND = "#5A32A3";
+const BRAND = "var(--brand-primary)";
 
 export type CustomDateLimit = {
   id: string;
@@ -135,7 +135,7 @@ function OutlineButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-semibold hover:bg-[#F3ECFB]"
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-semibold hover:bg-[var(--brand-primary-soft)]"
       style={{ borderColor: BRAND, color: BRAND }}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -196,7 +196,7 @@ function HoursEditor({
               type="checkbox"
               checked={rule.enabled}
               onChange={(e) => patch(rule.day, { enabled: e.target.checked })}
-              className="h-3.5 w-3.5 accent-[#5A32A3]"
+              className="h-3.5 w-3.5 accent-[var(--brand-primary)]"
             />
             {rule.day.slice(0, 3)}
           </label>
@@ -222,7 +222,7 @@ function HoursEditor({
                 aria-label="Copy Monday's hours"
                 title="Copy Monday's hours"
                 onClick={() => setCopyOpen((open) => !open)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#5A32A3] hover:bg-[#F3ECFB]"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
               >
                 <Copy className="h-4 w-4" />
               </button>
@@ -236,7 +236,7 @@ function HoursEditor({
                           type="checkbox"
                           checked={copyDays.includes(day)}
                           onChange={() => toggleCopyDay(day)}
-                          className="h-3.5 w-3.5 accent-[#5A32A3]"
+                          className="h-3.5 w-3.5 accent-[var(--brand-primary)]"
                         />
                         {day}
                       </label>
@@ -559,7 +559,7 @@ export function AvailabilityLimitsStep({
                       onChange={(e) =>
                         patch({ overrideUserHours: e.target.checked })
                       }
-                      className="h-3.5 w-3.5 accent-[#5A32A3]"
+                      className="h-3.5 w-3.5 accent-[var(--brand-primary)]"
                     />
                     Override User specific Hours
                   </label>
@@ -816,7 +816,7 @@ export function AvailabilityLimitsStep({
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="mt-3 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+                className="mt-3 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
               >
                 + Add Limit
               </button>

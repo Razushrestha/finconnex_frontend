@@ -525,8 +525,8 @@ export function ResizableColumns({
             <span
               className={cn(
                 "mx-auto block h-full w-px transition-colors",
-                "bg-transparent group-hover:w-0.5 group-hover:bg-[#5A32A3]",
-                dragging && "w-0.5 bg-[#5A32A3]",
+                "bg-transparent group-hover:w-0.5 group-hover:bg-[var(--brand-primary)]",
+                dragging && "w-0.5 bg-[var(--brand-primary)]",
               )}
             />
             </button>
@@ -534,7 +534,7 @@ export function ResizableColumns({
         })}
         {guideX != null ? (
           <div
-            className="pointer-events-none absolute top-0 z-30 w-px bg-[#5A32A3]"
+            className="pointer-events-none absolute top-0 z-30 w-px bg-[var(--brand-primary)]"
             style={{ left: guideX, height: "100%" }}
           />
         ) : null}
