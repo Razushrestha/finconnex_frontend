@@ -157,6 +157,9 @@ function formatDisplayDate(raw: unknown): string {
 function toIsoDateTime(raw: string | undefined): string | undefined {
   const value = raw?.trim();
   if (!value) return undefined;
+  // "05/11/2026" is 5 November here, but `new Date` reads it US-style as
+  // 11 May. Leave day-first dates to toIsoDate.
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) return undefined;
   const local = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (local) {
     const [, year, month, day, hour, minute] = local;
