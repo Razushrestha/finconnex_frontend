@@ -338,23 +338,6 @@ export async function proxyCrmV1(
     if (empty) return withCrmCookies(empty, auth, rememberMe);
   }
 
-  const settingsKindSkip = settingsProxyKind(path);
-  if (settingsKindSkip && method === "GET") {
-    const workspaceKey = sessionWorkspaceId || "local";
-    const catalog = await readFallbackCatalog(workspaceKey);
-    return withCrmCookies(
-      new NextResponse(
-        settingsGetFallbackPayload(settingsKindSkip, workspaceKey, catalog),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-      auth,
-      rememberMe,
-    );
-  }
-
   const storageUpload =
     request.method === "POST" &&
     path[0] === "storage" &&
@@ -763,7 +746,9 @@ export async function proxyCrmV1(
       text = settingsGetFallbackPayload(settingsKind, workspaceId, localCatalog);
       status = 200;
     } else if (settingsKind.kind === "root" || settingsKind.kind === "pages") {
-      text = withCatalogOnSettings(text, localCatalog);
+      // The CRM is the source of truth; the local copy only fills pages it
+      // has never stored.
+      text = withCatalogOnSettings(text, localCatalog, undefined, { crmWins: true });
     }
   }
 
@@ -803,6 +788,8 @@ export async function proxyCrmV1(
       text = withCatalogOnSettings(
         text,
         await readFallbackCatalog(workspaceId),
+        undefined,
+        { crmWins: true },
       );
     }
   }
