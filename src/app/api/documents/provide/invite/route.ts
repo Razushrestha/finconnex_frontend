@@ -5,7 +5,10 @@ import {
   decodeJwtPayload,
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
-import { deliverThroughBookingMailbox } from "@/lib/emails/sendgrid-server";
+import {
+  deliverThroughBookingMailbox,
+  deliverThroughPlatformMailer,
+} from "@/lib/emails/sendgrid-server";
 import { parsePublicSlotDays, publicBookingPath } from "@/lib/booking/public-crm";
 import {
   emailBrandFromSettings,
@@ -25,9 +28,11 @@ import {
 export const maxDuration = 60;
 
 /**
- * Sends the document-request invite through the workspace booking mailbox,
- * the same sender that delivers a booking confirmation. SendGrid is not used.
- * `/v1/mail/relay` accepts a message and returns 200 without delivering it.
+ * Sends the document-request invite through the CRM's platform mailer, the
+ * same sender that delivers verification codes. If the CRM refuses that send,
+ * falls back to the workspace booking mailbox, which needs a booking for the
+ * client. A temporary booking is created when none exists, and cancelled only
+ * if that send fails.
  */
 export async function POST(request: Request) {
   const session = await getSession();
@@ -101,6 +106,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const message = { to: [to], subject, text, html: html || undefined };
+  try {
+    const delivered = await deliverThroughPlatformMailer(message, accessToken);
+    console.info("[document-invite] sent through the platform mailer");
+    return NextResponse.json({ ok: true, delivered });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Could not send the email";
+    console.error(
+      `[document-invite] platform mailer did not send (${reason}); trying the booking mailbox`,
+    );
+  }
+
   let createdBookingId = "";
   try {
     const token = await guestMailToken(base, accessToken, workspaceId, to, clientName, (id) => {
@@ -109,13 +126,10 @@ export async function POST(request: Request) {
     console.info(
       `[document-invite] sending through the booking mailbox (${createdBookingId ? "temporary booking" : "existing booking"})`,
     );
-    const delivered = await deliverThroughBookingMailbox(
-      { to: [to], subject, text, html: html || undefined },
-      token,
-    );
-    // A temporary booking is only a mailbox. Cancelling it — which the dev
-    // server always does, and Vercel usually does not — drops the message
-    // the mailbox has not finished sending yet.
+    const delivered = await deliverThroughBookingMailbox(message, token);
+    // Leave a temporary booking in place after a successful send. Cancelling
+    // it while the dev server is still running drops mail the mailbox has
+    // not finished sending. It is cancelled below only when the send fails.
     createdBookingId = "";
     return NextResponse.json({ ok: true, delivered });
   } catch (error) {
@@ -409,7 +423,19 @@ function unwrapRecord(data: unknown): Record<string, unknown> | null {
   return row;
 }
 
+/**
+ * The booking's id. The public book reply is the booking itself, with its
+ * event type nested under `eventType`; that nested id must not be taken for it.
+ */
 function firstId(data: unknown): string {
+  const own =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
+  if (own && (typeof own.cancelToken === "string" || typeof own.rescheduleToken === "string")) {
+    const id = own.id ?? own.bookingId;
+    if (typeof id === "string" && id.trim()) return id.trim();
+  }
   const row = unwrapRecord(data);
   const id = row?.id ?? row?.bookingId ?? row?.eventTypeId;
   return typeof id === "string" ? id.trim() : "";

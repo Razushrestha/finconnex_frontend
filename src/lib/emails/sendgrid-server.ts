@@ -230,6 +230,19 @@ async function deliverViaCrm(input: DeliverInput, auth: CrmMailAuth): Promise<"c
 }
 
 /**
+ * Sends through the CRM's platform mail account (`POST /v1/mail/relay`), the
+ * same sender and account that delivers sign-up and verification codes.
+ */
+export async function deliverThroughPlatformMailer(
+  input: DeliverInput,
+  accessToken: string,
+): Promise<"crm"> {
+  const token = accessToken.trim();
+  if (!token) throw new Error("Sign in again so the CRM can send this email.");
+  return deliverViaCrm(input, { accessToken: token });
+}
+
+/**
  * The sender booking confirmations use when this app cannot send itself:
  * the workspace mailbox behind the booking's manage token. SendGrid is not
  * called.
