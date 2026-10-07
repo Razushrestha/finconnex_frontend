@@ -12,6 +12,7 @@ import { fetchLeadById } from "@/lib/leads/api";
 import { findLeadById, listLeadColumns } from "@/lib/leads/store";
 import { findDealById, listAllDeals } from "@/lib/deals/store";
 import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
+import { readClientEmailBrand } from "@/lib/emails/brand-mail";
 import { appointmentConfirmedEmail } from "@/lib/meetings/appointment-email";
 
 export type MeetingInvitee = {
@@ -309,6 +310,7 @@ export async function sendRelatedMeetingInvites(input: {
       joinUrl: input.meetingLink,
       rescheduleUrl: links?.rescheduleUrl,
       cancelUrl: links?.cancelUrl,
+      brand: readClientEmailBrand(),
     });
     try {
       await deliverStyledAppointment({

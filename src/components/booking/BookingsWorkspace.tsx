@@ -375,6 +375,22 @@ function HomeView({
     setReschedule({ row, title: "Reschedule" });
   }
 
+  async function cancelAppointment(row: DashboardAppointment) {
+    if (row.status === "Cancelled") return;
+    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    const bookingId = row.recordKind === "booking" ? row.id : "";
+    if (bookingId) {
+      await tryCrmBooking(() =>
+        cancelCrmBooking(bookingId, "Cancelled from the appointments list"),
+      );
+    }
+    if (meetingId) {
+      await tryCrmMeeting(() => cancelCrmMeeting(meetingId));
+    }
+    toast.success("Appointment cancelled");
+    onRefresh();
+  }
+
   async function removeAppointment(row: DashboardAppointment) {
     if (!window.confirm(`Delete appointment “${row.guestName}”? This also removes it for the client.`)) return;
     const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
@@ -541,6 +557,7 @@ function HomeView({
                 onView={() => openView(row)}
                 onEdit={() => openEdit(row)}
                 onReschedule={() => openReschedule(row)}
+                onCancel={() => void cancelAppointment(row)}
                 onDelete={() => void removeAppointment(row)}
               />
             ))}
@@ -598,6 +615,7 @@ function HomeView({
                     onView={openView}
                     onEdit={openEdit}
                     onReschedule={openReschedule}
+                    onCancel={(row) => void cancelAppointment(row)}
                     onDelete={(row) => void removeAppointment(row)}
                   />
                 ))}
@@ -733,6 +751,9 @@ function HomeView({
             if (row) setReschedule({ row, title: "Edit" });
           }}
           onCancel={() => {
+            if (detail) void cancelAppointment(detail);
+          }}
+          onDelete={() => {
             if (detail) void removeAppointment(detail);
           }}
           onSaved={() => {
@@ -858,12 +879,14 @@ function BookingStatusMenu({
   status,
   onEdit,
   onReschedule,
+  onCancel,
   onDelete,
   tone = "neutral",
 }: {
   status?: AppointmentStatus;
   onEdit: () => void;
   onReschedule: () => void;
+  onCancel: () => void;
   onDelete: () => void;
   tone?: "neutral" | "blue";
 }) {
@@ -954,12 +977,15 @@ function BookingStatusMenu({
                 type="button"
                 role="menuitem"
                 aria-pressed={cancelled}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  if (!cancelled) onCancel();
+                }}
                 className={cn(
                   "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px]",
                   cancelled
                     ? "bg-red-50 font-medium text-red-600"
-                    : "text-slate-400",
+                    : "text-slate-600 hover:bg-slate-50",
                 )}
               >
                 <span
@@ -970,20 +996,18 @@ function BookingStatusMenu({
                 />
                 Cancelled
               </button>
-              {cancelled ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setOpen(false);
-                    onDelete();
-                  }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-600 hover:bg-red-50"
-                >
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
-                  Delete
-                </button>
-              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-600 hover:bg-red-50"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                Delete
+              </button>
             </div>,
             document.body,
           )
@@ -999,6 +1023,7 @@ function AppointmentDayGroup({
   onView,
   onEdit,
   onReschedule,
+  onCancel,
   onDelete,
 }: {
   label: string;
@@ -1007,6 +1032,7 @@ function AppointmentDayGroup({
   onView: (row: DashboardAppointment) => void;
   onEdit: (row: DashboardAppointment) => void;
   onReschedule: (row: DashboardAppointment) => void;
+  onCancel: (row: DashboardAppointment) => void;
   onDelete: (row: DashboardAppointment) => void;
 }) {
   return (
@@ -1027,6 +1053,7 @@ function AppointmentDayGroup({
           onView={() => onView(row)}
           onEdit={() => onEdit(row)}
           onReschedule={() => onReschedule(row)}
+          onCancel={() => onCancel(row)}
           onDelete={() => onDelete(row)}
         />
       ))}
@@ -1040,6 +1067,7 @@ function AppointmentCard({
   onView,
   onEdit,
   onReschedule,
+  onCancel,
   onDelete,
 }: {
   row: DashboardAppointment;
@@ -1047,6 +1075,7 @@ function AppointmentCard({
   onView: () => void;
   onEdit: () => void;
   onReschedule: () => void;
+  onCancel: () => void;
   onDelete: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -1095,6 +1124,7 @@ function AppointmentCard({
                 status={row.status}
                 onEdit={onEdit}
                 onReschedule={onReschedule}
+                onCancel={onCancel}
                 onDelete={onDelete}
               />
             </div>
@@ -1159,6 +1189,7 @@ function AppointmentRow({
   onView,
   onEdit,
   onReschedule,
+  onCancel,
   onDelete,
 }: {
   row: DashboardAppointment;
@@ -1166,6 +1197,7 @@ function AppointmentRow({
   onView: () => void;
   onEdit: () => void;
   onReschedule: () => void;
+  onCancel: () => void;
   onDelete: () => void;
 }) {
   const eventName = row.eventTypeName || row.type;
@@ -1235,6 +1267,7 @@ function AppointmentRow({
           status={row.status}
           onEdit={onEdit}
           onReschedule={onReschedule}
+          onCancel={onCancel}
           onDelete={onDelete}
         />
       </td>
@@ -1461,6 +1494,7 @@ function AppointmentDrawer({
   onEditMeeting,
   onReschedule,
   onCancel,
+  onDelete,
   onSaved,
 }: {
   row: DashboardAppointment;
@@ -1470,6 +1504,7 @@ function AppointmentDrawer({
   onEditMeeting: () => void;
   onReschedule: () => void;
   onCancel: () => void;
+  onDelete: () => void;
   onSaved: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -1579,6 +1614,7 @@ function AppointmentDrawer({
         onEdit={onEditMeeting}
         onReschedule={onReschedule}
         onCancel={onCancel}
+        onDelete={onDelete}
       />
     );
   }
@@ -1743,6 +1779,7 @@ function AppointmentSummary({
   onEdit,
   onReschedule,
   onCancel,
+  onDelete,
 }: {
   row: DashboardAppointment;
   email: string;
@@ -1753,6 +1790,7 @@ function AppointmentSummary({
   onEdit: () => void;
   onReschedule: () => void;
   onCancel: () => void;
+  onDelete: () => void;
 }) {
   const [tab, setTab] = useState<"appointment" | "customer" | "audit">("appointment");
   const tabs = [
@@ -1791,7 +1829,8 @@ function AppointmentSummary({
                 tone="blue"
                 onEdit={onEdit}
                 onReschedule={onReschedule}
-                onDelete={onCancel}
+                onCancel={onCancel}
+                onDelete={onDelete}
               />
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-500">

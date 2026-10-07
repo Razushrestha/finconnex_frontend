@@ -1,12 +1,15 @@
 import { dateInTimezone, ianaTimezoneFromLabel } from "@/lib/booking/timezones";
+import {
+  emailBrandFromValues,
+  emailFillStyle,
+  type EmailBrand,
+} from "@/lib/emails/brand-mail";
 
 const ORG = "Finconnex Financial Services";
-const PHONE = "02 1234 5678";
 const EMAIL = "info@finconnex.com.au";
-const SITE = "https://www.finconnex.com.au";
-const NAVY = "#102A56";
-const BLUE = "#1D6FE8";
-const MUTED = "#5C6B82";
+const INK = "#111827";
+const MUTED = "#4B5563";
+const LINE = "#E5E7EB";
 
 export type AppointmentEmailInput = {
   guestName: string;
@@ -25,6 +28,7 @@ export type AppointmentEmailInput = {
   manageUrl?: string;
   rescheduleUrl?: string;
   cancelUrl?: string;
+  brand?: EmailBrand;
 };
 
 export function appointmentConfirmedEmail(input: AppointmentEmailInput): {
@@ -32,6 +36,9 @@ export function appointmentConfirmedEmail(input: AppointmentEmailInput): {
   html: string;
   text: string;
 } {
+  const brand = input.brand ?? emailBrandFromValues(null);
+  const fill = emailFillStyle(brand);
+  const accent = brand.primary;
   const guest = firstName(input.guestName);
   const host = input.hostName.trim() || "your consultant";
   const dateLabel = formatLongDate(input.dateIso);
@@ -40,7 +47,7 @@ export function appointmentConfirmedEmail(input: AppointmentEmailInput): {
   const joinUrl = input.joinUrl?.trim();
   const online = isOnline(input, meetingType);
   const meetingDetail = joinUrl
-    ? `<a href="${escapeHtml(joinUrl)}" style="color:${BLUE};text-decoration:none">${escapeHtml(joinUrl)}</a>`
+    ? `<a href="${escapeHtml(joinUrl)}" style="color:${accent};text-decoration:none">${escapeHtml(joinUrl)}</a>`
     : online
       ? "A meeting link will be sent separately to your email."
       : escapeHtml(input.location?.trim() || "");
@@ -55,84 +62,53 @@ export function appointmentConfirmedEmail(input: AppointmentEmailInput): {
     fallback ||
     `mailto:${EMAIL}?subject=${encodeURIComponent(`Cancel: ${input.title}`)}`;
   const subject = `Your appointment is confirmed`;
+  const primaryUrl = joinUrl || calendarUrl;
+  const buttonStyle = `display:inline-block;${fill}color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;border-radius:8px;padding:12px 14px;`;
+  const actionButtons = [
+    joinUrl ? { href: joinUrl, label: "Join meeting" } : null,
+    { href: calendarUrl, label: "Add to Calendar" },
+    { href: rescheduleUrl, label: "Reschedule" },
+    { href: cancelUrl, label: "Cancel" },
+  ].filter((button): button is { href: string; label: string } => Boolean(button));
+  const actionRow = actionButtons
+    .map(
+      (button, index) =>
+        `<td style="padding:0 ${index < actionButtons.length - 1 ? "8px" : "0"} 0 0;"><a href="${escapeHtml(button.href)}" style="${buttonStyle}">${button.label}</a></td>`,
+    )
+    .join("");
 
   const html = `<!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#eef3fb;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3fb;padding:24px 12px;">
-  <tr><td align="center">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:${NAVY};">
-      <tr><td style="padding:28px 32px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td>
-              <div style="font-size:26px;font-weight:800;letter-spacing:-0.4px;color:${NAVY};">Finconne<span style="color:${BLUE};">X</span></div>
-              <div style="font-size:10px;letter-spacing:1.6px;color:#7B8BA3;font-weight:700;">FINANCIAL SERVICES</div>
-            </td>
-            <td align="right" style="border-left:3px solid ${BLUE};padding-left:12px;font-size:13px;color:#7B8BA3;">Your trusted<br/>finance partner</td>
-          </tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:12px 24px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f8ff;border-radius:18px;">
-          <tr>
-            <td style="padding:28px 24px;" valign="middle">
-              <div style="width:42px;height:42px;border-radius:21px;background:${BLUE};color:#ffffff;text-align:center;line-height:42px;font-size:22px;font-weight:700;">✓</div>
-              <div style="font-size:28px;line-height:1.2;font-weight:800;margin-top:14px;color:${NAVY};">Your Appointment<br/>is Confirmed!</div>
-              <p style="margin:14px 0 0;font-size:14px;line-height:1.5;color:${MUTED};">Hi ${escapeHtml(guest)},<br/>Your appointment has been successfully booked.<br/>We look forward to speaking with you.</p>
-            </td>
-            <td width="180" align="right" valign="middle" style="padding:16px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #d7e4f7;">
-                <tr><td style="background:${BLUE};color:#ffffff;font-size:12px;font-weight:700;text-align:center;padding:8px 18px;border-radius:16px 16px 0 0;">${escapeHtml(monthShort(input.dateIso))}</td></tr>
-                <tr><td style="font-size:28px;font-weight:800;text-align:center;padding:10px 18px 4px;color:${NAVY};">${escapeHtml(dayNumber(input.dateIso))}</td></tr>
-                <tr><td style="text-align:center;padding:0 18px 12px;color:${BLUE};font-size:18px;">✓</td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:18px 24px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e6eef8;border-radius:16px;">
-          ${detailRow("Date", dateLabel)}
-          ${detailRow("Time", timeLabel)}
-          ${detailRow("With", `<strong>${escapeHtml(host)}</strong><br/><span style="color:${MUTED};font-weight:400;">${escapeHtml(ORG)}</span>`)}
-          ${detailRow("Meeting Type", `<strong>${escapeHtml(meetingType)}</strong>${meetingDetail ? `<br/><span style="color:${MUTED};font-weight:400;">${meetingDetail}</span>` : ""}`, true)}
-        </table>
-      </td></tr>
-      <tr><td style="padding:8px 24px;">
-        <a href="${escapeHtml(calendarUrl)}" style="display:block;background:${BLUE};color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;border-radius:10px;padding:14px 16px;">Add to Calendar</a>
-      </td></tr>
-      <tr><td style="padding:8px 24px 4px;">
-        <a href="${escapeHtml(rescheduleUrl)}" style="display:block;background:#ffffff;color:${BLUE};text-align:center;text-decoration:none;font-weight:700;font-size:15px;border:1px solid #d5e2f5;border-radius:10px;padding:13px 16px;">Reschedule</a>
-      </td></tr>
-      <tr><td style="padding:4px 24px 4px;">
-        <a href="${escapeHtml(cancelUrl)}" style="display:block;background:#ffffff;color:${BLUE};text-align:center;text-decoration:none;font-weight:700;font-size:15px;border:1px solid #d5e2f5;border-radius:10px;padding:13px 16px;">Cancel</a>
-      </td></tr>
-      <tr><td style="padding:14px 24px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7ff;border-radius:12px;">
-          <tr><td style="padding:14px 16px;font-size:13px;line-height:1.5;color:${NAVY};">
-            <strong>Need to make changes?</strong><br/>
-            <span style="color:${MUTED};">You can reschedule or cancel your appointment anytime using the buttons above.</span>
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:16px 32px 8px;font-size:14px;line-height:1.6;color:${MUTED};">
-        If you have any questions before the appointment, feel free to reach out to us.<br/><br/>
-        Regards,<br/>
-        <strong style="color:${NAVY};">${ORG}</strong>
-      </td></tr>
-      <tr><td style="padding:8px 24px 28px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e6eef8;">
-          <tr>
-            ${contactCell("Call Us", PHONE, `tel:${PHONE.replace(/\s/g, "")}`)}
-            ${contactCell("Email Us", EMAIL, `mailto:${EMAIL}`)}
-            ${contactCell("Visit Us", "www.finconnex.com.au", SITE)}
-          </tr>
-        </table>
-      </td></tr>
+<body style="margin:0;padding:24px 12px;background:#f3f4f6;">
+<div style="font-family:Arial,Helvetica,sans-serif;color:${INK};max-width:560px;margin:0 auto;background:#ffffff;">
+  <div style="${fill}color:#ffffff;padding:22px 24px;">
+    <div style="font-size:11px;letter-spacing:1.4px;font-weight:700;opacity:0.85;">FINCONNEX</div>
+    <div style="margin-top:6px;font-size:26px;font-weight:800;line-height:1.2;">${escapeHtml(host)}</div>
+  </div>
+  <div style="padding:22px 24px 8px;">
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.5;">Hi ${escapeHtml(guest)},</p>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55;"><strong>${escapeHtml(host)}</strong> has confirmed your <strong>${escapeHtml(input.title.trim() || "appointment")}</strong> appointment.</p>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.55;color:${MUTED};">Your appointment has been successfully booked. We look forward to speaking with you.</p>
+    <div style="margin:0 0 10px;font-size:12px;letter-spacing:1.2px;font-weight:700;color:${accent};">APPOINTMENT</div>
+    ${detailCard("Date", escapeHtml(dateLabel))}
+    ${detailCard("Time", escapeHtml(timeLabel))}
+    ${detailCard("With", escapeHtml(host), escapeHtml(ORG))}
+    ${detailCard("Meeting type", escapeHtml(meetingType), meetingDetail)}
+    <p style="margin:16px 0;font-size:14px;line-height:1.55;color:${MUTED};">Use the buttons for this appointment. These links are unique to you and should not be shared with anyone.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+      <tr>
+        ${actionRow}
+      </tr>
     </table>
-  </td></tr>
-</table>
+    <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${MUTED};">If a button does not work, copy and paste this URL into your browser:</p>
+    <div style="border:1px solid ${LINE};border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.5;color:${accent};word-break:break-all;">${escapeHtml(primaryUrl)}</div>
+    <div style="margin-top:16px;border:1px solid ${LINE};border-radius:10px;padding:14px 16px;">
+      <div style="font-size:11px;letter-spacing:1.2px;font-weight:700;color:${accent};">QUESTIONS</div>
+      <p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:${MUTED};">If you have any questions, contact your assigned consultant directly.</p>
+    </div>
+    <p style="margin:22px 0 8px;font-size:15px;line-height:1.5;">Regards,<br/><strong>FinconneX</strong></p>
+  </div>
+</div>
 </body>
 </html>`;
 
@@ -152,8 +128,7 @@ export function appointmentConfirmedEmail(input: AppointmentEmailInput): {
     `Cancel: ${cancelUrl}`,
     "",
     `Regards,`,
-    ORG,
-    `${PHONE} · ${EMAIL} · www.finconnex.com.au`,
+    "FinconneX",
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -177,17 +152,12 @@ function formatLongDate(dateIso: string) {
   });
 }
 
-function monthShort(dateIso: string) {
-  const [year, month, day] = dateIso.split("-").map(Number);
-  if (!year || !month || !day) return "";
-  return new Date(year, month - 1, day)
-    .toLocaleDateString("en-AU", { month: "short" })
-    .toUpperCase();
-}
-
-function dayNumber(dateIso: string) {
-  const day = Number(dateIso.split("-")[2]);
-  return Number.isFinite(day) ? String(day) : "";
+function detailCard(label: string, value: string, extra = "") {
+  return `<div style="border:1px solid ${LINE};border-radius:10px;padding:14px 16px;margin:0 0 10px;">
+  <div style="font-size:15px;font-weight:700;color:${INK};">${escapeHtml(label)}</div>
+  <div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">${value}</div>
+  ${extra ? `<div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">${extra}</div>` : ""}
+</div>`;
 }
 
 function formatClock(totalMinutes: number) {
@@ -267,22 +237,6 @@ function googleCalendarUrl(
     ctz: ianaTimezoneFromLabel(input.timeZoneLabel),
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
-function detailRow(label: string, value: string, last = false) {
-  return `<tr>
-    <td style="padding:14px 18px;${last ? "" : "border-bottom:1px solid #eef2f7;"}font-size:13px;">
-      <div style="color:${MUTED};margin-bottom:2px;">${escapeHtml(label)}</div>
-      <div style="font-size:15px;font-weight:700;color:${NAVY};">${value}</div>
-    </td>
-  </tr>`;
-}
-
-function contactCell(label: string, value: string, href: string) {
-  return `<td width="33%" style="padding:14px 8px 0;font-size:12px;line-height:1.4;">
-    <div style="color:${BLUE};font-weight:700;">${escapeHtml(label)}</div>
-    <a href="${escapeHtml(href)}" style="color:${NAVY};text-decoration:none;">${escapeHtml(value)}</a>
-  </td>`;
 }
 
 function escapeHtml(value: string) {
