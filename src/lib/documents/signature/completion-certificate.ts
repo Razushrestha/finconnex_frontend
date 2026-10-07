@@ -42,15 +42,39 @@ const ORG_NAME = "Finconnex Financial Services";
 const ORG_ADDRESS =
   "Level 3/301 Castlereagh St., SYDNEY, NSW, Australia 2000";
 
+function parseStampDate(value: string): Date | null {
+  const text = value.trim();
+  if (/^\d{4}-/.test(text)) {
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const au = text.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?/i,
+  );
+  if (au) {
+    const day = Number(au[1]);
+    const month = Number(au[2]);
+    const year = Number(au[3]);
+    let hour = au[4] ? Number(au[4]) : 0;
+    const minute = au[5] ? Number(au[5]) : 0;
+    const second = au[6] ? Number(au[6]) : 0;
+    const meridiem = au[7]?.toLowerCase();
+    if (meridiem === "pm" && hour < 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+    const date = new Date(year, month - 1, day, hour, minute, second);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatCertificateStamp(value?: string | Date | null): string {
   if (!value) return "—";
   const date =
     value instanceof Date
       ? value
-      : /^\d{4}-/.test(String(value))
-        ? new Date(value)
-        : new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
+      : parseStampDate(String(value));
+  if (!date || Number.isNaN(date.getTime())) return String(value);
   const formatted = date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -77,17 +101,31 @@ function timezoneLabel() {
 
 function eventTime(
   audit: SignatureRequest["audit"],
-  signer: SignatureSigner,
+  signer: SignatureSigner | undefined,
   needle: string,
 ) {
-  const hit = [...audit]
-    .reverse()
-    .find(
-      (event) =>
-        event.actor === signer.name &&
-        event.action.toLowerCase().includes(needle),
-    );
+  const name = signer?.name.trim().toLowerCase() ?? "";
+  const rows = needle === "sent" ? audit : [...audit].reverse();
+  const hit = rows.find((event) => {
+    const action = event.action.toLowerCase();
+    const matches =
+      needle === "sent"
+        ? action.includes("sent") && !action.includes("signed")
+        : action.includes(needle);
+    if (!matches) return false;
+    if (needle === "sent") return true;
+    const actor = event.actor.trim().toLowerCase();
+    return !name || actor === name || action.includes(name);
+  });
   return hit?.at;
+}
+
+function firstStamp(...values: (string | undefined)[]) {
+  for (const value of values) {
+    if (!value?.trim()) continue;
+    return formatCertificateStamp(value);
+  }
+  return undefined;
 }
 
 function stamp(value?: string) {
@@ -111,9 +149,16 @@ export function completionCertificateFromRequest(
     sentByEmail: originator?.email,
     organizationName: ORG_NAME,
     organizationAddress: ORG_ADDRESS,
-    sentOn: stamp(req.sentDate) || stamp(req.audit.find((a) =>
-      a.action.toLowerCase().includes("sent"),
-    )?.at),
+    sentOn: firstStamp(
+      req.sentAt,
+      req.sentDate,
+      eventTime(req.audit, undefined, "sent"),
+      req.status === "Signed"
+        ? req.signedDate ||
+            actionable.find((s) => s.signedAt)?.signedAt ||
+            eventTime(req.audit, undefined, "signed")
+        : undefined,
+    ),
     completedOn:
       stamp(req.signedDate) ||
       stamp(lastAudit) ||
@@ -129,21 +174,24 @@ export function completionCertificateFromRequest(
     witnessCount: 0,
     reviewerCount: 0,
     signers: actionable.map((s) => {
-      const emailed = eventTime(req.audit, s, "sent") || req.sentDate;
-      const viewed = eventTime(req.audit, s, "viewed");
-      const agreed =
-        eventTime(req.audit, s, "consent") ||
-        eventTime(req.audit, s, "agree") ||
-        viewed;
       const signed = s.signedAt || eventTime(req.audit, s, "signed");
+      const sent = req.sentAt || req.sentDate || eventTime(req.audit, s, "sent");
+      const emailed = s.emailedAt || sent;
+      const viewed = s.viewedAt || eventTime(req.audit, s, "viewed");
+      const agreed =
+        s.termsAgreedAt ||
+        eventTime(req.audit, s, "consent") ||
+        eventTime(req.audit, s, "agree");
+      const completed = s.status === "Signed" && Boolean(signed?.trim());
+      const signedFallback = completed ? signed : undefined;
       return {
         name: s.name,
         email: s.email,
         role: s.role === "Approver" ? "Approver" : "Signer",
         status: s.status,
-        emailedAt: stamp(emailed),
-        viewedAt: stamp(viewed),
-        termsAgreedAt: stamp(agreed),
+        emailedAt: firstStamp(emailed, signedFallback),
+        viewedAt: firstStamp(viewed, signedFallback),
+        termsAgreedAt: firstStamp(agreed, signedFallback),
         signedAt: stamp(signed),
         ip: s.status === "Signed" || s.status === "Viewed" ? req.ipAddress || DEMO_SIGNER_IP : undefined,
         device: "Web",

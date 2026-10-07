@@ -117,10 +117,15 @@ export async function POST(
       }
     }
 
+    const agreedAt =
+      typeof bodyRec.termsAgreedAt === "string" && bodyRec.termsAgreedAt.trim()
+        ? bodyRec.termsAgreedAt.trim()
+        : local.termsAgreedAt || new Date().toISOString();
     await writePublicSignSession(safeToken, {
       ...local,
       fields: currentFields,
       status: "Signed",
+      termsAgreedAt: agreedAt,
       signedAt: new Date().toISOString(),
       consumed: true,
       documentUrl: publicSignDocumentPath(safeToken),

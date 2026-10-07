@@ -33,6 +33,7 @@ import { SignatureModal } from "./SignatureModal";
 import { SigningFieldInputModal } from "./SigningFieldInputModal";
 import {
   defaultStampValue,
+  fillKnownIdentityFields,
   isSameFieldOnOtherDocument,
   isSignatureCaptureKind,
   signingFieldAction,
@@ -97,6 +98,7 @@ export function PublicSignClient({ token }: { token: string }) {
   const [publicMode, setPublicMode] = useState(false);
   const [linkExpired, setLinkExpired] = useState(false);
   const justFinishedRef = useRef(false);
+  const termsAgreedAtRef = useRef<string>("");
 
   // Which of the request's (possibly several) attached documents is
   // currently shown. Defaults to the first document once it's known.
@@ -202,13 +204,43 @@ export function PublicSignClient({ token }: { token: string }) {
             documentName: publicName,
             documentUrl: publicUrl,
             recipientName: String(publicRes?.recipientName ?? ""),
+            recipientEmail: String(publicRes?.signerEmail ?? ""),
             role: String(publicRes?.role ?? ""),
             status: String(publicRes?.status ?? "Sent"),
+            sentAt: String(publicRes?.sentAt ?? ""),
+            viewedAt: String(publicRes?.viewedAt ?? ""),
+            termsAgreedAt: String(publicRes?.termsAgreedAt ?? ""),
+            signedAt: String(publicRes?.signedAt ?? ""),
             fields: publicFields as never,
           });
           setPublicMode(true);
-          setReq(mapped.request);
-          setSigner(mapped.signer);
+          const openedAt =
+            mapped.signer.viewedAt ||
+            (mapped.signer.status === "Signed" || mapped.signer.status === "Declined"
+              ? ""
+              : new Date().toISOString());
+          if (mapped.signer.termsAgreedAt) {
+            termsAgreedAtRef.current = mapped.signer.termsAgreedAt;
+          }
+          const openedSigner = openedAt
+            ? { ...mapped.signer, viewedAt: openedAt }
+            : mapped.signer;
+          setReq({
+            ...mapped.request,
+            signers: mapped.request.signers.map((row) =>
+              row.id === openedSigner.id
+                ? {
+                    ...openedSigner,
+                    emailedAt: openedSigner.emailedAt || mapped.request.sentAt,
+                  }
+                : row,
+            ),
+            fields: fillKnownIdentityFields(mapped.request.fields, openedSigner),
+          });
+          setSigner({
+            ...openedSigner,
+            emailedAt: openedSigner.emailedAt || mapped.request.sentAt,
+          });
           setHydrated(true);
           if (mapped.signer.status !== "Signed" && mapped.signer.status !== "Declined") {
             void fetch(`/api/sign/${encodeURIComponent(token)}/view`, {
@@ -242,7 +274,10 @@ export function PublicSignClient({ token }: { token: string }) {
       }
 
       setPublicMode(false);
-      setReq(liveReq);
+      setReq({
+        ...liveReq,
+        fields: fillKnownIdentityFields(liveReq.fields, liveSigner),
+      });
       setSigner(liveSigner);
       setHydrated(true);
       if (liveSigner.status !== "Signed" && liveSigner.status !== "Declined") {
@@ -378,6 +413,7 @@ export function PublicSignClient({ token }: { token: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           signatureData,
+          termsAgreedAt: termsAgreedAtRef.current || undefined,
           fields: next.fields
             .filter((field) => field.signerId === signer.id && field.value?.trim())
             .map((field) => ({ fieldId: field.id, value: field.value })),
@@ -749,6 +785,32 @@ export function PublicSignClient({ token }: { token: string }) {
                 setConsentError(true);
                 return;
               }
+              const agreedAt = termsAgreedAtRef.current || new Date().toISOString();
+              termsAgreedAtRef.current = agreedAt;
+              if (signer) {
+                setReq((current) =>
+                  current
+                    ? {
+                        ...current,
+                        signers: current.signers.map((row) =>
+                          row.id === signer.id
+                            ? { ...row, termsAgreedAt: row.termsAgreedAt || agreedAt }
+                            : row,
+                        ),
+                      }
+                    : current,
+                );
+                setSigner((current) =>
+                  current
+                    ? { ...current, termsAgreedAt: current.termsAgreedAt || agreedAt }
+                    : current,
+                );
+              }
+              void fetch(`/api/sign/${encodeURIComponent(token)}/view`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "terms", termsAgreedAt: agreedAt }),
+              });
               setSigningEnabled(true);
               setConsentError(false);
               startSigningGuide();

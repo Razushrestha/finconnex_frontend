@@ -3,6 +3,7 @@ import {
   applySignerDecline,
   applySignerViewed,
   getRequestDocuments,
+  getSignatureRequestById,
   upsertSignatureRequest,
   type SignatureRequest,
   type SignatureSigner,
@@ -27,7 +28,11 @@ export function parsePublicSignerStatus(raw: unknown): SignerStatus | null {
 type ProgressItem = {
   token?: string;
   status?: string;
+  sentAt?: string | null;
   signedAt?: string | null;
+  viewedAt?: string | null;
+  termsAgreedAt?: string | null;
+  requestId?: string | null;
   signerId?: string | null;
   signerEmail?: string | null;
   recipientName?: string | null;
@@ -113,7 +118,12 @@ async function loadProgress(
     items.push({
       token,
       status: typeof data.status === "string" ? data.status : undefined,
+      sentAt: typeof data.sentAt === "string" ? data.sentAt : null,
       signedAt: typeof data.signedAt === "string" ? data.signedAt : null,
+      viewedAt: typeof data.viewedAt === "string" ? data.viewedAt : null,
+      termsAgreedAt:
+        typeof data.termsAgreedAt === "string" ? data.termsAgreedAt : null,
+      requestId: typeof data.requestId === "string" ? data.requestId : null,
       signerId: typeof data.signerId === "string" ? data.signerId : null,
       signerEmail: typeof data.signerEmail === "string" ? data.signerEmail : null,
       recipientName:
@@ -126,6 +136,46 @@ async function loadProgress(
   return items;
 }
 
+function textOrEmpty(value?: string | null) {
+  const text = value?.trim();
+  return text || undefined;
+}
+
+/** Copy send, open, and terms times onto the request even after it is signed. */
+export function applyPublicSignerTimeline(
+  req: SignatureRequest,
+  signerId: string,
+  item: ProgressItem,
+): SignatureRequest {
+  const parentId = textOrEmpty(item.requestId);
+  const parent =
+    parentId && parentId !== req.id
+      ? getSignatureRequestById(parentId)
+      : undefined;
+  const sentAt =
+    textOrEmpty(item.sentAt) ||
+    textOrEmpty(req.sentAt) ||
+    textOrEmpty(parent?.sentAt) ||
+    textOrEmpty(parent?.sentDate) ||
+    textOrEmpty(req.sentDate);
+  const signers = req.signers.map((signer) => {
+    if (signer.id !== signerId) return signer;
+    return {
+      ...signer,
+      emailedAt: signer.emailedAt || sentAt,
+      viewedAt: signer.viewedAt || textOrEmpty(item.viewedAt),
+      termsAgreedAt: signer.termsAgreedAt || textOrEmpty(item.termsAgreedAt),
+      signedAt: signer.signedAt || textOrEmpty(item.signedAt),
+    };
+  });
+  return {
+    ...req,
+    sentAt: req.sentAt || textOrEmpty(item.sentAt) || textOrEmpty(parent?.sentAt),
+    sentDate: req.sentDate || textOrEmpty(item.sentAt) || parent?.sentDate,
+    signers,
+  };
+}
+
 export async function syncSignatureRequestFromPublicLinks(
   req: SignatureRequest,
 ): Promise<SignatureRequest> {
@@ -134,6 +184,7 @@ export async function syncSignatureRequestFromPublicLinks(
   for (const item of items) {
     const signer = matchSigner(next.signers, item);
     if (!signer || signer.role === "CC") continue;
+    next = applyPublicSignerTimeline(next, signer.id, item);
     const status = parsePublicSignerStatus(item.status);
     if (!status) continue;
     const token = (item.token || signer.token || "").trim();

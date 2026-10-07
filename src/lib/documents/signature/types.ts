@@ -85,6 +85,12 @@ export interface SignatureSigner {
   status: SignerStatus;
   /** Unique public link token for this signer */
   token: string;
+  /** When the signing email was sent to this person. */
+  emailedAt?: string;
+  /** When this person first opened the document. */
+  viewedAt?: string;
+  /** When this person accepted the electronic-signature terms. */
+  termsAgreedAt?: string;
   signedAt?: string;
   /** typed:… or data-URL */
   signatureData?: string;
@@ -164,6 +170,8 @@ export interface SignatureRequest {
   relatedQuotationId?: string;
   status: SignatureStatus;
   sentDate?: string;
+  /** ISO time the request was sent. `sentDate` stays the short display value. */
+  sentAt?: string;
   signedDate?: string;
   expiryDate: string;
   ipAddress?: string;
@@ -320,6 +328,9 @@ export function makeSigner(partial: {
   role?: SignerRole;
   roleLabel?: string;
   entityType?: RecipientSource;
+  emailedAt?: string;
+  viewedAt?: string;
+  termsAgreedAt?: string;
   signedAt?: string;
   signatureData?: string;
 }): SignatureSigner {
@@ -337,6 +348,9 @@ export function makeSigner(partial: {
     colorIndex:
       partial.colorIndex ?? (partial.order - 1) % SIGNER_COLORS.length,
     entityType: partial.entityType ?? "email",
+    emailedAt: partial.emailedAt,
+    viewedAt: partial.viewedAt,
+    termsAgreedAt: partial.termsAgreedAt,
     signedAt: partial.signedAt,
     signatureData: partial.signatureData,
   };
@@ -728,6 +742,7 @@ export function ensureDefaultFields(req: SignatureRequest): SignatureRequest {
 
 export function markRequestSent(req: SignatureRequest, actor: string) {
   const n = ensureDefaultFields(req);
+  const sentAtIso = new Date().toISOString();
   const today = new Date().toLocaleDateString("en-AU");
   const actionable = n.signers
     .filter((s) => s.role !== "CC")
@@ -743,11 +758,12 @@ export function markRequestSent(req: SignatureRequest, actor: string) {
   const signers = n.signers.map((s) => {
     if (s.role === "CC") return s;
     if (s.status === "Signed" || s.status === "Declined") return s;
+    const mailed = { ...s, emailedAt: s.emailedAt || sentAtIso };
     if (n.signingOrder === "parallel") {
-      return { ...s, status: "Sent" as SignerStatus };
+      return { ...mailed, status: "Sent" as SignerStatus };
     }
     if (nextActive && s.id === nextActive.id) {
-      return { ...s, status: "Sent" as SignerStatus };
+      return { ...mailed, status: "Sent" as SignerStatus };
     }
     return { ...s, status: "Pending" as SignerStatus };
   });
@@ -763,6 +779,7 @@ export function markRequestSent(req: SignatureRequest, actor: string) {
     signers,
     status: overall === "Signed" ? "Signed" : "Sent",
     sentDate: n.sentDate ?? today,
+    sentAt: n.sentAt ?? sentAtIso,
     signer: signers[0]?.name ?? n.signer,
     signerEmail: signers[0]?.email ?? n.signerEmail,
     manageToken: signers[0]?.token ?? n.manageToken,
@@ -815,11 +832,12 @@ export function applySignerSignature(
     const isSig = kind === "signature" || kind === "initials" || kind === "sign";
 
     if (isSig) return { ...f, value: signatureData };
+    const signer = signers.find((s) => s.id === signerId);
     if (kind === "name" && !f.value) {
-      return {
-        ...f,
-        value: signers.find((s) => s.id === signerId)?.name,
-      };
+      return { ...f, value: signer?.name };
+    }
+    if (kind === "email" && !f.value) {
+      return { ...f, value: signer?.email };
     }
     if (isDate && !f.value) return { ...f, value: today };
     return f;
@@ -871,7 +889,13 @@ export function applySignerViewed(
   }
 
   const signers = n.signers.map((s) =>
-    s.id === signerId ? { ...s, status: "Viewed" as SignerStatus } : s,
+    s.id === signerId
+      ? {
+          ...s,
+          status: "Viewed" as SignerStatus,
+          viewedAt: s.viewedAt || new Date().toISOString(),
+        }
+      : s,
   );
   const draft: SignatureRequest = {
     ...n,

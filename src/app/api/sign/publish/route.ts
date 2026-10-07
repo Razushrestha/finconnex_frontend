@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       recipientName: signer.name || "Signer",
       role: signer.role || "Signer",
       status: "Sent",
+      sentAt: new Date().toISOString(),
       requestId: typeof meta.requestId === "string" ? meta.requestId : "",
       signerId: signer.id || "",
       signerEmail: signer.email || "",

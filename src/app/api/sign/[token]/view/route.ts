@@ -6,7 +6,7 @@ import {
 } from "@/lib/documents/signature/public-sign-store";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ token: string }> },
 ) {
   const { token } = await context.params;
@@ -15,6 +15,10 @@ export async function POST(
     return NextResponse.json({ error: "Missing signing token" }, { status: 400 });
   }
 
+  const body = (await request.json().catch(() => ({}))) as {
+    event?: string;
+    termsAgreedAt?: string;
+  };
   const local = await readPublicSignSession(safeToken);
   if (local?.consumed) {
     return NextResponse.json(
@@ -24,10 +28,17 @@ export async function POST(
   }
   const current = String(local?.status ?? "").toLowerCase();
   if (local && !current.includes("sign") && !current.includes("declin")) {
+    const agreeing = body.event === "terms";
+    const agreedAt =
+      (typeof body.termsAgreedAt === "string" && body.termsAgreedAt.trim()) ||
+      new Date().toISOString();
     await writePublicSignSession(safeToken, {
       ...local,
-      status: "Viewed",
-      viewedAt: new Date().toISOString(),
+      status: agreeing ? local.status || "Viewed" : "Viewed",
+      viewedAt: local.viewedAt || new Date().toISOString(),
+      ...(agreeing
+        ? { termsAgreedAt: local.termsAgreedAt || agreedAt }
+        : {}),
     });
   }
 

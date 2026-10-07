@@ -15,7 +15,9 @@ export type PublicSignSession = {
   recipientName?: string;
   role?: string;
   status?: string;
+  sentAt?: string;
   viewedAt?: string;
+  termsAgreedAt?: string;
   signedAt?: string;
   consumed?: boolean;
   requestId?: string;
