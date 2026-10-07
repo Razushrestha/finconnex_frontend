@@ -108,6 +108,7 @@ export function WorkQueueView() {
     React.useState<WorkqueueCategoryDef[]>(CATEGORIES_DEFAULT);
   const [manageOpen, setManageOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [clientReady, setClientReady] = React.useState(false);
 
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
   const [editRow, setEditRow] = React.useState<QueueRow | null>(null);
@@ -125,6 +126,7 @@ export function WorkQueueView() {
   });
 
   React.useEffect(() => {
+    setClientReady(true);
     setCategories(readStoredCategories());
     mergeWorkQueueTabs(getUserTabs());
     void (async () => {
@@ -190,13 +192,15 @@ export function WorkQueueView() {
   }, []);
 
   const activityItems = React.useMemo(() => {
-    const local = getActivityNav(scope, timeFilter, specificDate ?? undefined);
-    if (crm.source !== "api") return local;
+    const local = getActivityNav(scope, timeFilter, specificDate ?? undefined).map(
+      (item) => (clientReady ? item : { ...item, count: 0 }),
+    );
+    if (!clientReady || crm.source !== "api") return local;
     return local.map((item) => ({
       ...item,
       count: crm.counts[item.id] ?? 0,
     }));
-  }, [scope, timeFilter, specificDate, tick, crm.source, crm.counts]);
+  }, [scope, timeFilter, specificDate, tick, crm.source, crm.counts, clientReady]);
 
   const sidebarCategories = React.useMemo(() => {
     const cats = getWorkqueueSidebar(
@@ -205,6 +209,12 @@ export function WorkQueueView() {
       timeFilter,
       specificDate ?? undefined,
     );
+    if (!clientReady) {
+      return cats.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => ({ ...item, count: 0 })),
+      }));
+    }
     if (crm.source !== "api") return cats;
     return cats.map((cat) => ({
       ...cat,
@@ -213,14 +223,16 @@ export function WorkQueueView() {
         count: crm.counts[item.id] ?? 0,
       })),
     }));
-  }, [scope, categories, timeFilter, specificDate, tick, crm.source, crm.counts]);
+  }, [scope, categories, timeFilter, specificDate, tick, crm.source, crm.counts, clientReady]);
 
   const rawRows = React.useMemo(
     () =>
-      crm.source === "api"
-        ? crm.rows
-        : listQueueRows(activeNav, scope, timeFilter, specificDate ?? undefined),
-    [activeNav, scope, timeFilter, specificDate, tick, crm.source, crm.rows],
+      !clientReady
+        ? []
+        : crm.source === "api"
+          ? crm.rows
+          : listQueueRows(activeNav, scope, timeFilter, specificDate ?? undefined),
+    [activeNav, scope, timeFilter, specificDate, tick, crm.source, crm.rows, clientReady],
   );
 
   const filteredRows = React.useMemo(
