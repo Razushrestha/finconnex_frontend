@@ -36,6 +36,7 @@ import {
 } from "@/lib/documents/signature/types";
 import { useRouter } from "next/navigation";
 import { fetchSignatureSelf } from "@/lib/documents/signature/current-user";
+import { knownIdentityValue } from "@/lib/documents/signature/field-kinds";
 import { SignatureInkImage } from "@/components/documents/signature/SignatureInkImage";
 import { toast } from "@/lib/notify/toast";
 import { ConfirmSendDetailsModal } from "./ConfirmSendDetailsModal";
@@ -335,6 +336,48 @@ export function PlaceFieldsView({
     });
     return () => cancelAnimationFrame(frame);
   }, [activeDocId]);
+
+  const changeFieldValueRef = useRef(handleChangeFieldValue);
+  changeFieldValueRef.current = handleChangeFieldValue;
+  const blankIdentityKey = placedFields
+    .filter((field) => {
+      if (field.value?.trim()) return false;
+      return Boolean(
+        knownIdentityValue(field.type, { name: "x", email: "x@y.z" }, {
+          includeDate: isSenderPrefillField(field.recipientId),
+        }),
+      );
+    })
+    .map((field) => {
+      const person = recipients.find((recipient) => recipient.id === field.recipientId);
+      return `${field.id}:${person?.name ?? ""}:${person?.email ?? ""}`;
+    })
+    .join("|");
+
+  useEffect(() => {
+    if (!blankIdentityKey) return;
+    let alive = true;
+    void fetchSignatureSelf().then((self) => {
+      if (!alive) return;
+      for (const field of placedFields) {
+        if (field.value?.trim()) continue;
+        const prefill = isSenderPrefillField(field.recipientId);
+        const person = prefill
+          ? self
+          : recipients.find((recipient) => recipient.id === field.recipientId);
+        if (!person) continue;
+        const value = knownIdentityValue(field.type, person, {
+          includeDate: prefill,
+        });
+        if (value) changeFieldValueRef.current?.(field.id, value);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // The key already records which blank fields and recipient names changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blankIdentityKey]);
 
   function handleCanvasWheel(e: React.WheelEvent<HTMLDivElement>) {
     if (htmlDragRef.current || documents.length < 2) return;
@@ -1123,7 +1166,7 @@ export function PlaceFieldsView({
                                         />
                                       ) : (
                                         <span className="truncate">
-                                          {displayLabel}
+                                          {field.value?.trim() || displayLabel}
                                         </span>
                                       )}
                                       <button

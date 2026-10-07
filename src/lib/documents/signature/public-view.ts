@@ -9,11 +9,16 @@ export type PublicSignatureView = {
   documentName?: string;
   documentUrl?: string | null;
   recipientName?: string;
+  recipientEmail?: string;
   role?: string;
   status?: string;
   canAct?: boolean;
   expiresAt?: string | null;
   message?: string | null;
+  sentAt?: string | null;
+  viewedAt?: string | null;
+  termsAgreedAt?: string | null;
+  signedAt?: string | null;
   fields?: Array<{
     id?: string;
     recipientId?: string;
@@ -64,7 +69,7 @@ export function mapPublicSignatureView(
   const signer = makeSigner({
     id: recipientId,
     name: pickStr(view.recipientName, "Signer"),
-    email: "",
+    email: pickStr(view.recipientEmail),
     order: 1,
     token,
     role: pickStr(view.role).toLowerCase().includes("approv")
@@ -75,6 +80,10 @@ export function mapPublicSignatureView(
       : pickStr(view.status).toLowerCase().includes("sign")
         ? "Signed"
         : "Sent",
+    emailedAt: pickStr(view.sentAt) || undefined,
+    viewedAt: pickStr(view.viewedAt) || undefined,
+    termsAgreedAt: pickStr(view.termsAgreedAt) || undefined,
+    signedAt: pickStr(view.signedAt) || undefined,
   });
 
   const fields: SignatureField[] = (view.fields ?? []).map((field, index) => {
@@ -128,6 +137,9 @@ export function mapPublicSignatureView(
     fields,
     signingOrder: "sequential",
     status: signer.status === "Signed" ? "Signed" : "Sent",
+    sentAt: pickStr(view.sentAt) || undefined,
+    sentDate: pickStr(view.sentAt) || undefined,
+    signedDate: pickStr(view.signedAt) || undefined,
     expiryDate: pickStr(view.expiresAt),
     createdBy: "",
     manageToken: token,

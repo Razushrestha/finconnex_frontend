@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultStampValue,
+  fillKnownIdentityFields,
   isSignatureCaptureKind,
+  knownIdentityValue,
   signingFieldAction,
 } from "@/lib/documents/signature/field-kinds";
 
@@ -48,5 +50,27 @@ describe("signing field actions", () => {
 
   it("builds a stamp from signer initials", () => {
     expect(defaultStampValue("Ada Lovelace")).toBe("STAMP AL");
+  });
+
+  it("fills a blank name, email, and date from the person", () => {
+    expect(knownIdentityValue("name", { name: "Ada Lovelace" })).toBe("Ada Lovelace");
+    expect(knownIdentityValue("email", { email: "ada@example.com" })).toBe(
+      "ada@example.com",
+    );
+    expect(knownIdentityValue("date", { name: "Ada" })).toBe("");
+    expect(
+      knownIdentityValue("date", { name: "Ada" }, { includeDate: true }),
+    ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const filled = fillKnownIdentityFields(
+      [
+        { signerId: "s1", kind: "email", value: "" },
+        { signerId: "s1", kind: "text", value: "" },
+        { signerId: "s2", kind: "name", value: "" },
+      ],
+      { id: "s1", name: "Ada", email: "ada@example.com" },
+    );
+    expect(filled[0].value).toBe("ada@example.com");
+    expect(filled[1].value).toBe("");
+    expect(filled[2].value).toBe("");
   });
 });

@@ -25,8 +25,11 @@ export async function POST(request: Request) {
       items: items.map((item) => ({
         token: item.token,
         status: item.status ?? "Sent",
+        sentAt: item.sentAt ?? null,
         signedAt: item.signedAt ?? null,
         viewedAt: item.viewedAt ?? null,
+        termsAgreedAt: item.termsAgreedAt ?? null,
+        requestId: item.requestId ?? null,
         consumed: Boolean(item.consumed),
         signerId: item.signerId ?? null,
         signerEmail: item.signerEmail ?? null,

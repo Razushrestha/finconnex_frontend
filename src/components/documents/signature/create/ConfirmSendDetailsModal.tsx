@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import type { PlacedField } from "@/components/documents/signature/create/PdfFieldEditor";
-import {
-  PREFILL_RECIPIENT_ID,
-  type SignatureSigner,
-} from "@/lib/documents/signature/types";
+import type { SignatureSigner } from "@/lib/documents/signature/types";
 
 export function ConfirmSendDetailsModal({
   recipients,
@@ -40,17 +37,6 @@ export function ConfirmSendDetailsModal({
     fields: placedFields.filter((field) => field.recipientId === recipient.id)
       .length,
   }));
-
-  const prefillCount = placedFields.filter(
-    (field) => field.recipientId === PREFILL_RECIPIENT_ID,
-  ).length;
-  if (prefillCount > 0) {
-    rows.unshift({
-      id: PREFILL_RECIPIENT_ID,
-      label: "Prefill by you",
-      fields: prefillCount,
-    });
-  }
 
   if (!mounted) return null;
 

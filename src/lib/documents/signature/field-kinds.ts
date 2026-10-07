@@ -92,6 +92,35 @@ export function signingGuidePrompt(kind: string | undefined): string {
   return "Complete this field.";
 }
 
+function todayIsoDate() {
+  const date = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Name, email, and date we already know, so those boxes do not stay blank. */
+export function knownIdentityValue(
+  kind: string | undefined,
+  person: { name?: string; email?: string },
+  opts?: { includeDate?: boolean },
+): string {
+  const k = normalizeFieldKind(kind);
+  if (k === "name") return person.name?.trim() || "";
+  if (k === "email") return person.email?.trim() || "";
+  if (opts?.includeDate && isDateFieldKind(k)) return todayIsoDate();
+  return "";
+}
+
+export function fillKnownIdentityFields<
+  T extends { signerId: string; kind: string; value?: string },
+>(fields: T[], signer: { id: string; name?: string; email?: string }): T[] {
+  return fields.map((field) => {
+    if (field.signerId !== signer.id || field.value?.trim()) return field;
+    const value = knownIdentityValue(field.kind, signer, { includeDate: true });
+    return value ? { ...field, value } : field;
+  });
+}
+
 export function defaultStampValue(signerName: string): string {
   const initials = signerName
     .split(/\s+/)
