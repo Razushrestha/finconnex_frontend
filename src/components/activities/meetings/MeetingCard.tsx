@@ -49,8 +49,8 @@ const TYPE_SOFT: Record<MeetingType, string> = {
 interface MeetingCardProps {
   meeting: Meeting;
   columnId: string;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   isDragging: boolean;
   isSelected?: boolean;
   onSelect?: (
@@ -61,8 +61,8 @@ interface MeetingCardProps {
 export function MeetingCard({
   meeting,
   columnId,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   isDragging,
   isSelected = false,
   onSelect,
@@ -120,19 +120,17 @@ export function MeetingCard({
   return (
     <>
       <div
-        draggable
+        // The board drags cards with pointer events, not the browser's
+        // drag and drop; the footer's buttons must not start a drag.
+        draggable={false}
+        onPointerDown={(e) => {
+          if (footerRef.current?.contains(e.target as Node)) return;
+          onDragPointerDown(e);
+        }}
+        onClickCapture={onDragClickCapture}
+        onDragStart={(e) => e.preventDefault()}
         role="link"
         tabIndex={0}
-        onDragStart={(e) => {
-          wasDragging.current = true;
-          onDragStart(e);
-        }}
-        onDragEnd={() => {
-          onDragEnd();
-          setTimeout(() => {
-            wasDragging.current = false;
-          }, 0);
-        }}
         onClick={(e) => {
           if (
             footerRef.current &&

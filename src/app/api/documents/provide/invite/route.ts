@@ -31,8 +31,8 @@ export const maxDuration = 60;
  * Sends the document-request invite through the CRM's platform mailer, the
  * same sender that delivers verification codes. If the CRM refuses that send,
  * falls back to the workspace booking mailbox, which needs a booking for the
- * client. A temporary booking is created when none exists, and cancelled only
- * if that send fails.
+ * client. A temporary booking is created when none exists and is always
+ * cancelled once the send has finished, whether it succeeded or not.
  */
 export async function POST(request: Request) {
   const session = await getSession();
@@ -126,11 +126,9 @@ export async function POST(request: Request) {
     console.info(
       `[document-invite] sending through the booking mailbox (${createdBookingId ? "temporary booking" : "existing booking"})`,
     );
+    // The CRM hands the message to SendGrid before it answers, so cancelling
+    // the temporary booking afterwards (below) cannot drop it.
     const delivered = await deliverThroughBookingMailbox(message, token);
-    // Leave a temporary booking in place after a successful send. Cancelling
-    // it while the dev server is still running drops mail the mailbox has
-    // not finished sending. It is cancelled below only when the send fails.
-    createdBookingId = "";
     return NextResponse.json({ ok: true, delivered });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not send the email";
