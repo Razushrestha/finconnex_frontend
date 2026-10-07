@@ -386,6 +386,18 @@ function normalizeCrmAvailabilitySchedule(
   };
 }
 
+/** The first assigned host's time zone on an event type response. */
+function hostTimezoneOf(row: Record<string, unknown>): string {
+  const hosts = Array.isArray(row.hosts) ? row.hosts : [];
+  for (const entry of hosts) {
+    const rec = asRecord(entry);
+    const host = asRecord(rec?.host) ?? rec;
+    const zone = pickStr(host?.timezone, host?.timeZone);
+    if (zone) return zone;
+  }
+  return "";
+}
+
 export function normalizeCrmEventType(
   row: Record<string, unknown>,
   index = 0,
@@ -421,7 +433,11 @@ export function normalizeCrmEventType(
     slug,
     durationMinutes:
       pickNum(row.durationMinutes, row.duration_minutes, row.duration) || 30,
-    timezone: pickStr(row.timezone, row.timeZone, row.time_zone) || "Australia/Sydney",
+    // An event type has no zone of its own: its hours are its host's, so
+    // read the host's zone before assuming Sydney.
+    timezone:
+      pickStr(row.timezone, row.timeZone, row.time_zone, hostTimezoneOf(row)) ||
+      "Australia/Sydney",
     description: pickStr(row.description, row.details),
     active,
     isPublic:

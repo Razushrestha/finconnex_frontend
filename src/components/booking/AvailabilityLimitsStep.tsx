@@ -24,6 +24,7 @@ import {
   type Weekday,
 } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
+import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 
 const BRAND = "#5A32A3";
 
@@ -266,6 +267,7 @@ export function AvailabilityLimitsStep({
   consultantUserIds,
   initial,
   timezone,
+  onTimezoneChange,
   onBack,
   onNext,
   onChange,
@@ -276,6 +278,8 @@ export function AvailabilityLimitsStep({
   consultantUserIds?: Record<string, string>;
   initial?: AvailabilityLimitsValues | null;
   timezone?: string;
+  /** Set when the hours' time zone can be chosen here. */
+  onTimezoneChange?: (zone: string) => void;
   onBack: () => void;
   onNext: (values: AvailabilityLimitsValues, hostIds: string[]) => void;
   onChange?: (values: AvailabilityLimitsValues) => void;
@@ -441,6 +445,22 @@ export function AvailabilityLimitsStep({
               </h1>
               <Tip text="Hours guests can book this consultation." />
             </div>
+
+            {onTimezoneChange ? (
+              <section className="mb-4 rounded-xl border border-[#E5E7EB] px-4 py-4">
+                <p className="text-[14px] font-semibold text-slate-900">Time zone</p>
+                <p className="mt-0.5 mb-3 text-[12px] text-slate-500">
+                  Set this first: the hours below are read in this time zone, and it is the
+                  booking page&apos;s default. Guests can switch to their own.
+                </p>
+                <TimeZonePicker
+                  value={timezone || "UTC"}
+                  onChange={onTimezoneChange}
+                  ariaLabel="Consultation time zone"
+                  className="h-10 border-[#E5E7EB] text-[13px]"
+                />
+              </section>
+            ) : null}
 
             <section className="rounded-xl border border-[#E5E7EB] px-4 py-4">
               <div className="flex items-start justify-between gap-3">

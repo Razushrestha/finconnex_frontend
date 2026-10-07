@@ -1593,6 +1593,10 @@ export function ConsultationOverview({
               consultantUserIds={consultantUserIds}
               initial={availabilityFromPage(page)}
               timezone={page.timezone}
+              onTimezoneChange={(zone) =>
+                // Saved with the page; the hours are re-synced in this zone on Save.
+                onSavedRef.current({ ...pageRef.current, timezone: zone })
+              }
               onChange={persistAvailability}
               onBack={() => setSection("consultants")}
               onNext={(values) => persistAvailability(values)}

@@ -64,6 +64,7 @@ import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
 import { BodyPortal } from "@/components/shared/BodyPortal";
+import { currentZoneName } from "@/lib/booking/all-timezones";
 import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
@@ -166,6 +167,9 @@ export function ConsultationsBoard() {
     useState<AvailabilityPanelId>("dates");
   const [availabilityValues, setAvailabilityValues] =
     useState<AvailabilityLimitsValues | null>(null);
+  // The host's own time zone, set before the hours; it is also the booking
+  // page's default zone.
+  const [wizardTimezone, setWizardTimezone] = useState(browserTimezone);
   const [rulesStep, setRulesStep] = useState(false);
   const [rulesValues, setRulesValues] = useState<BookingRulesValues | null>(
     null,
@@ -314,7 +318,7 @@ export function ConsultationsBoard() {
       maxAdvanceDays: mapped.maxAdvanceDays,
       maxAttendees: mapped.maxAttendees,
       schedulingRules: mapped.schedulingRules,
-      timezone: "Australia/Sydney",
+      timezone: wizardTimezone,
       meetingVia:
         detailsValues.meetingPlace === "online"
           ? "video"
@@ -478,7 +482,7 @@ export function ConsultationsBoard() {
       eventType: "Consultation",
       durationMinutes: detailsValues.durationMinutes,
       bufferMinutes: 0,
-      timezone: "Australia/Sydney",
+      timezone: wizardTimezone,
       description: "",
       availability: [],
       questions: [],
@@ -537,7 +541,7 @@ export function ConsultationsBoard() {
       eventType: "Consultation",
       durationMinutes: detailsValues.durationMinutes,
       bufferMinutes: 0,
-      timezone: "Australia/Sydney",
+      timezone: wizardTimezone,
       description: "",
       availability: [],
       questions: [],
@@ -622,7 +626,8 @@ export function ConsultationsBoard() {
         panel={availabilityPanel}
         consultants={assignedConsultants}
         consultantUserIds={assignedUserIds}
-        timezone="Australia/Sydney"
+        timezone={wizardTimezone}
+        onTimezoneChange={setWizardTimezone}
         initial={availabilityValues}
         onChange={setAvailabilityValues}
         onBack={() => {
@@ -1318,3 +1323,12 @@ function PeopleSlot({ people }: { people: string[] }) {
   );
 }
 
+/** This browser's time zone, in its current IANA name; Sydney if unknown. */
+function browserTimezone(): string {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return zone ? currentZoneName(zone) : "Australia/Sydney";
+  } catch {
+    return "Australia/Sydney";
+  }
+}

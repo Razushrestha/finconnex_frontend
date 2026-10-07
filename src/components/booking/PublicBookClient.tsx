@@ -88,10 +88,10 @@ import {
   type PhoneCountry,
 } from "@/lib/phone/countries";
 import {
-  allTimezoneOptions,
   currentZoneName,
   timezoneOptionLabel,
 } from "@/lib/booking/all-timezones";
+import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 import { cn } from "@/lib/utils";
 
 type Step = "date" | "details" | "done";
@@ -658,11 +658,15 @@ function BookFlow({
 
   // Every time zone, by UTC offset; the guest's and the page's are kept even
   // if this browser spells them differently.
-  const tzOptions = allTimezoneOptions([
-    guestTz,
-    page.timezone,
-    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
-  ]);
+  // Zones to list even where this browser spells them differently.
+  const tzExtraZones = useMemo(
+    () =>
+      [
+        page.timezone,
+        typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
+      ].filter(Boolean),
+    [page.timezone],
+  );
 
   const locationLabel = bookingLocationLabel(page);
 
@@ -1060,18 +1064,12 @@ function BookFlow({
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-[16px] font-semibold text-slate-800">Slot Availability</h3>
-                  <select
-                    aria-label="Time zone"
-                    value={currentZoneName(guestTz)}
-                    onChange={(e) => changeGuestTz(e.target.value)}
+                  <TimeZonePicker
+                    value={guestTz}
+                    onChange={changeGuestTz}
+                    extraZones={tzExtraZones}
                     className="mt-3 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)]"
-                  >
-                    {tzOptions.map((tz) => (
-                      <option key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   {slotNotice ? (
                     <p
                       role="alert"
@@ -1239,18 +1237,13 @@ function BookFlow({
                 </select>
               </ModernTile>
               <ModernTile icon={Globe} label="Time zone">
-                <select
-                  aria-label="Time zone"
-                  value={currentZoneName(guestTz)}
-                  onChange={(e) => changeGuestTz(e.target.value)}
-                  className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
-                >
-                  {tzOptions.map((tz) => (
-                    <option key={tz.value} value={tz.value}>
-                      {tz.label}
-                    </option>
-                  ))}
-                </select>
+                <TimeZonePicker
+                  value={guestTz}
+                  onChange={changeGuestTz}
+                  extraZones={tzExtraZones}
+                  className="h-auto border-0 bg-transparent p-0 text-[15px] font-medium text-slate-800 focus:border-0"
+                  hideChevron
+                />
               </ModernTile>
               <ModernTile icon={Clock} label="Time">
                 {slots.length ? (
@@ -1460,18 +1453,12 @@ function BookFlow({
                           year: "numeric",
                         })}
                       </p>
-                      <select
-                        aria-label="Time zone"
-                        value={currentZoneName(guestTz)}
-                        onChange={(e) => changeGuestTz(e.target.value)}
+                      <TimeZonePicker
+                        value={guestTz}
+                        onChange={changeGuestTz}
+                        extraZones={tzExtraZones}
                         className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[260px]"
-                      >
-                        {tzOptions.map((tz) => (
-                          <option key={tz.value} value={tz.value}>
-                            {tz.label}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="mt-5 flex items-center gap-1 sm:gap-2">
                       <button
@@ -1640,18 +1627,13 @@ function BookFlow({
               <label htmlFor="fresh-tz" className="text-[14px] text-slate-600">
                 Choose Timezone
               </label>
-              <select
-                id="fresh-tz"
-                value={currentZoneName(guestTz)}
-                onChange={(e) => changeGuestTz(e.target.value)}
+              <TimeZonePicker
+                value={guestTz}
+                onChange={changeGuestTz}
+                extraZones={tzExtraZones}
                 className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[280px]"
-              >
-                {tzOptions.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
+                id="fresh-tz"
+              />
             </div>
             <h2 className="mt-10 text-center text-[17px] text-slate-700">
               Select a Day
@@ -1967,22 +1949,16 @@ function BookFlow({
               <label className="mt-8 block text-[13px] font-semibold text-slate-800">
                 Time Zone
               </label>
-              <select
-                value={currentZoneName(guestTz)}
-                onChange={(e) => {
-                  setGuestTz(e.target.value);
-                  setDialCode(dialCodeForTimezone(e.target.value));
-                  // Times are re-read in the new zone, so the old pick no longer matches.
-                  if (page.crmPublic) setSelectedSlot(null);
+              <TimeZonePicker
+                value={guestTz}
+                onChange={(zone) => {
+                  setGuestTz(zone);
+                  setDialCode(dialCodeForTimezone(zone));
                 }}
-                className="mt-1 w-full appearance-none border-0 bg-transparent py-1 text-[13px] text-slate-500 outline-none"
-              >
-                {tzOptions.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
+                extraZones={tzExtraZones}
+                className="h-auto border-0 bg-transparent p-0 text-[15px] font-medium text-slate-800 focus:border-0"
+                hideChevron
+              />
             </section>
 
             <section className="flex max-h-[560px] min-h-[320px] flex-col p-5">
