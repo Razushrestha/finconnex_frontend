@@ -51,7 +51,9 @@ function persist() {
   }
 }
 
-let state: TabState = { tabs: [], scope: "", removedIds: [] };
+const EMPTY_TAB_STATE: TabState = { tabs: [], scope: "", removedIds: [] };
+
+let state: TabState = EMPTY_TAB_STATE;
 let hydrated = false;
 const listeners = new Set<Listener>();
 
@@ -84,7 +86,7 @@ export function hydrateWorkQueueTabs() {
 }
 
 export function getWorkQueueTabState(): TabState {
-  return hydrated ? state : (readStored() ?? defaultState());
+  return hydrated ? state : EMPTY_TAB_STATE;
 }
 
 export function subscribeWorkQueueTabs(listener: Listener) {
