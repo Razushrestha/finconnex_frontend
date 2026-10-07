@@ -301,10 +301,46 @@ export function AvailabilityLimitsStep({
   const hydrated = useRef(false);
   // Once the user edits a limit, a late server load must not overwrite it.
   const limitsEdited = useRef(false);
+  // In a consultation's settings (embedded) there is no Next to save with, so
+  // the hours and zone are sent to the CRM shortly after each change; without
+  // this the host's schedule kept its old zone and hours.
+  const userEdited = useRef(false);
+  const initialTimezone = useRef(timezone);
+  const [syncState, setSyncState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [syncError, setSyncError] = useState("");
 
   useEffect(() => {
     onChange?.(values);
   }, [values, onChange]);
+
+  useEffect(() => {
+    if (!embedded || !consultants.length) return;
+    if (timezone !== initialTimezone.current) userEdited.current = true;
+    if (!userEdited.current) return;
+    if (slotLimitNeedsNumber(values.slotsPerEvent) || slotLimitNeedsNumber(values.slotsPerCustomer)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSyncState("saving");
+      setSyncError("");
+      syncConsultationAvailability({
+        names: consultants,
+        userIds: consultantUserIds,
+        timezone,
+        values: {
+          ...values,
+          slotsPerEvent: normalizeSlotLimit(values.slotsPerEvent),
+          slotsPerCustomer: normalizeSlotLimit(values.slotsPerCustomer),
+        },
+      })
+        .then(() => setSyncState("saved"))
+        .catch((err: unknown) => {
+          setSyncState("error");
+          setSyncError(err instanceof Error ? err.message : "Could not save availability");
+        });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [embedded, values, timezone, consultants, consultantUserIds]);
 
   useEffect(() => {
     if (hydrated.current || !consultants.length) return;
@@ -371,6 +407,7 @@ export function AvailabilityLimitsStep({
   }
 
   function patch(partial: Partial<AvailabilityLimitsValues>) {
+    userEdited.current = true;
     if (
       "slotsPerEvent" in partial ||
       "slotsPerCustomer" in partial ||
@@ -443,7 +480,24 @@ export function AvailabilityLimitsStep({
               <h1 className="text-[16px] font-semibold text-slate-900">
                 Event Type Availability
               </h1>
-              <Tip text="Hours guests can book this consultation." />
+              <div className="flex items-center gap-2">
+                {embedded && syncState !== "idle" ? (
+                  <span
+                    role={syncState === "error" ? "alert" : "status"}
+                    className={cn(
+                      "text-[12px] font-medium",
+                      syncState === "error" ? "text-rose-600" : "text-slate-500",
+                    )}
+                  >
+                    {syncState === "saving"
+                      ? "Saving…"
+                      : syncState === "saved"
+                        ? "Saved"
+                        : syncError || "Not saved"}
+                  </span>
+                ) : null}
+                <Tip text="Hours guests can book this consultation." />
+              </div>
             </div>
 
             {onTimezoneChange ? (
