@@ -23,7 +23,7 @@ import {
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
-import { type RelatedEntityKind } from "@/lib/activities/shared";
+import { avatarColor, type RelatedEntityKind } from "@/lib/activities/shared";
 import {
   TASK_RELATED_ENTITY_KINDS,
   liveRelatedRecords,
@@ -69,6 +69,7 @@ import {
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
 import RelatedRecordCombobox from "./RelatedRecordComboBox";
+import { ContactNameCombobox } from "@/components/shared/ContactNameCombobox";
 import {
   ReminderSettingsCard,
   TaskRepeatBlock,
@@ -142,15 +143,18 @@ const initialState: FormState = {
   reminderRepeat: defaultReminderRepeatRule,
 };
 
-// Fields required before the task can be saved.
-const REQUIRED_FIELDS = [
-  "title",
-  "taskType",
-  "priority",
-  "status",
-  "dueDate",
-  "assignedTo",
-] as const;
+// Only Task Subject is required before the task can be saved.
+const REQUIRED_FIELDS = ["title"] as const;
+const TASK_SUBJECT_MAX = 150;
+const MAX_COLLABORATORS = 3;
+
+function collaboratorAddLabel(count: number) {
+  const nextSlot = count + 1;
+  if (nextSlot === 1) return "Add 1st collaborator";
+  if (nextSlot === 2) return "Add 2nd collaborator";
+  if (nextSlot === 3) return "Add 3rd collaborator";
+  return `Add collaborator ${nextSlot}`;
+}
 
 function initials(name: string) {
   return name
@@ -469,7 +473,6 @@ export function CreateTaskForm({
   const minReminderDate = minDueDate;
   const hasDueDate = Boolean(form.dueDate.trim());
 
-  const contactOptions = liveRelatedRecords("Contact");
   const relatedOptions = rankRelatedRecordsByContact(
     [
       ...extraRelated,
@@ -532,6 +535,11 @@ export function CreateTaskForm({
       ),
       ...validateTaskDates(form.dueDate, form.reminderDate),
     };
+    if (next.title) {
+      next.title = "Task Subject is required";
+    } else if (form.title.trim().length > TASK_SUBJECT_MAX) {
+      next.title = `Task Subject must be ${TASK_SUBJECT_MAX} characters or fewer`;
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -593,13 +601,18 @@ export function CreateTaskForm({
     if (
       !userId ||
       form.collaborators.includes(userId) ||
-      userId === form.assignedTo
-    )
+      userId === form.assignedTo ||
+      form.collaborators.length >= MAX_COLLABORATORS
+    ) {
       return;
+    }
     update("collaborators", [...form.collaborators, userId]);
     setCollaboratorSearch("");
     setAddingCollaborator(false);
   }
+
+  const canAddCollaborator = form.collaborators.length < MAX_COLLABORATORS;
+  const addCollaboratorLabel = collaboratorAddLabel(form.collaborators.length);
 
   function removeCollaborator(userId: string) {
     update(
@@ -827,9 +840,13 @@ export function CreateTaskForm({
                   (submitted && errors.title ? " border-red-300" : "")
                 }
                 value={form.title}
+                maxLength={TASK_SUBJECT_MAX}
                 onChange={(e) => update("title", e.target.value)}
                 placeholder="e.g., Follow up on Q3 Proposal"
               />
+              <p className="mt-1 text-[10px] text-slate-400 tabular-nums">
+                {form.title.length}/{TASK_SUBJECT_MAX}
+              </p>
               {submitted && errors.title && (
                 <p className="mt-1 text-xs text-red-500">{errors.title}</p>
               )}
@@ -837,9 +854,7 @@ export function CreateTaskForm({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
-                <label className={labelClass}>
-                  Task Type <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Task Type</label>
                 <select
                   className={
                     selectClass +
@@ -859,13 +874,11 @@ export function CreateTaskForm({
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass}>Contact Name</label>
-                <RelatedRecordCombobox
+                <ContactNameCombobox
                   value={form.contactName}
                   onChange={(v) => update("contactName", v)}
-                  options={contactOptions}
-                  placeholder="Search contact…"
-                  allowCustom
-                  createLabel={(name) => `Use “${name}”`}
+                  placeholder="Add contact"
+                  addLabel="Add contact"
                 />
               </div>
             </div>
@@ -1045,9 +1058,7 @@ export function CreateTaskForm({
           {/* Owner + collaborators — same card, separate sections */}
           <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div>
-              <label className={labelClass}>
-                Task Owner <span className="text-red-500">*</span>
-          </label>
+                <label className={labelClass}>Task Owner</label>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {form.assignedTo ? (
                   <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
@@ -1089,7 +1100,7 @@ export function CreateTaskForm({
               )}
             </div>
 
-            <div className="border-t border-border pt-4">
+            <div className="relative z-20 overflow-visible border-t border-border pt-4">
               <label className={labelClass}>Collaborators</label>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {form.collaborators.map((userId) => (
@@ -1112,6 +1123,7 @@ export function CreateTaskForm({
                   </span>
                 ))}
 
+                {canAddCollaborator ? (
                 <div ref={collaboratorPickerRef} className="relative">
                   <button
                     type="button"
@@ -1124,8 +1136,8 @@ export function CreateTaskForm({
                         ? "border-violet-300 bg-violet-50 text-violet-700"
                         : "border-gray-300 text-gray-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
                     }`}
-                    aria-label="Add collaborator"
-                    title="Add collaborator"
+                    aria-label={addCollaboratorLabel}
+                    title={addCollaboratorLabel}
                     aria-expanded={addingCollaborator}
                   >
                     <Plus className="h-4 w-4" />
@@ -1174,6 +1186,7 @@ export function CreateTaskForm({
                     </div>
                   )}
                 </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1182,9 +1195,7 @@ export function CreateTaskForm({
           <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelClass}>
-                  Status <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Status</label>
           <select
                   className={
                     selectClass +
@@ -1203,9 +1214,7 @@ export function CreateTaskForm({
           </select>
               </div>
               <div>
-                <label className={labelClass}>
-                  Priority <span className="text-red-500">*</span>
-                </label>
+                <label className={labelClass}>Priority</label>
           <select
                   className={
                     selectClass +
@@ -1226,9 +1235,7 @@ export function CreateTaskForm({
             </div>
 
             <div>
-              <label className={labelClass}>
-                Due Date <span className="text-red-500">*</span>
-              </label>
+              <label className={labelClass}>Due Date</label>
               <div className="relative">
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input

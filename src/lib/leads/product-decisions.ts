@@ -10,10 +10,10 @@ export const UNREPLIED_THRESHOLD_HOURS_DEFAULT = 24;
 export const OWNER_AVATAR_DEFAULT = false as const;
 
 /**
- * Note + Attachment quick actions never show urgency color or badges.
- * They create completed timeline entries only.
+ * Note quick action never shows urgency color or badges.
+ * It creates completed timeline entries only.
  */
-export const FOREVER_NEUTRAL_QUICK_ACTIONS = ["note", "attachment"] as const;
+export const FOREVER_NEUTRAL_QUICK_ACTIONS = ["note"] as const;
 
 /**
  * v1 Lead Card does not auto-escalate overdue items or send push.

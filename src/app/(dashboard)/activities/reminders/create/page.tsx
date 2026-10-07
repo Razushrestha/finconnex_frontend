@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   createReminderScheduleEntry,
   type NotificationMethod,
@@ -26,6 +26,10 @@ import { ReminderDetailsCard } from "@/components/activities/reminders/create/Re
 import { ReminderSchedulesCard } from "@/components/activities/reminders/create/ReminderSchedulesCard";
 import { ContextualLinkingCard } from "@/components/activities/reminders/create/ContextualLinkingCard";
 import { ReminderSettingsSidebar } from "@/components/activities/reminders/create/RemainderSettingsSidebar";
+import {
+  defaultReminderRepeatRule,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
 
 interface Assignee {
   id: string;
@@ -34,10 +38,22 @@ interface Assignee {
 
 export default function CreateReminderPage() {
   const router = useRouter();
+  const params = useSearchParams();
+  const dateParam = params.get("date");
+  const timeParam = params.get("time");
   const [subject, setSubject] = useState("");
   const [notes, setNotes] = useState("");
   const [scheduleEntries, setScheduleEntries] = useState<ReminderScheduleEntry[]>(
-    [createReminderScheduleEntry("In-app")],
+    () => {
+      const entry = createReminderScheduleEntry("In-app");
+      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        entry.date = dateParam;
+      }
+      if (timeParam && /^\d{2}:\d{2}$/.test(timeParam)) {
+        entry.time = timeParam;
+      }
+      return [entry];
+    },
   );
 
   const [selectedEntity, setSelectedEntity] = useState<ReminderParentType | "">(
@@ -48,7 +64,9 @@ export default function CreateReminderPage() {
 
   const [notificationMethod, setNotificationMethod] =
     useState<NotificationMethod>("In-app");
-  const [frequency, setFrequency] = useState("Does not repeat");
+  const [frequencyRule, setFrequencyRule] = useState<ReminderRepeatRule>(
+    () => ({ ...defaultReminderRepeatRule }),
+  );
   const [leadTime, setLeadTime] = useState("15 minutes before");
 
   const [assignees, setAssignees] = useState<Assignee[]>([]);
@@ -84,6 +102,16 @@ export default function CreateReminderPage() {
       prev.map((entry) => ({ ...entry, notificationMethod: method })),
     );
   }
+
+  const reminderStart = (() => {
+    const entry = scheduleEntries.find((row) => row.date && row.time);
+    if (!entry) return null;
+    const date = new Date(`${entry.date}T${entry.time}`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  })();
+  const reminderDue = reminderStart
+    ? new Date(reminderStart.getTime() + 14 * 24 * 60 * 60 * 1000)
+    : null;
 
   async function handleSave() {
     if (!subject.trim()) {
@@ -183,8 +211,10 @@ export default function CreateReminderPage() {
           <ReminderSettingsSidebar
             notificationMethod={notificationMethod}
             onNotificationMethodChange={handleNotificationMethodChange}
-            frequency={frequency}
-            onFrequencyChange={setFrequency}
+            frequencyRule={frequencyRule}
+            onFrequencyRuleChange={setFrequencyRule}
+            reminderStart={reminderStart}
+            reminderDue={reminderDue}
             leadTime={leadTime}
             onLeadTimeChange={setLeadTime}
             assignees={assignees}

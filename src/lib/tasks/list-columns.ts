@@ -1,4 +1,7 @@
-import type { ManageColumn } from "@/components/work-queue/ManageColumnsModal";
+import {
+  orderManageColumnsByPin,
+  type ManageColumn,
+} from "@/components/work-queue/ManageColumnsModal";
 
 const STORAGE_KEY = "finconnex.tasks.list-columns.v1";
 
@@ -10,8 +13,8 @@ export const DEFAULT_TASK_LIST_COLUMNS: ManageColumn[] = [
   { id: "priority", label: "Priority", checked: true },
   { id: "relatedTo", label: "Related To", checked: true },
   { id: "dueDate", label: "Due Date", checked: true },
-  { id: "status", label: "Status", checked: true, required: true },
-  { id: "assignedTo", label: "Assigned To", checked: true, required: true },
+  { id: "status", label: "Status", checked: true },
+  { id: "assignedTo", label: "Assigned To", checked: true },
   { id: "createdBy", label: "Created By", checked: false },
   { id: "createdOn", label: "Created On", checked: false },
   { id: "modifiedBy", label: "Modified By", checked: false },
@@ -32,6 +35,7 @@ const SORTABLE_COLUMN_IDS = new Set([
   "taskId",
   "taskType",
   "priority",
+  "relatedTo",
   "dueDate",
   "status",
   "assignedTo",
@@ -42,8 +46,11 @@ const SORTABLE_COLUMN_IDS = new Set([
   "reminderDate",
   "completedBy",
   "completedDate",
+  "collaborators",
   "commentsCount",
   "attachmentsCount",
+  "description",
+  "notes",
   "overdue",
 ]);
 
@@ -80,10 +87,7 @@ export function mergeTaskListColumns(
     if (!used.has(def.id)) merged.push({ ...def });
   }
 
-  // Pinned columns float to the front (after required ones stay with their checks).
-  const pinned = merged.filter((c) => c.pinned);
-  const unpinned = merged.filter((c) => !c.pinned);
-  return [...pinned, ...unpinned];
+  return orderManageColumnsByPin(merged);
 }
 
 export function loadTaskListColumns(): ManageColumn[] {

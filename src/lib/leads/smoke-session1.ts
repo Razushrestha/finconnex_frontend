@@ -176,12 +176,12 @@ export function runSmokeSession1() {
     console.error("   FAIL owner avatar should default off");
     invariantOk = false;
   }
-  if (vm.quickActions.length !== 7) {
-    console.error("   FAIL expected 7 quick actions");
+  if (vm.quickActions.length !== 6) {
+    console.error("   FAIL expected 6 quick actions");
     invariantOk = false;
   }
   const quickOrder = vm.quickActions.map((a) => a.kind).join(",");
-  if (quickOrder !== "call,sms,email,meeting,task,note,attachment") {
+  if (quickOrder !== "call,sms,email,meeting,task,note") {
     console.error("   FAIL quick action order:", quickOrder);
     invariantOk = false;
   }

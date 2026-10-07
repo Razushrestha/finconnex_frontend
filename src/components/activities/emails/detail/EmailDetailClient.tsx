@@ -88,13 +88,6 @@ export function EmailDetailClient({ id }: { id: string }) {
     );
   }
 
-  const initials = (email.relatedTo || email.to[0] || "EM")
-    .replace(/^(Lead|Contact|Deal|Company):\s*/i, "")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-
   const timelineEvents = [
     ...(email.openedDate
       ? [{ id: "opened", title: "Email Opened", timestamp: email.openedDate }]
@@ -287,18 +280,7 @@ export function EmailDetailClient({ id }: { id: string }) {
           <h3 className="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             Related CRM Profile
           </h3>
-          <CrmProfileCard
-            name={
-              (email.relatedTo || email.to[0] || "Recipient").replace(
-                /^(Lead|Contact|Deal|Company):\s*/i,
-                "",
-              )
-            }
-            initials={initials || "EM"}
-            role={email.relatedType || "Client / Lead"}
-            company="FinConnex"
-            activeDeal={email.relatedTo || "—"}
-          />
+          <CrmProfileCard email={email} />
         </div>
 
         <div>

@@ -87,6 +87,7 @@ export function TaskMetadataCard({
           {editing ? (
             <input
               value={title}
+              maxLength={150}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full border-b border-slate-200 bg-transparent text-2xl font-semibold tracking-tight text-slate-900 outline-none focus:border-violet-400"
             />

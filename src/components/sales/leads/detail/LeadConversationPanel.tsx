@@ -182,25 +182,43 @@ function summarize(items: ConversationItem[], first: string) {
   return `${first} is in conversation about loan options. Latest inbound: “${(lastIn?.body ?? "—").slice(0, 90)}”. Latest reply: “${(lastOut?.body ?? "—").slice(0, 90)}”.`;
 }
 
-export function LeadConversationPanel({ card }: { card: LeadCardData }) {
+export function LeadConversationPanel({
+  card,
+  initialComposerChannel = "whatsapp",
+  initialChannelFilters,
+  hideRecentAttachments = false,
+  hideConversationSummary = false,
+}: {
+  card: LeadCardData;
+  /** When opening from lead-card SMS quick action, land on SMS composer. */
+  initialComposerChannel?: ComposerChannel;
+  /** Optional channel filters applied when the panel mounts. */
+  initialChannelFilters?: ConversationChannel[];
+  /** Hide the Recent Attachments card (SMS quick-action drawer). */
+  hideRecentAttachments?: boolean;
+  /** Hide AI Conversation Summary (quick-action drawer); keep on lead detail. */
+  hideConversationSummary?: boolean;
+}) {
   const first = card.name.split(" ")[0] ?? card.name;
   const [revision, setRevision] = useState(0);
   const [remoteItems, setRemoteItems] = useState<ConversationItem[] | null>(
     null,
   );
   const [channelFilters, setChannelFilters] = useState<ConversationChannel[]>(
-    [],
+    () => initialChannelFilters ?? [],
   );
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("oldest");
   const [filterOpen, setFilterOpen] = useState(false);
   const [composerChannel, setComposerChannel] =
-    useState<ComposerChannel>("sms");
+    useState<ComposerChannel>(initialComposerChannel);
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [, setSubject] = useState("");
   const [attachment, setAttachment] = useState<ConversationAttachment | null>(
     null,
   );
+  const showSidebarCards =
+    !hideRecentAttachments || !hideConversationSummary;
   const [sidebar, setSidebar] = useState(true);
   const [plusOpen, setPlusOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -213,6 +231,13 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setComposerChannel(initialComposerChannel);
+    if (initialChannelFilters) {
+      setChannelFilters(initialChannelFilters);
+    }
+  }, [initialComposerChannel, initialChannelFilters, card.id]);
 
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
 
@@ -514,7 +539,14 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   let lastDay = "";
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
+    <div
+      className={cn(
+        "grid h-full min-h-0 grid-cols-1 gap-3",
+        sidebar && showSidebarCards
+          ? "xl:grid-cols-[minmax(0,1fr)_260px]"
+          : "xl:grid-cols-1",
+      )}
+    >
       <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-1.5">
           <div className="relative">
@@ -922,54 +954,60 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
         </div>
       </section>
 
-      {sidebar ? (
+      {sidebar && showSidebarCards ? (
         <aside className="min-h-0 space-y-3 overflow-y-auto">
-          <SideCard title="Recent Attachments">
-            {attachments.length === 0 ? (
-              <p className="text-[12px] text-slate-400">No attachments yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {attachments.map((file) => (
-                  <li key={file.name}>
-                    <button
-                      type="button"
-                      onClick={() => downloadAttachment(file)}
-                      className="flex w-full items-center justify-between rounded-xl border border-slate-100 px-2.5 py-2 text-left hover:bg-slate-50"
-                    >
-                      <span className="inline-flex min-w-0 items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-[10px] font-bold text-rose-600">
-                          PDF
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[12px] font-medium text-slate-800">
-                            {file.name}
+          {!hideRecentAttachments ? (
+            <SideCard title="Recent Attachments">
+              {attachments.length === 0 ? (
+                <p className="text-[12px] text-slate-400">No attachments yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {attachments.map((file) => (
+                    <li key={file.name}>
+                      <button
+                        type="button"
+                        onClick={() => downloadAttachment(file)}
+                        className="flex w-full items-center justify-between rounded-xl border border-slate-100 px-2.5 py-2 text-left hover:bg-slate-50"
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-[10px] font-bold text-rose-600">
+                            PDF
                           </span>
-                          <span className="text-[10px] text-slate-400">{file.size}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-[12px] font-medium text-slate-800">
+                              {file.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {file.size}
+                            </span>
+                          </span>
                         </span>
-                      </span>
-                      <Download className="h-3.5 w-3.5 text-slate-400" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SideCard>
+                        <Download className="h-3.5 w-3.5 text-slate-400" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SideCard>
+          ) : null}
 
-          <SideCard
-            title={
-              <span className="inline-flex items-center gap-1.5">
-                Conversation Summary
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
-                  <Sparkles className="h-3 w-3" />
-                  AI
+          {!hideConversationSummary ? (
+            <SideCard
+              title={
+                <span className="inline-flex items-center gap-1.5">
+                  Conversation Summary
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                    <Sparkles className="h-3 w-3" />
+                    AI
+                  </span>
                 </span>
-              </span>
-            }
-          >
-            <p className="text-[12px] leading-relaxed text-slate-600">
-              {summarize(items, first)}
-            </p>
-          </SideCard>
+              }
+            >
+              <p className="text-[12px] leading-relaxed text-slate-600">
+                {summarize(items, first)}
+              </p>
+            </SideCard>
+          ) : null}
         </aside>
       ) : null}
 

@@ -49,9 +49,11 @@ export function createCalendarItem(input: {
       ? "bg-amber-500"
       : input.type === "Meeting"
         ? "bg-sky-500"
-        : input.type === "Reminder"
-          ? "bg-rose-500"
-          : "bg-violet-500";
+        : input.type === "Call"
+          ? "bg-emerald-500"
+          : input.type === "Reminder"
+            ? "bg-rose-500"
+            : "bg-violet-500";
   const item: CalendarItem = {
     id: newRulesId("cal"),
     title: input.title.trim(),

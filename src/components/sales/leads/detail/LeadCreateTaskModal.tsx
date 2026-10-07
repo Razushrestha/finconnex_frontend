@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar,
   ChevronLeft,
@@ -17,13 +18,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
-import { RepeatReminderFields } from "@/components/activities/tasks/RepeatReminderFields";
 import AttachmentUpload from "@/components/activities/tasks/AttachmentUpload";
-import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import {
+  ReminderSettingsCard,
+  TaskRepeatBlock,
+  turnOffReminderRepeat,
+} from "@/components/activities/tasks/ReminderSettingsCard";
+import {
+  emptyInlineTaskNote,
+  formatInlineTaskNote,
+  InlineTaskNoteComposer,
+  type InlineTaskNoteValue,
+} from "@/components/shared/InlineTaskNoteComposer";
 import {
   RELATED_ENTITY_KINDS,
+  avatarColor,
+  initials as sharedInitials,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import type { NotificationMethod } from "@/lib/reminders/types";
 import { liveRelatedRecords } from "@/lib/activities/related-records";
 import { parseFlexibleDate } from "@/lib/leads/activity-dates";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
@@ -74,21 +87,25 @@ import {
 import { buildRemindersFromSchedule } from "@/lib/tasks/reminder-series";
 import { cn } from "@/lib/utils";
 
-const PURPLE = "var(--brand-primary)";
+const PURPLE = "#5A32A3";
+const MAX_COLLABORATORS = 3;
+
+function collaboratorAddLabel(count: number) {
+  const nextSlot = count + 1;
+  if (nextSlot === 1) return "Add 1st collaborator";
+  if (nextSlot === 2) return "Add 2nd collaborator";
+  if (nextSlot === 3) return "Add 3rd collaborator";
+  return `Add collaborator ${nextSlot}`;
+}
 
 const inputClass =
-  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/20";
+  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#5A32A3] focus:outline-none focus:ring-2 focus:ring-[#5A32A3]/20";
 const labelClass = "mb-1 block text-[12px] font-medium text-slate-600";
 
 type View = "main" | "more";
 
 function initials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+  return sharedInitials(name);
 }
 
 function parseDatetimeLocal(value: string): Date | null {
@@ -136,17 +153,19 @@ function reminderNotifyFromMethods(
 
 function remindersFromForm(
   reminderDate: string,
+  notifyBy: NotificationMethod[],
   rule: ReminderRepeatRule,
   dueDate: string,
 ) {
   const parsed = parseDatetimeLocal(reminderDate);
   if (!parsed) return undefined;
+  const notify = reminderNotifyFromMethods(notifyBy);
   return buildRemindersFromSchedule({
     first: parsed,
     due: parseDatetimeLocal(dueDate),
     rule,
-    notify: reminderNotifyFromMethods(["Email", "In-app"]),
-    notificationMethod: notifyToMethod("Both"),
+    notify,
+    notificationMethod: notifyToMethod(notify),
     type: "Task Due",
   });
 }
@@ -156,37 +175,6 @@ function newActionItemId() {
     return crypto.randomUUID();
   }
   return `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function PurpleSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-        checked ? "bg-[var(--brand-primary)]" : "bg-slate-200",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform",
-          checked ? "translate-x-5" : "translate-x-0",
-        )}
-      />
-    </button>
-  );
 }
 
 function relatedOptionsFor(
@@ -249,6 +237,10 @@ export function LeadCreateTaskModal({
   const [reminderOn, setReminderOn] = useState(false);
   const [repeatOn, setRepeatOn] = useState(false);
   const [reminderDate, setReminderDate] = useState("");
+  const [notifyBy, setNotifyBy] = useState<NotificationMethod[]>(["Email"]);
+  const [taskRepeat, setTaskRepeat] = useState<ReminderRepeatRule>(
+    defaultReminderRepeatRule,
+  );
   const [reminderRepeat, setReminderRepeat] = useState<ReminderRepeatRule>(
     defaultReminderRepeatRule,
   );
@@ -260,15 +252,45 @@ export function LeadCreateTaskModal({
   const [taskType, setTaskType] = useState<TaskType>("Follow-up");
   const [status, setStatus] = useState<TaskStatus>("Not Started");
   const [description, setDescription] = useState("");
-  const [notes, setNotes] = useState("");
-  const [actionItems, setActionItems] = useState<TaskActionItem[]>([]);
+  const [note, setNote] = useState<InlineTaskNoteValue>(() => emptyInlineTaskNote());
   const [attachments, setAttachments] = useState<File[]>([]);
+
+  const [actionItems, setActionItems] = useState<TaskActionItem[]>([]);
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [collaboratorSearch, setCollaboratorSearch] = useState("");
+  const [collaboratorMenuPos, setCollaboratorMenuPos] = useState<{
+    top: number;
+    left: number;
+    openUp: boolean;
+  } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const pendingActionFocus = useRef<string | null>(null);
   const collaboratorPickerRef = useRef<HTMLDivElement>(null);
+  const collaboratorAddBtnRef = useRef<HTMLButtonElement>(null);
+  const collaboratorMenuRef = useRef<HTMLDivElement>(null);
+
+  function openCollaboratorMenu() {
+    const rect = collaboratorAddBtnRef.current?.getBoundingClientRect();
+    if (!rect) {
+      setAddingCollaborator(true);
+      return;
+    }
+    const menuHeight = 220;
+    const openUp = window.innerHeight - rect.bottom < menuHeight + 16;
+    setCollaboratorMenuPos({
+      top: openUp ? rect.top - 6 : rect.bottom + 6,
+      left: Math.min(rect.left, window.innerWidth - 272),
+      openUp,
+    });
+    setAddingCollaborator(true);
+  }
+
+  function closeCollaboratorMenu() {
+    setAddingCollaborator(false);
+    setCollaboratorSearch("");
+    setCollaboratorMenuPos(null);
+  }
 
   const editing = Boolean(editTaskId || draft);
 
@@ -288,7 +310,6 @@ export function LeadCreateTaskModal({
     setView("main");
     setError("");
     setSaving(false);
-    setAttachments([]);
 
     const live = editTaskId ? findTaskById(editTaskId)?.task : null;
     if (live) {
@@ -300,8 +321,16 @@ export function LeadCreateTaskModal({
       setAssignedTo(live.assignedTo || card.owner);
       setCollaborators(live.collaborators ?? []);
       setReminderOn(Boolean(live.reminderDate));
-      setRepeatOn(Boolean(live.reminders?.some((item) => item.repeatRule)));
+      setRepeatOn(Boolean(live.repeatRule && live.repeatRule.preset !== "none"));
       setReminderDate(reminder ? toDatetimeLocalValue(reminder) : "");
+      setNotifyBy(
+        live.notifyBy?.length ? [...live.notifyBy] : ["Email"],
+      );
+      setTaskRepeat(
+        live.repeatRule && live.repeatRule.preset !== "none"
+          ? { ...live.repeatRule, weekdays: [...live.repeatRule.weekdays] }
+          : defaultReminderRepeatRule,
+      );
       setReminderRepeat(
         live.reminders?.find((item) => item.repeatRule)?.repeatRule ??
           defaultReminderRepeatRule,
@@ -312,7 +341,12 @@ export function LeadCreateTaskModal({
       setTaskType(live.taskType);
       setStatus(live.status === "Completed" ? "Completed" : live.status);
       setDescription(live.description ?? "");
-      setNotes(live.notes ?? "");
+      setNote({
+        title: "",
+        body: live.notes ?? "",
+        attachments: [],
+      });
+      setAttachments([]);
       setActionItems(live.actionItems ?? []);
       return;
     }
@@ -332,6 +366,8 @@ export function LeadCreateTaskModal({
       setReminderOn(false);
       setRepeatOn(false);
       setReminderDate("");
+      setNotifyBy(["Email"]);
+      setTaskRepeat(defaultReminderRepeatRule);
       setReminderRepeat(defaultReminderRepeatRule);
       setContactName(leadApplicants(card)[0]?.name || card.name);
       setRelatedKind("Lead");
@@ -339,7 +375,8 @@ export function LeadCreateTaskModal({
       setTaskType("Follow-up");
       setStatus("Not Started");
       setDescription(draft.subtitle ?? "");
-      setNotes("");
+      setNote(emptyInlineTaskNote());
+      setAttachments([]);
       setActionItems([]);
       return;
     }
@@ -352,6 +389,8 @@ export function LeadCreateTaskModal({
     setReminderOn(false);
     setRepeatOn(false);
     setReminderDate("");
+    setNotifyBy(["Email"]);
+    setTaskRepeat(defaultReminderRepeatRule);
     setReminderRepeat(defaultReminderRepeatRule);
     setContactName(leadApplicants(card)[0]?.name || card.name);
     setRelatedKind("Lead");
@@ -359,23 +398,40 @@ export function LeadCreateTaskModal({
     setTaskType("Follow-up");
     setStatus("Not Started");
     setDescription("");
-    setNotes("");
+    setNote(emptyInlineTaskNote());
+      setAttachments([]);
     setActionItems([]);
   }
 
   useEffect(() => {
     if (!addingCollaborator) return;
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
       if (
-        collaboratorPickerRef.current &&
-        !collaboratorPickerRef.current.contains(event.target as Node)
+        collaboratorPickerRef.current?.contains(target) ||
+        collaboratorMenuRef.current?.contains(target)
       ) {
-        setAddingCollaborator(false);
-        setCollaboratorSearch("");
+        return;
       }
+      closeCollaboratorMenu();
+    }
+    function handleReposition() {
+      const rect = collaboratorAddBtnRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const menuHeight = 220;
+      const openUp = window.innerHeight - rect.bottom < menuHeight + 16;
+      setCollaboratorMenuPos({
+        top: openUp ? rect.top - 6 : rect.bottom + 6,
+        left: Math.min(rect.left, window.innerWidth - 272),
+        openUp,
+      });
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("resize", handleReposition);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", handleReposition);
+    };
   }, [addingCollaborator]);
 
   const owners = useMemo(() => {
@@ -391,6 +447,8 @@ export function LeadCreateTaskModal({
   const filteredCollaborators = availableCollaborators.filter((owner) =>
     owner.toLowerCase().includes(collaboratorSearch.trim().toLowerCase()),
   );
+  const canAddCollaborator = collaborators.length < MAX_COLLABORATORS;
+  const addCollaboratorLabel = collaboratorAddLabel(collaborators.length);
 
   const relatedOptions = relatedOptionsFor(relatedKind, {
     kind: "Lead",
@@ -401,29 +459,31 @@ export function LeadCreateTaskModal({
   const minDueDate = toDatetimeLocalValue(startOfMinute(new Date()));
   const due = parseDatetimeLocal(dueDate);
 
-  function handleReminderToggle(next: boolean) {
-    setReminderOn(next);
-    if (!next) {
-      setReminderDate("");
+  function addCollaborator(name: string) {
+    if (
+      !name ||
+      name === assignedTo ||
+      collaborators.includes(name) ||
+      collaborators.length >= MAX_COLLABORATORS
+    ) {
       return;
     }
-    if (due) {
-      const reminder = new Date(due);
-      reminder.setHours(reminder.getHours() - 1);
-      if (reminder.getTime() <= Date.now()) {
-        reminder.setTime(Date.now() + 15 * 60 * 1000);
-      }
-      setReminderDate(toDatetimeLocalValue(reminder));
-    }
+    setCollaborators((prev) => [...prev, name]);
+    setAddingCollaborator(false);
+    setCollaboratorSearch("");
   }
 
-  function handleRepeatToggle(next: boolean) {
-    setRepeatOn(next);
-    setReminderRepeat(
-      next
-        ? { ...defaultReminderRepeatRule, preset: "daily" }
-        : defaultReminderRepeatRule,
-    );
+  function removeCollaborator(name: string) {
+    setCollaborators((prev) => prev.filter((item) => item !== name));
+  }
+
+  function toggleNotifyBy(method: NotificationMethod) {
+    setNotifyBy((prev) => {
+      const selected = prev.includes(method);
+      return selected
+        ? prev.filter((item) => item !== method)
+        : [...prev, method];
+    });
   }
 
   function pruneBlankActionItems() {
@@ -471,12 +531,9 @@ export function LeadCreateTaskModal({
       setView("main");
       return;
     }
-    if (!dueDate.trim() || !due) {
-      setError("Add a due date");
-      setView("main");
-      return;
-    }
     if (
+      dueDate.trim() &&
+      due &&
       !editing &&
       due.getTime() < startOfMinute(new Date()).getTime()
     ) {
@@ -508,28 +565,40 @@ export function LeadCreateTaskModal({
         contactName.trim() && contactName.trim() !== card.name
           ? `Contact: ${contactName.trim()}`
           : "";
-      const combinedNotes = [extraRelated, contactLine, notes.trim()]
+      const noteBlock = formatInlineTaskNote(note);
+      const combinedNotes = [extraRelated, contactLine, noteBlock]
         .filter(Boolean)
         .join("\n");
 
+      const storedDue = dueDate.trim()
+        ? formatStoredTaskDateTime(dueDate)
+        : "";
       const reminderPayload =
         reminderOn && reminderDate.trim()
           ? formatStoredTaskDateTime(reminderDate)
           : undefined;
-      const reminders = reminderPayload
-        ? remindersFromForm(
-            reminderDate,
-            repeatOn ? reminderRepeat : defaultReminderRepeatRule,
-            dueDate,
-          )
-        : undefined;
+      const reminders =
+        reminderOn && reminderDate.trim()
+          ? remindersFromForm(
+              reminderDate,
+              notifyBy,
+              reminderRepeat,
+              dueDate,
+            )
+          : undefined;
+      const notifyPayload =
+        reminderOn && reminderDate.trim() && notifyBy.length
+          ? notifyBy
+          : undefined;
+      const repeatRulePayload =
+        repeatOn && taskRepeat.preset !== "none" ? taskRepeat : undefined;
 
       if (editTaskId && findTaskById(editTaskId)) {
         patchTask(editTaskId, {
           title: title.trim(),
           taskType,
           priority,
-          dueDate: formatStoredTaskDateTime(dueDate),
+          dueDate: storedDue,
           reminderDate: reminderPayload,
           reminders,
           assignedTo,
@@ -538,7 +607,8 @@ export function LeadCreateTaskModal({
           notes: combinedNotes || undefined,
           collaborators: collaborators.length ? collaborators : undefined,
           actionItems: filledActionItems.length ? filledActionItems : undefined,
-          notifyBy: reminderOn ? (["Email", "In-app"] as const) : undefined,
+          notifyBy: notifyPayload,
+          repeatRule: repeatRulePayload,
         });
         if (status !== "Completed") updateTaskStatus(editTaskId, status);
         if (isCrmTaskId(editTaskId)) {
@@ -570,7 +640,7 @@ export function LeadCreateTaskModal({
         taskType,
         priority,
         status,
-        dueDate: formatStoredTaskDateTime(dueDate),
+        dueDate: storedDue,
         reminderDate: reminderPayload,
         reminders,
         assignedTo,
@@ -579,9 +649,8 @@ export function LeadCreateTaskModal({
         notes: combinedNotes || undefined,
         collaborators: collaborators.length ? collaborators : undefined,
         actionItems: filledActionItems.length ? filledActionItems : undefined,
-        notifyBy: reminderOn
-          ? (["Email", "In-app"] as Task["notifyBy"])
-          : undefined,
+        notifyBy: notifyPayload,
+        repeatRule: repeatRulePayload,
         createdBy: getRulesActor().name || assignedTo,
       };
       let task = createTask(taskInput);
@@ -709,9 +778,7 @@ export function LeadCreateTaskModal({
                 />
               </div>
               <div>
-                <label className={labelClass}>
-                  Due Date <span className="text-rose-500">*</span>
-                </label>
+                <label className={labelClass}>Due Date</label>
                 <div className="relative">
                   <Calendar className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
@@ -725,7 +792,9 @@ export function LeadCreateTaskModal({
                       if (!value.trim()) {
                         setReminderOn(false);
                         setReminderDate("");
+                        setNotifyBy(["Email"]);
                         setRepeatOn(false);
+                        setTaskRepeat(defaultReminderRepeatRule);
                         setReminderRepeat(defaultReminderRepeatRule);
                       }
                     }}
@@ -766,115 +835,162 @@ export function LeadCreateTaskModal({
                 </select>
               </div>
               <div>
-                <label className={labelClass}>Collaborator</label>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {collaborators.map((name) => (
-                    <span
-                      key={name}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pr-2 pl-1 text-[12px] text-slate-700"
-                    >
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-[9px] font-semibold text-violet-700">
-                        {initials(name)}
-                      </span>
-                      {name}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCollaborators((prev) =>
-                            prev.filter((item) => item !== name),
-                          )
-                        }
-                        aria-label={`Remove ${name}`}
+                <label className={labelClass}>Collaborators</label>
+                <div className="relative mt-1.5" ref={collaboratorPickerRef}>
+                  <div className="flex items-center gap-1">
+                    {collaborators.map((name, index) => (
+                      <span
+                        key={`${name}-${index}`}
+                        className="group relative shrink-0"
                       >
-                        <X className="h-3 w-3 text-slate-400" />
+                        <span
+                          title={name}
+                          className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold",
+                            avatarColor(name),
+                          )}
+                        >
+                          {initials(name)}
+                        </span>
+                        <button
+                          type="button"
+                          title={`Remove ${name}`}
+                          onClick={() => removeCollaborator(name)}
+                          className="absolute -top-1 -right-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-700 text-white group-hover:flex"
+                          aria-label={`Remove collaborator ${name}`}
+                        >
+                          <X className="h-2 w-2" strokeWidth={3} />
+                        </button>
+                      </span>
+                    ))}
+                    {canAddCollaborator &&
+                    (filteredCollaborators.length > 0 ||
+                      addingCollaborator) ? (
+                      <button
+                        ref={collaboratorAddBtnRef}
+                        type="button"
+                        title={addCollaboratorLabel}
+                        aria-label={addCollaboratorLabel}
+                        aria-expanded={addingCollaborator}
+                        onClick={() => {
+                          if (addingCollaborator) closeCollaboratorMenu();
+                          else openCollaboratorMenu();
+                        }}
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed transition-colors",
+                          addingCollaborator
+                            ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
+                            : "border-slate-300 text-slate-400 hover:border-[#5A32A3] hover:text-[#5A32A3]",
+                        )}
+                      >
+                        <Plus className="h-3 w-3" strokeWidth={2.5} />
                       </button>
-                    </span>
-                  ))}
-                  <div ref={collaboratorPickerRef} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setAddingCollaborator((v) => !v)}
-                      className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 text-[11px] font-medium text-slate-500 hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add
-                    </button>
-                    {addingCollaborator ? (
-                      <div className="absolute top-8 left-0 z-30 w-56 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                        <div className="relative px-2 py-1.5">
-                          <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                          <input
-                            autoFocus
-                            value={collaboratorSearch}
-                            onChange={(e) => setCollaboratorSearch(e.target.value)}
-                            placeholder="Search…"
-                            className="w-full rounded-md border border-slate-200 py-1.5 pr-2 pl-8 text-[12px] focus:border-[var(--brand-primary)] focus:outline-none"
-                          />
-                        </div>
-                        {filteredCollaborators.map((owner) => (
-                          <button
-                            key={owner}
-                            type="button"
-                            onClick={() => {
-                              setCollaborators((prev) => [...prev, owner]);
-                              setAddingCollaborator(false);
-                              setCollaboratorSearch("");
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
-                          >
-                            {owner}
-                          </button>
-                        ))}
-                      </div>
                     ) : null}
                   </div>
+                  {addingCollaborator && collaboratorMenuPos
+                    ? createPortal(
+                        <div
+                          ref={collaboratorMenuRef}
+                          className="fixed z-[120] w-64 overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5"
+                          style={{
+                            left: collaboratorMenuPos.left,
+                            top: collaboratorMenuPos.openUp
+                              ? undefined
+                              : collaboratorMenuPos.top,
+                            bottom: collaboratorMenuPos.openUp
+                              ? window.innerHeight - collaboratorMenuPos.top
+                              : undefined,
+                          }}
+                        >
+                          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
+                            {addCollaboratorLabel}
+                          </p>
+                          <div className="px-2 pb-2">
+                            <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+                              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                              <input
+                                autoFocus
+                                value={collaboratorSearch}
+                                onChange={(e) =>
+                                  setCollaboratorSearch(e.target.value)
+                                }
+                                placeholder="Search collaborators…"
+                                className="min-w-0 flex-1 bg-transparent text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
+                              />
+                            </label>
+                          </div>
+                          <div className="max-h-40 overflow-y-auto py-1">
+                            {filteredCollaborators.length === 0 ? (
+                              <p className="px-3 py-2 text-[12px] text-slate-400">
+                                {collaboratorSearch.trim()
+                                  ? "No matching collaborators"
+                                  : "No collaborators available"}
+                              </p>
+                            ) : (
+                              filteredCollaborators.map((owner) => (
+                                <button
+                                  key={owner}
+                                  type="button"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    addCollaborator(owner);
+                                    closeCollaboratorMenu();
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-violet-50"
+                                >
+                                  <span
+                                    className={cn(
+                                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
+                                      avatarColor(owner),
+                                    )}
+                                  >
+                                    {initials(owner)}
+                                  </span>
+                                  <span className="truncate text-[13px] font-medium text-slate-800">
+                                    {owner}
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>,
+                        document.body,
+                      )
+                    : null}
                 </div>
               </div>
               {dueDate.trim() ? (
-                <>
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                    <span className="text-[13px] font-medium text-slate-700">
-                      Reminder
-                    </span>
-                    <PurpleSwitch
-                      checked={reminderOn}
-                      onChange={handleReminderToggle}
-                      label="Reminder"
-                    />
-                  </div>
-                  {reminderOn ? (
-                    <div>
-                      <label className={labelClass}>Remind at</label>
-                      <input
-                        type="datetime-local"
-                        min={minDueDate}
-                        max={dueDate || undefined}
-                        className={inputClass}
-                        value={reminderDate}
-                        onChange={(e) => setReminderDate(e.target.value)}
-                      />
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium text-slate-700">
-                      Repeat
-                    </span>
-                    <PurpleSwitch
-                      checked={repeatOn}
-                      onChange={handleRepeatToggle}
-                      label="Repeat"
-                    />
-                  </div>
-                  {repeatOn && due ? (
-                    <RepeatReminderFields
-                      value={reminderRepeat}
-                      start={new Date()}
-                      due={due}
-                      allowAfterCompletion={reminderOn}
-                      onChange={setReminderRepeat}
-                    />
-                  ) : null}
-                </>
+                <div className="space-y-1 border-t border-slate-100 pt-3">
+                  <ReminderSettingsCard
+                    enabled={reminderOn}
+                    onEnabledChange={(on) => {
+                      setReminderOn(on);
+                      if (!on) {
+                        setReminderDate("");
+                        setReminderRepeat(turnOffReminderRepeat());
+                      }
+                    }}
+                    reminderDate={reminderDate}
+                    onReminderDateChange={setReminderDate}
+                    min={minDueDate}
+                    max={dueDate || undefined}
+                    notifyBy={notifyBy}
+                    onToggleNotify={toggleNotifyBy}
+                    repeat={reminderRepeat}
+                    onRepeatChange={setReminderRepeat}
+                    due={due}
+                  />
+                  <TaskRepeatBlock
+                    enabled={repeatOn}
+                    onEnabledChange={(on) => {
+                      setRepeatOn(on);
+                      if (!on) setTaskRepeat(turnOffReminderRepeat());
+                    }}
+                    value={taskRepeat}
+                    onChange={setTaskRepeat}
+                    due={due}
+                  />
+                </div>
               ) : null}
               <button
                 type="button"
@@ -1008,7 +1124,7 @@ export function LeadCreateTaskModal({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => addActionLine(item.id)}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[var(--brand-primary)]"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#5A32A3]"
                         aria-label="Add action item"
                       >
                         <Plus className="h-4 w-4" />
@@ -1019,15 +1135,12 @@ export function LeadCreateTaskModal({
               </div>
               <div>
                 <label className={labelClass}>Notes</label>
-                <MentionNotesTextarea
-                  value={notes}
-                  onChange={setNotes}
-                  placeholder="Internal notes… Type @ to mention someone."
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Attachments</label>
-                <AttachmentUpload files={attachments} onChange={setAttachments} />
+                <div className="mt-1.5">
+                  <InlineTaskNoteComposer value={note} onChange={setNote} />
+                  <div className="mt-3">
+                    <AttachmentUpload files={attachments} onChange={setAttachments} />
+                  </div>
+                </div>
               </div>
             </div>
           )}

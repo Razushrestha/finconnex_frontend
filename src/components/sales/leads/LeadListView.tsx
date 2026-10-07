@@ -7,8 +7,7 @@ import {
   Mail,
   CalendarDays,
   CheckSquare,
-  StickyNote,
-  Paperclip,
+  FileText,
 } from "lucide-react";
 import { type KanbanColumn } from "@/lib/leads/types";
 import { listLeadColumns } from "@/lib/leads/store";
@@ -49,9 +48,16 @@ import { useLeadCallFlow } from "@/components/sales/leads/LeadCallPicker";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
+  visibleManageColumns,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
-import { notify } from "@/lib/notify/toast";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  isSortableColumnId,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 interface LeadListViewProps {
   columns?: KanbanColumn[];
@@ -72,18 +78,16 @@ const QUICK_ICONS = {
   email: Mail,
   meeting: CalendarDays,
   task: CheckSquare,
-  note: StickyNote,
-  attachment: Paperclip,
+  note: FileText,
 } as const;
 
-const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
+const QUICK_LABELS: Record<keyof typeof QUICK_ICONS, string> = {
   call: "Call",
   sms: "SMS",
   email: "Email",
   meeting: "Appointment",
   task: "Task",
   note: "Note",
-  attachment: "Attachment",
 };
 
 export const DEFAULT_LEAD_LIST_COLUMNS: ManageColumn[] = [
@@ -113,6 +117,38 @@ function buildAllLeadsShape(columns: KanbanColumn[]) {
       statusDotColor: column.dotColorClass,
     })),
   )[0];
+}
+
+function leadSortValue(
+  lead: LeadRow,
+  field: string,
+  cardSettings: LeadCardSettings,
+): unknown {
+  if (field === "lead") return lead.name;
+  if (field === "contactName") return resolveLeadContact(lead).name;
+  if (field === "status") return lead.stageTitle;
+  if (field === "sla" || field === "activity" || field === "lastActivity") {
+    const vm = buildLeadCardViewModelFromCard(lead, lead.statusTitle, {
+      cardSettings,
+    });
+    if (field === "sla") {
+      return (
+        vm.sla?.stageClock?.dueAt ??
+        vm.sla?.milestoneClock?.dueAt ??
+        vm.sla?.badgeLabel ??
+        ""
+      );
+    }
+    if (field === "activity") {
+      return (
+        vm.activitySummary.primary?.dueAt ??
+        vm.activitySummary.dueLabel ??
+        ""
+      );
+    }
+    return vm.lastActivity?.event.dueAt ?? vm.lastActivity?.relativeTime ?? "";
+  }
+  return (lead as unknown as Record<string, unknown>)[field];
 }
 
 type LeadVM = ReturnType<typeof buildLeadCardViewModelFromCard>;
@@ -291,8 +327,11 @@ function buildColumnRenderers(
           role="toolbar"
           aria-label={`Quick actions for ${lead.name}`}
         >
-          {vm.quickActions.map((action) => {
-            const Icon = QUICK_ICONS[action.kind];
+          {vm.quickActions
+            .filter((action) => action.kind !== "attachment")
+            .map((action) => {
+            const kind = action.kind as keyof typeof QUICK_ICONS;
+            const Icon = QUICK_ICONS[kind];
             const stateHint = QUICK_STATE_WORDS[action.urgency];
             const countHint =
               action.badgeCount >= 2 ? `, ${action.badgeCount} pending` : "";
@@ -315,8 +354,8 @@ function buildColumnRenderers(
                     phone: lead.phone,
                   });
                 }}
-                aria-label={`${QUICK_LABELS[action.kind]}: ${stateHint}${countHint}`}
-                title={`${QUICK_LABELS[action.kind]} (${stateHint})`}
+                aria-label={`${QUICK_LABELS[kind]}: ${stateHint}${countHint}`}
+                title={`${QUICK_LABELS[kind]} (${stateHint})`}
                 className={cn(
                   "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
@@ -351,6 +390,8 @@ export function LeadListView({
   );
   const [revision, setRevision] = useState(0);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [internalPageSize, setInternalPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
@@ -426,8 +467,10 @@ export function LeadListView({
             statusDotColor: column.dotColorClass,
           })),
       );
-    return sortLeadCards(rows, sortValue);
-  }, [columns, columnsProp, filters, revision, sortValue]);
+    return sortRows(rows, columnSort, (lead, field) =>
+      leadSortValue(lead, field, cardSettings),
+    );
+  }, [columns, columnsProp, filters, revision, columnSort, cardSettings]);
 
   const pagedLeads = useMemo(
     () => allLeads.slice(0, pageSize),
@@ -453,7 +496,7 @@ export function LeadListView({
     [callFlow.onCallClick],
   );
   const orderedVisibleColumns = useMemo(
-    () => manageColumns.filter((c) => c.checked),
+    () => visibleManageColumns(manageColumns),
     [manageColumns],
   );
 
@@ -474,7 +517,8 @@ export function LeadListView({
   }
 
   function flash(msg: string) {
-    notify(msg);
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2400);
   }
 
   return (
@@ -514,7 +558,20 @@ export function LeadListView({
                     "px-3 py-2.5 text-left"
                   }
                 >
-                  {columnRenderers[col.id]?.th}
+                  {isSortableColumnId(col.id) ? (
+                    <SortableColumnHeader
+                      label={columnRenderers[col.id]?.th ?? col.label}
+                      field={col.id}
+                      sort={columnSort}
+                      onSort={(field) =>
+                        setColumnSort((current) =>
+                          toggleColumnSort(current, field),
+                        )
+                      }
+                    />
+                  ) : (
+                    columnRenderers[col.id]?.th
+                  )}
                 </th>
               ))}
 
@@ -599,6 +656,11 @@ export function LeadListView({
         }}
       />
 
+      {toast && (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

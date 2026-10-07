@@ -1045,15 +1045,22 @@ export function filterQueueRows(
 }
 
 export const QUEUE_SORT_OPTIONS = [
+  { id: "subject", label: "Subject" },
   { id: "dueDate", label: "Due Date" },
   { id: "priority", label: "Priority" },
   { id: "status", label: "Status" },
-  { id: "subject", label: "Subject" },
   { id: "relatedTo", label: "Related To" },
   { id: "contactName", label: "Contact Name" },
+  { id: "fileHandler", label: "File Handler" },
+  { id: "tag", label: "Tag" },
   { id: "taskOwner", label: "Task Owner" },
   { id: "createdTime", label: "Created Time" },
+  { id: "modifiedBy", label: "Modified By" },
   { id: "modifiedTime", label: "Modified Time" },
+  { id: "closedTime", label: "Closed Time" },
+  { id: "createdBy", label: "Created By" },
+  { id: "description", label: "Description" },
+  { id: "lastActivityTime", label: "Last Activity Time" },
 ] as const;
 
 export type QueueSortField = (typeof QUEUE_SORT_OPTIONS)[number]["id"];
@@ -1067,12 +1074,26 @@ function sortFieldText(row: QueueRow, field: QueueSortField): string {
       return row.related;
     case "contactName":
       return row.contactName ?? "";
+    case "fileHandler":
+      return row.fileHandler ?? "";
+    case "tag":
+      return row.tag ?? "";
     case "taskOwner":
       return row.taskOwner ?? "";
     case "createdTime":
       return row.createdTime ?? "";
+    case "modifiedBy":
+      return row.modifiedBy ?? "";
     case "modifiedTime":
       return row.modifiedTime ?? "";
+    case "closedTime":
+      return row.closedTime ?? "";
+    case "createdBy":
+      return row.createdBy ?? "";
+    case "description":
+      return row.description ?? "";
+    case "lastActivityTime":
+      return row.lastActivityTime ?? "";
     case "priority":
       return row.priority;
     case "status":

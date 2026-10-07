@@ -18,8 +18,10 @@ import {
 import {
   readColumnOrder,
   readHiddenColumnIds,
+  readPinnedColumnIds,
   writeColumnOrder,
   writeHiddenColumnIds,
+  writePinnedColumnIds,
 } from "@/lib/list-columns/visibility";
 import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
 import {
@@ -184,6 +186,7 @@ export function ResizableColumns({
   const widthsRef = useRef<Record<string, number>>({});
   const hiddenRef = useRef<Set<string>>(new Set());
   const orderRef = useRef<string[]>([]);
+  const pinnedRef = useRef<Set<string>>(new Set());
   const hydratedKeyRef = useRef<string | null>(null);
   const dragRef = useRef<{
     id: string;
@@ -204,6 +207,7 @@ export function ResizableColumns({
       table.querySelectorAll("thead th"),
     ) as HTMLTableCellElement[];
     const hidden = hiddenRef.current;
+    const pinned = pinnedRef.current;
     const cols: ManageColumn[] = [];
     for (const [index, th] of ths.entries()) {
       const id = columnId(th, index);
@@ -216,6 +220,7 @@ export function ResizableColumns({
         label,
         checked: !hidden.has(id),
         required: cols.length === 0,
+        pinned: pinned.has(id),
       });
     }
     return cols;
@@ -372,6 +377,7 @@ export function ResizableColumns({
       widthsRef.current = readColumnWidths(storageKey);
       hiddenRef.current = new Set(readHiddenColumnIds(storageKey));
       orderRef.current = readColumnOrder(storageKey);
+      pinnedRef.current = new Set(readPinnedColumnIds(storageKey));
       hydratedKeyRef.current = storageKey;
     }
     refresh();
@@ -491,6 +497,7 @@ export function ResizableColumns({
         "relative min-h-0 w-full min-w-0",
         "[&_thead_th]:!font-bold [&_thead_th]:text-slate-500",
         "[&_thead_th:last-child:not([data-col-id=options])]:pr-12",
+        "[&_thead_th>button]:w-full",
         outer,
       )}
     >
@@ -563,10 +570,13 @@ export function ResizableColumns({
           onSave={(cols) => {
             const hidden = cols.filter((col) => !col.checked).map((col) => col.id);
             const order = cols.map((col) => col.id);
+            const pinned = cols.filter((col) => col.pinned).map((col) => col.id);
             hiddenRef.current = new Set(hidden);
             orderRef.current = order;
+            pinnedRef.current = new Set(pinned);
             writeHiddenColumnIds(storageKey, hidden);
             writeColumnOrder(storageKey, order);
+            writePinnedColumnIds(storageKey, pinned);
             setManageOpen(false);
             refresh();
           }}

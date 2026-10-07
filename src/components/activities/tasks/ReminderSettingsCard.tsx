@@ -98,8 +98,8 @@ function SettingsPopup({
   children: ReactNode;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/25 px-4 pt-20 backdrop-blur-[2px]"
+        <div
+      className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-900/25 px-4 pt-20 backdrop-blur-[2px]"
       onClick={onCancel}
     >
       <div

@@ -11,7 +11,6 @@ import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { rulesRoleForWorkspaceRole } from "@/lib/auth/workspace-role";
 import { BOTTOM_BAR_H } from "@/lib/layout";
 import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
-import { CrmPrefetcher } from "@/components/persistence/CrmPrefetcher";
 import {
   resolveWorkspaceBrand,
   workspaceBrandCssVars,
@@ -23,32 +22,12 @@ interface DashboardShellProps {
   session: SessionPayload;
 }
 
-type ShellUser = {
-  name: string;
-  role: string;
-  workspaceRole?: string | null;
-  email?: string;
-  tenantName?: string;
-  avatarUrl?: string;
-};
-
 export function DashboardShell({ children, session }: DashboardShellProps) {
   return (
     <SettingsCrmProvider>
-      <CrmPrefetcher />
       <DashboardShellInner session={session}>{children}</DashboardShellInner>
     </SettingsCrmProvider>
   );
-}
-
-function shellUserFromSession(session: SessionPayload): ShellUser {
-  return {
-    name: session.name,
-    role: session.role,
-    workspaceRole: session.workspaceRole,
-    email: session.email,
-    tenantName: session.tenantName,
-  };
 }
 
 function DashboardShellInner({ children, session }: DashboardShellProps) {
@@ -60,7 +39,6 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   }
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [user, setUser] = useState<ShellUser>(() => shellUserFromSession(session));
   const shellRef = useRef<HTMLDivElement>(null);
   const crm = useCrmSettings();
   const brand = useMemo(
@@ -75,74 +53,6 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
     [crm.settings, crm.previewBrand],
   );
 
-  // On <html>, so the whole app — including dialogs portalled to <body> —
-  // and the brand-derived Tailwind palette in globals.css follow it.
-  useEffect(() => {
-    const root = document.documentElement;
-    const vars = workspaceBrandCssVars(brand) as Record<string, string>;
-    for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
-    return () => {
-      for (const name of Object.keys(vars)) root.style.removeProperty(name);
-    };
-  }, [brand]);
-
-  useEffect(() => {
-    setUser(shellUserFromSession(session));
-  }, [
-    session.userId,
-    session.name,
-    session.email,
-    session.role,
-    session.workspaceRole,
-    session.tenantName,
-  ]);
-
-  // Cookie session can lag the CRM (e.g. after switching accounts). Refresh
-  // name / email / workspace role from /api/auth/me so the profile menu shows
-  // whoever actually signed in.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/auth/me", { credentials: "same-origin" });
-        const data = (await res.json().catch(() => null)) as {
-          authenticated?: boolean;
-          user?: {
-            id?: string;
-            name?: string;
-            email?: string;
-            role?: string;
-            workspaceRole?: string | null;
-            avatar?: string | null;
-          };
-          tenant?: { name?: string };
-        } | null;
-        if (cancelled || !data?.authenticated || !data.user) return;
-        setUser({
-          name: data.user.name?.trim() || session.name,
-          email: data.user.email?.trim() || session.email,
-          role: data.user.role?.trim() || session.role,
-          workspaceRole:
-            data.user.workspaceRole ?? session.workspaceRole ?? null,
-          tenantName: data.tenant?.name?.trim() || session.tenantName,
-          avatarUrl: data.user.avatar?.trim() || undefined,
-        });
-      } catch {
-        /* keep cookie session */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    session.userId,
-    session.name,
-    session.email,
-    session.role,
-    session.workspaceRole,
-    session.tenantName,
-  ]);
-
   useEffect(() => {
     /*
      * The permission engine must be told the role held *in this workspace*.
@@ -152,22 +62,21 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
      * rest. Platform staff keep their own tier; everyone else is judged by
      * their membership, exactly as the Nest guards judge them.
      */
-    const role = isPlatformAdminRole(user.role)
+    const role = isPlatformAdminRole(session.role)
       ? "System Admin"
-      : (rulesRoleForWorkspaceRole(user.workspaceRole) ?? user.role);
+      : (rulesRoleForWorkspaceRole(session.workspaceRole) ?? session.role);
     setRulesActor({
       id: session.userId,
-      name: user.name,
-      email: user.email || session.email,
+      name: session.name,
+      email: session.email,
       role,
     });
   }, [
     session.userId,
+    session.name,
     session.email,
-    user.name,
-    user.email,
-    user.role,
-    user.workspaceRole,
+    session.role,
+    session.workspaceRole,
   ]);
 
   // Focus/scrollIntoView on overlays can shift this overflow-hidden shell and
@@ -192,25 +101,25 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
           document flow), so this wrapper takes up no space there: width
           only matters at md+, where the sidebar is back in normal flow. */}
       <div className="relative z-20 shrink-0">
-        <Suspense
-          fallback={
-            <aside className="hidden h-screen w-64 shrink-0 md:block" />
-          }
-        >
-          <Sidebar
-            collapsed={collapsed}
-            tenantName={user.tenantName ?? session.tenantName}
-            mobileOpen={mobileOpen}
-            onMobileOpenChange={setMobileOpen}
-            onToggleSidebar={() => setCollapsed((c) => !c)}
-          />
-        </Suspense>
+        <Sidebar
+          collapsed={collapsed}
+          tenantName={session.tenantName}
+          mobileOpen={mobileOpen}
+          onMobileOpenChange={setMobileOpen}
+          onToggleSidebar={() => setCollapsed((c) => !c)}
+        />
       </div>
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<div className="h-16 shrink-0 border-b border-border/60" />}>
           <Navbar
             onOpenMobileMenu={() => setMobileOpen(true)}
-            user={user}
+            user={{
+              name: session.name,
+              role: session.role,
+              workspaceRole: session.workspaceRole,
+              email: session.email,
+              tenantName: session.tenantName,
+            }}
           />
         </Suspense>
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">

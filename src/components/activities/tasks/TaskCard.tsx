@@ -11,12 +11,14 @@ import {
   ArrowUp,
   ArrowRight,
   ArrowDown,
-  MessageCircle,
+  FileText,
   Paperclip,
   Check,
   RotateCcw,
   Flag,
   UserPlus,
+  Search,
+  Plus,
   X,
 } from "lucide-react";
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
@@ -25,6 +27,8 @@ import { resolveAssignableOwnerName } from "@/lib/users/assignable";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { ArrowTag } from "@/components/common/ArrowTag";
 import { useRouter } from "next/navigation";
+import { formatRelatedTo } from "@/lib/activities/shared";
+import { WorkQueueNotesDrawer } from "@/components/work-queue/WorkQueueNotesDrawer";
 
 interface TaskCardProps {
   task: Task;
@@ -116,12 +120,12 @@ export function TaskCard({
 
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [showNotesDrawer, setShowNotesDrawer] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [commentText, setCommentText] = useState("");
   const [assignModalTab, setAssignModalTab] = useState<
     "owner" | "collaborators"
   >("owner");
+  const [assignSearch, setAssignSearch] = useState("");
 
   const footerRef = useRef<HTMLDivElement>(null);
   const wasDragging = useRef(false);
@@ -162,28 +166,66 @@ export function TaskCard({
   const selectUser = (user: string) => {
     onAssignUser?.(task.taskId, user);
     toast.success(`Assigned to ${user}`);
-    setShowAssignModal(false);
+    closeAssignModal();
   };
 
-  const submitComment = () => {
-    const trimmed = commentText.trim();
-    if (!trimmed) {
-      toast.error("Note can't be empty");
-      return;
-    }
-    onAddComment?.(task.taskId, trimmed);
-    toast.success("Note added");
-    setCommentText("");
-    setShowCommentModal(false);
-  };
-
-  function toggleFollower(owner: string) {
+  function toggleCollaborator(name: string) {
     const current = task.collaborators ?? [];
-    const next = current.includes(owner)
-      ? current.filter((f) => f !== owner)
-      : [...current, owner];
+    const next = current.includes(name)
+      ? current.filter((f) => f !== name)
+      : current.length >= 3
+        ? current
+        : [...current, name];
     onChangeCollaborators?.(task.taskId, next);
   }
+
+  function addCollaboratorFromSearch() {
+    const name = assignSearch.trim();
+    if (!name) return;
+    const current = task.collaborators ?? [];
+    if (current.length >= 3) {
+      toast.error("You can add up to 3 collaborators");
+      return;
+    }
+    if (name === task.assignedTo) {
+      toast.error("Owner can't also be a collaborator");
+      return;
+    }
+    if (current.some((c) => c.toLowerCase() === name.toLowerCase())) return;
+    onChangeCollaborators?.(task.taskId, [...current, name]);
+    setAssignSearch("");
+    toast.success(`Added ${name} as collaborator`);
+  }
+
+  function openAssignModal() {
+    setAssignModalTab("owner");
+    setAssignSearch("");
+    setShowAssignModal(true);
+  }
+
+  function closeAssignModal() {
+    setShowAssignModal(false);
+    setAssignSearch("");
+  }
+
+  const assignQuery = assignSearch.trim().toLowerCase();
+  const filteredOwners = TASK_OWNERS.filter((owner) =>
+    assignQuery ? owner.toLowerCase().includes(assignQuery) : true,
+  );
+  const collaboratorPool = Array.from(
+    new Set([...TASK_OWNERS, ...(task.collaborators ?? [])]),
+  ).filter((name) => name !== task.assignedTo);
+  const filteredCollaborators = collaboratorPool.filter((name) =>
+    assignQuery ? name.toLowerCase().includes(assignQuery) : true,
+  );
+  const canAddCollaborator =
+    assignModalTab === "collaborators" &&
+    Boolean(assignSearch.trim()) &&
+    (task.collaborators?.length ?? 0) < 3 &&
+    assignSearch.trim() !== task.assignedTo &&
+    !collaboratorPool.some(
+      (name) => name.toLowerCase() === assignSearch.trim().toLowerCase(),
+    );
 
   return (
     <>
@@ -322,7 +364,7 @@ export function TaskCard({
               <div className="flex items-center gap-3 text-[11px] text-slate-400">
                 {task.commentsCount ? (
                   <span className="flex items-center gap-1">
-                    <MessageCircle className="h-3.5 w-3.5" />
+                    <FileText className="h-3.5 w-3.5" />
                     {task.commentsCount}
                   </span>
                 ) : null}
@@ -422,7 +464,7 @@ export function TaskCard({
 
           <button
             type="button"
-            onClick={() => setShowAssignModal(true)}
+            onClick={openAssignModal}
             title="Assign Owner"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
@@ -430,11 +472,11 @@ export function TaskCard({
           </button>
           <button
             type="button"
-            onClick={() => setShowCommentModal(true)}
-            title="Add note"
+            onClick={() => setShowNotesDrawer(true)}
+            title="Notes"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
+            <FileText className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -443,7 +485,7 @@ export function TaskCard({
       {showAssignModal ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowAssignModal(false)}
+          onClick={closeAssignModal}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -451,11 +493,13 @@ export function TaskCard({
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">
-                {assignModalTab === "owner" ? "Assign Owner" : "Add Followers"}
+                {assignModalTab === "owner"
+                  ? "Assign Owner"
+                  : "Add Collaborators"}
               </h3>
               <button
                 type="button"
-                onClick={() => setShowAssignModal(false)}
+                onClick={closeAssignModal}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="h-4 w-4" />
@@ -465,7 +509,10 @@ export function TaskCard({
             <div className="mb-3 flex rounded-md bg-slate-100 p-0.5 text-[13px]">
               <button
                 type="button"
-                onClick={() => setAssignModalTab("owner")}
+                onClick={() => {
+                  setAssignModalTab("owner");
+                  setAssignSearch("");
+                }}
                 className={`flex-1 rounded-[5px] py-1 font-medium transition-colors ${
                   assignModalTab === "owner"
                     ? "bg-white text-slate-900 shadow-sm"
@@ -476,14 +523,17 @@ export function TaskCard({
               </button>
               <button
                 type="button"
-                onClick={() => setAssignModalTab("collaborators")}
+                onClick={() => {
+                  setAssignModalTab("collaborators");
+                  setAssignSearch("");
+                }}
                 className={`flex-1 rounded-[5px] py-1 font-medium transition-colors ${
                   assignModalTab === "collaborators"
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                Followers
+                Collaborators
                 {task.collaborators?.length ? (
                   <span className="ml-1 text-slate-400">
                     ({task.collaborators.length})
@@ -492,9 +542,35 @@ export function TaskCard({
               </button>
             </div>
 
+            <label className="mb-2 flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-sky-500">
+              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <input
+                autoFocus
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canAddCollaborator) {
+                    e.preventDefault();
+                    addCollaboratorFromSearch();
+                  }
+                }}
+                placeholder={
+                  assignModalTab === "owner"
+                    ? "Search owners…"
+                    : "Search or add collaborators…"
+                }
+                className="min-w-0 flex-1 bg-transparent text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
+              />
+            </label>
+
             <div className="max-h-64 space-y-1 overflow-y-auto">
-              {assignModalTab === "owner"
-                ? TASK_OWNERS.map((owner) => (
+              {assignModalTab === "owner" ? (
+                filteredOwners.length === 0 ? (
+                  <p className="px-2 py-3 text-center text-[12px] text-slate-400">
+                    No matching owners
+                  </p>
+                ) : (
+                  filteredOwners.map((owner) => (
                     <button
                       key={owner}
                       type="button"
@@ -511,16 +587,40 @@ export function TaskCard({
                       {owner}
                     </button>
                   ))
-                : TASK_OWNERS.filter((owner) => owner !== task.assignedTo).map(
-                    (owner) => {
+                )
+              ) : (
+                <>
+                  {canAddCollaborator ? (
+                    <button
+                      type="button"
+                      onClick={addCollaboratorFromSearch}
+                      className="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-sky-700 hover:bg-sky-50"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-sky-400 text-sky-600">
+                        <Plus className="h-3.5 w-3.5" />
+                      </span>
+                      Add “{assignSearch.trim()}”
+                    </button>
+                  ) : null}
+                  {filteredCollaborators.length === 0 && !canAddCollaborator ? (
+                    <p className="px-2 py-3 text-center text-[12px] text-slate-400">
+                      {assignQuery
+                        ? "No matching collaborators"
+                        : "No collaborators available"}
+                    </p>
+                  ) : (
+                    filteredCollaborators.map((owner) => {
                       const checked =
                         task.collaborators?.includes(owner) ?? false;
+                      const atLimit =
+                        !checked && (task.collaborators?.length ?? 0) >= 3;
                       return (
                         <button
                           key={owner}
                           type="button"
-                          onClick={() => toggleFollower(owner)}
-                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-slate-50 ${
+                          disabled={atLimit}
+                          onClick={() => toggleCollaborator(owner)}
+                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 ${
                             checked
                               ? "bg-sky-50 text-sky-700"
                               : "text-slate-700"
@@ -537,70 +637,35 @@ export function TaskCard({
                                 : "border-slate-300"
                             }`}
                           >
-                            {checked && (
+                            {checked ? (
                               <Check
                                 className="h-3 w-3 text-white"
                                 strokeWidth={3}
                               />
-                            )}
-        </span>
+                            ) : null}
+                          </span>
                         </button>
                       );
-                    },
+                    })
                   )}
+                </>
+              )}
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Add note modal */}
-      {showCommentModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowCommentModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Add note
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCommentModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <textarea
-              autoFocus
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Write a note…"
-              rows={4}
-              className="mb-3 w-full resize-none rounded-md border border-slate-200 p-2 text-[13px] text-slate-700 outline-none focus:border-sky-400"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCommentModal(false)}
-                className="rounded-md px-3 py-1.5 text-[12px] font-medium text-slate-500 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitComment}
-                className="rounded-md bg-sky-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-sky-700"
-              >
-                Add note
-              </button>
-            </div>
-      </div>
-    </div>
+      {showNotesDrawer ? (
+        <WorkQueueNotesDrawer
+          row={{
+            id: task.taskId,
+            subject: task.title,
+            related: formatRelatedTo(task.relatedTo) || undefined,
+            href: `/activities/tasks/detail/${task.taskId}`,
+          }}
+          onClose={() => setShowNotesDrawer(false)}
+          onChanged={(message) => toast.success(message)}
+        />
       ) : null}
     </>
   );

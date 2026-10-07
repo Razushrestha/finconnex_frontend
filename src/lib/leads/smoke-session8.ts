@@ -51,7 +51,7 @@ export function runSmokeSession8() {
   if (PUSH_NOTIFICATIONS_FOR_CARD !== false) {
     fail("card push must be off for v1");
   }
-  if (FOREVER_NEUTRAL_QUICK_ACTIONS.join(",") !== "note,attachment") {
+  if (FOREVER_NEUTRAL_QUICK_ACTIONS.join(",") !== "note") {
     fail("forever-neutral set drift");
   }
   if (DEFAULT_LEAD_CARD_SETTINGS.unrepliedThresholdHours !== 24) {

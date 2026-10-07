@@ -14,6 +14,7 @@ import { StatusColorPill } from "@/components/common/StatusColorPill";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
+  visibleManageColumns,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
 import {
@@ -24,6 +25,13 @@ import {
   tablePreferenceFromColumns,
   tryCrmTablePreference,
 } from "@/lib/table-preferences/api";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  isSortableColumnId,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 interface CompaniesListViewProps {
   groups?: CompanyGroup[];
@@ -52,6 +60,13 @@ function buildAllCompaniesShape(groups: CompanyGroup[]) {
       statusDotColor: group.dotColorClass,
     })),
   )[0];
+}
+
+function companySortValue(company: CompanyRow, field: string): unknown {
+  if (field === "company") return company.name;
+  if (field === "status") return company.statusTitle;
+  if (field === "revenue") return company.annualRevenue;
+  return (company as unknown as Record<string, unknown>)[field];
 }
 
 interface ColumnRenderer {
@@ -147,6 +162,7 @@ export function CompaniesListView({
   const [manageColumns, setManageColumns] = useState<ManageColumn[]>(
     DEFAULT_COMPANY_COLUMNS,
   );
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
@@ -187,8 +203,8 @@ export function CompaniesListView({
             statusDotColor: group.dotColorClass,
           })),
       );
-    return sortCompanyCards(rows, sortValue, sortDirection);
-  }, [groups, filters, sortValue, sortDirection]);
+    return sortRows(rows, columnSort, companySortValue);
+  }, [groups, filters, columnSort]);
 
   const pagedCompanies = useMemo(
     () => allCompanies.slice(0, pageSize),
@@ -202,7 +218,7 @@ export function CompaniesListView({
     pagedCompanies.some((c) => selectedIds.has(c.id)) && !allSelected;
 
   const orderedVisibleColumns = useMemo(
-    () => manageColumns.filter((c) => c.checked),
+    () => visibleManageColumns(manageColumns),
     [manageColumns],
   );
 
@@ -255,7 +271,20 @@ export function CompaniesListView({
                     columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
                   }
                 >
-                  {columnRenderers[col.id]?.th}
+                  {isSortableColumnId(col.id) ? (
+                    <SortableColumnHeader
+                      label={columnRenderers[col.id]?.th ?? col.label}
+                      field={col.id}
+                      sort={columnSort}
+                      onSort={(field) =>
+                        setColumnSort((current) =>
+                          toggleColumnSort(current, field),
+                        )
+                      }
+                    />
+                  ) : (
+                    columnRenderers[col.id]?.th
+                  )}
                 </th>
               ))}
 

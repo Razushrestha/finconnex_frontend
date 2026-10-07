@@ -22,6 +22,7 @@ import { resolveDealContact } from "@/lib/sales/resolve-contact";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
+  visibleManageColumns,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
 import {
@@ -32,6 +33,13 @@ import {
   tablePreferenceFromColumns,
   tryCrmTablePreference,
 } from "@/lib/table-preferences/api";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  isSortableColumnId,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 interface DealsListViewProps {
   pipeline: DealPipeline;
@@ -64,6 +72,13 @@ function buildAllDealsShape(stages: DealStage[]) {
       stageDotColor: stage.dotColorClass,
     })),
   )[0];
+}
+
+function dealSortValue(deal: DealRow, field: string): unknown {
+  if (field === "stage") return deal.stageTitle;
+  if (field === "contactName") return resolveDealContact(deal).name;
+  if (field === "email") return resolveDealContact(deal).email;
+  return (deal as unknown as Record<string, unknown>)[field];
 }
 
 interface ColumnRenderer {
@@ -216,6 +231,7 @@ export function DealsListView({
     useState<ManageColumn[]>(DEFAULT_DEAL_COLUMNS);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   useEffect(() => {
     if (stagesProp) setStages(stagesProp);
@@ -258,8 +274,8 @@ export function DealsListView({
             stageDotColor: stage.dotColorClass,
           })),
       );
-    return sortDealCards(rows, sortValue, sortDirection);
-  }, [stages, filters, sortValue, sortDirection]);
+    return sortRows(rows, columnSort, dealSortValue);
+  }, [stages, filters, columnSort]);
 
   const pagedDeals = useMemo(
     () => allDeals.slice(0, pageSize),
@@ -288,7 +304,7 @@ export function DealsListView({
   }
 
   const orderedVisibleColumns = useMemo(
-    () => manageColumns.filter((c) => c.checked),
+    () => visibleManageColumns(manageColumns),
     [manageColumns],
   );
 
@@ -326,7 +342,20 @@ export function DealsListView({
                     "px-5 py-3.5 text-left font-semibold"
                   }
                 >
-                  {columnRenderers[col.id]?.th}
+                  {isSortableColumnId(col.id) ? (
+                    <SortableColumnHeader
+                      label={columnRenderers[col.id]?.th ?? col.label}
+                      field={col.id}
+                      sort={columnSort}
+                      onSort={(field) =>
+                        setColumnSort((current) =>
+                          toggleColumnSort(current, field),
+                        )
+                      }
+                    />
+                  ) : (
+                    columnRenderers[col.id]?.th
+                  )}
                 </th>
               ))}
 

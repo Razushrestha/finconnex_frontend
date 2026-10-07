@@ -86,6 +86,8 @@ export interface Call {
   agenda?: string;
   purpose?: string;
   assignedTo: string;
+  /** Optional collaborators (not the owner). Max 3 in UI. */
+  collaborators?: string[];
   /** Team member who placed or answered the call — may differ from the owner. */
   calledBy?: string;
   recording?: CallRecording;

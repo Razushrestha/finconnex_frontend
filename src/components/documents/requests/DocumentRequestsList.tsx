@@ -1,22 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowDown,
-  ArrowDownUp,
-  ArrowUp,
-  CalendarDays,
-  Check,
-  Clock3,
-  Eye,
-  FileText,
-  MoreVertical,
-  User,
-  Info,
-} from "lucide-react";
+import { Check, CalendarDays, Clock3, Eye, FileText, MoreVertical, User, Info } from "lucide-react";
 import { initials } from "@/lib/activities/shared";
 import {
   formatRelativeFromDisplay,
@@ -48,7 +35,8 @@ import {
 import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
-import { notify } from "@/lib/notify/toast";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import type { ColumnSort } from "@/lib/tables/column-sort";
 
 const AVATAR_SOLID = [
   "bg-violet-500",
@@ -143,37 +131,39 @@ function ProgressRing({
   );
 }
 
+function documentColumnSort(sort: DocumentSortKey): ColumnSort {
+  if (sort.startsWith("started-")) {
+    return { field: "started", direction: sort.endsWith("asc") ? "asc" : "desc" };
+  }
+  if (sort.startsWith("updated-")) {
+    return { field: "updated", direction: sort.endsWith("asc") ? "asc" : "desc" };
+  }
+  if (sort.startsWith("status-")) {
+    return { field: "status", direction: sort.endsWith("asc") ? "asc" : "desc" };
+  }
+  return null;
+}
+
 function SortHeader({
   label,
-  active,
-  direction,
+  column,
+  sort,
   onClick,
 }: {
   label: string;
-  active: boolean;
-  direction: "asc" | "desc";
+  column: "started" | "updated" | "status";
+  sort: DocumentSortKey;
   onClick: () => void;
 }) {
-  const Icon = !active ? ArrowDownUp : direction === "asc" ? ArrowUp : ArrowDown;
+  const mapped = documentColumnSort(sort);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1 font-semibold tracking-wide uppercase",
-        active ? "text-[var(--brand-primary)]" : "text-slate-400 hover:text-slate-600",
-      )}
-    >
-      {label}
-      <Icon className="h-3 w-3 shrink-0" />
-    </button>
+    <SortableColumnHeader
+      label={label}
+      field={column}
+      sort={mapped?.field === column ? mapped : null}
+      onSort={() => onClick()}
+    />
   );
-}
-
-function shownField(value?: string) {
-  const text = value?.trim() ?? "";
-  if (!text || text === "—" || text === "-" || text === "–") return "";
-  return text;
 }
 
 function DateCell({ value }: { value: string }) {
@@ -207,10 +197,7 @@ function RowActions({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [notifyCancel, setNotifyCancel] = useState(false);
   const [editingReminders, setEditingReminders] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const actionButtonRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const closed =
     request.status === "Approved" ||
@@ -219,46 +206,16 @@ function RowActions({
   const hasFiles = uploadedItems(request).length > 0;
 
   useEffect(() => {
-    if (!open) {
-      setMenuStyle(null);
-      return;
-    }
-    function place() {
-      const button = actionButtonRef.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
-      const available = (openUp ? spaceAbove : spaceBelow) - 12;
-      const maxHeight = Math.min(320, Math.max(96, available));
-      setMenuStyle({
-        position: "fixed",
-        right: Math.max(8, window.innerWidth - rect.right),
-        width: 208,
-        maxHeight,
-        zIndex: 80,
-        ...(openUp
-          ? { bottom: window.innerHeight - rect.top + 4 }
-          : { top: rect.bottom + 4 }),
-      });
-    }
+    if (!open) return;
     function onDoc(e: MouseEvent) {
-      const target = e.target as Node;
-      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
-      setConfirmCancel(false);
-      setNotifyCancel(false);
+      if (!ref.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setConfirmCancel(false);
+        setNotifyCancel(false);
+      }
     }
-    place();
     document.addEventListener("mousedown", onDoc);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
+    return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
   function downloadDocs() {
@@ -380,10 +337,8 @@ function RowActions({
           <Eye className="h-4 w-4" />
         </button>
         <button
-          ref={actionButtonRef}
           type="button"
           aria-label="Actions"
-          aria-expanded={open}
           onClick={(e) => {
             e.stopPropagation();
             setOpen((v) => !v);
@@ -406,13 +361,8 @@ function RowActions({
           }}
         />
       ) : null}
-      {open && menuStyle
-        ? createPortal(
-        <div
-          ref={menuRef}
-          style={menuStyle}
-          className="overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
-        >
+      {open ? (
+        <div className="absolute right-0 z-30 mt-1 w-52 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
           {confirmCancel ? (
             <div className="px-3 py-2">
               <p className="text-[12px] leading-snug text-slate-600">
@@ -423,7 +373,7 @@ function RowActions({
                   type="checkbox"
                   checked={notifyCancel}
                   onChange={(e) => setNotifyCancel(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-slate-300 accent-[var(--brand-primary)]"
+                  className="h-3.5 w-3.5 rounded border-slate-300 accent-[#5A32A3]"
                 />
                 Notify client
                 <span
@@ -455,7 +405,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={!hasFiles}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
                 onClick={downloadDocs}
               >
                 Download documents
@@ -463,7 +413,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
                 onClick={resendInvite}
               >
                 Resend invitation link
@@ -471,7 +421,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed || request.status !== "Pending"}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
                 onClick={markReceived}
               >
                 Mark received
@@ -479,7 +429,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed || request.status !== "Received"}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
                 onClick={approveRequest}
               >
                 Approve
@@ -495,7 +445,7 @@ function RowActions({
               <button
                 type="button"
                 disabled={closed}
-                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[var(--brand-primary-soft)] hover:text-[var(--brand-primary)] disabled:opacity-40"
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
                 onClick={() => {
                   setOpen(false);
                   setEditingReminders(true);
@@ -513,10 +463,8 @@ function RowActions({
               </button>
             </>
           )}
-        </div>,
-          document.body,
-        )
-        : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -556,6 +504,7 @@ export function DocumentRequestsList({
   columnChrome = true,
 }: DocumentRequestsListProps) {
   const router = useRouter();
+  const [toast, setToast] = useState<string | null>(null);
   const [localSort, setLocalSort] = useState<DocumentSortKey>(
     sortProp ?? "updated-desc",
   );
@@ -573,7 +522,8 @@ export function DocumentRequestsList({
   const visible = limit ? sorted.slice(0, limit) : sorted;
 
   function flash(msg: string) {
-    notify(msg);
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2800);
   }
   const allSelected = visible.length > 0 && selectedIds.length === visible.length;
 
@@ -659,24 +609,24 @@ export function DocumentRequestsList({
             <th data-col-id="startDate" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Start date"
-                active={sort === "started-desc" || sort === "started-asc"}
-                direction={sort === "started-asc" ? "asc" : "desc"}
+                column="started"
+                sort={sort}
                 onClick={() => changeSort(nextDocumentSort(sort, "started"))}
               />
             </th>
             <th data-col-id="lastUpdated" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Last updated"
-                active={sort === "updated-desc" || sort === "updated-asc"}
-                direction={sort === "updated-asc" ? "asc" : "desc"}
+                column="updated"
+                sort={sort}
                 onClick={() => changeSort(nextDocumentSort(sort, "updated"))}
               />
             </th>
             <th data-col-id="status" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Status"
-                active={sort === "status-asc" || sort === "status-desc"}
-                direction={sort === "status-desc" ? "desc" : "asc"}
+                column="status"
+                sort={sort}
                 onClick={() => changeSort(nextDocumentSort(sort, "status"))}
               />
             </th>
@@ -732,13 +682,11 @@ export function DocumentRequestsList({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-3" title={shownField(r.requestedBy)}>
-                    {shownField(r.requestedBy) ? (
-                      <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-slate-800">
-                        <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span className="truncate">{shownField(r.requestedBy)}</span>
-                      </p>
-                    ) : null}
+                  <td className="px-3 py-3" title={r.requestedBy}>
+                    <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+                      <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      <span className="truncate">{r.requestedBy}</span>
+                    </p>
                   </td>
                   <td className="px-3 py-3" title={r.requestId}>
                     <p className="flex min-w-0 items-center gap-1.5 font-mono text-[12px] text-slate-600">
@@ -747,12 +695,10 @@ export function DocumentRequestsList({
                     </p>
                   </td>
                   {showRelatedTo ? (
-                    <td className="px-3 py-3" title={shownField(r.relatedTo)}>
-                      {shownField(r.relatedTo) ? (
-                        <p className="truncate text-[13px] text-slate-700">
-                          {shownField(r.relatedTo)}
-                        </p>
-                      ) : null}
+                    <td className="px-3 py-3" title={r.relatedTo}>
+                      <p className="truncate text-[13px] text-slate-700">
+                        {r.relatedTo || "—"}
+                      </p>
                     </td>
                   ) : null}
                   <td className="px-3 py-3">
@@ -820,6 +766,11 @@ export function DocumentRequestsList({
       ) : (
         table
       )}
+      {toast ? (
+        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -837,7 +788,7 @@ export function DocumentRequestCard({
   return (
     <Link
       href={`/documents/requests/${request.id}`}
-      className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-[var(--brand-primary)]/30"
+      className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-[#5A32A3]/30"
     >
       <p className="truncate pr-7 text-[13px] font-semibold text-slate-900">
         {request.requestedFrom}

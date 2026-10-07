@@ -21,6 +21,7 @@ import {
   liveRelatedRecords,
 } from "@/lib/activities/related-records";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
+import { ContactNameCombobox } from "@/components/shared/ContactNameCombobox";
 import {
   formatTaskTimestamp,
   notifyToMethod,
@@ -75,6 +76,8 @@ interface ScheduleCallFormProps {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
     contact?: string;
+    /** datetime-local value YYYY-MM-DDTHH:mm */
+    startTime?: string;
   };
 }
 
@@ -115,15 +118,6 @@ const initialState: FormState = {
   taskRepeat: defaultReminderRepeatRule,
   reminderRepeat: defaultReminderRepeatRule,
 };
-
-function contactOptions(extraName?: string) {
-  return liveRelatedRecords(
-    "Contact",
-    extraName?.trim()
-      ? { kind: "Contact", name: extraName.trim() }
-      : undefined,
-  ).map((record) => ({ kind: "Contact" as const, name: record.name }));
-}
 
 function parseDatetimeLocal(value: string): Date | null {
   if (!value.trim()) return null;
@@ -237,6 +231,7 @@ export function ScheduleCallForm({
       defaults?.contact ??
       (defaults?.relatedKind === "Contact" ? (defaults.relatedName ?? "") : ""),
     fromNumber: defaultCallerId(defaultActorName()),
+    startTime: defaults?.startTime ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -359,7 +354,6 @@ export function ScheduleCallForm({
   const hasStartTime = Boolean(form.startTime.trim());
   const actor = getRulesActor().name || ownerLabel || "Admin";
   const auditPreviewOn = formatTaskTimestamp(new Date());
-  const callToOptions = contactOptions(form.callFor);
 
   const relatedOptions = liveRelatedRecords(
     form.relatedKind,
@@ -374,7 +368,6 @@ export function ScheduleCallForm({
     };
     if (!form.callFor.trim()) next.callFor = "Contact is required";
     if (!form.startTime) next.startTime = "Call start time is required";
-    if (!form.assignedTo.trim()) next.assignedTo = "Call owner is required";
     if (!form.subject.trim()) next.subject = "Subject is required";
     if (ownerNumbers.length && !form.fromNumber.trim()) {
       next.fromNumber = "From number is required";
@@ -590,11 +583,12 @@ export function ScheduleCallForm({
               required
               error={submitted ? errors.callFor : undefined}
             >
-              <RelatedRecordCombobox
+              <ContactNameCombobox
                 value={form.callFor}
                 onChange={(v) => update("callFor", v)}
-                options={callToOptions}
-                placeholder="Select contact…"
+                placeholder="Add contact"
+                addLabel="Add contact"
+                error={Boolean(submitted && errors.callFor)}
               />
             </Field>
 
@@ -873,7 +867,6 @@ export function ScheduleCallForm({
 
             <Field
               label="Call Owner"
-              required
               error={submitted ? errors.assignedTo : undefined}
             >
               <InputShell icon={Users} error={!!(submitted && errors.assignedTo)}>

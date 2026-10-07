@@ -137,6 +137,7 @@ export function LeadFollowersField({
   }
 
   function add(name: string) {
+    if (followers.length >= 3) return;
     persist([...followers, name]);
     setQuery("");
     setOpen(false);
@@ -157,6 +158,7 @@ export function LeadFollowersField({
   }
 
   const nextSlot = followers.length + 1;
+  const atLimit = followers.length >= 3;
   const addLabel =
     nextSlot === 1
       ? "Add 1st follower"
@@ -190,7 +192,7 @@ export function LeadFollowersField({
             </button>
           </span>
         ))}
-        {candidates.length > 0 || open ? (
+        {!atLimit && (candidates.length > 0 || open) ? (
           <button
             type="button"
             title={addLabel}
@@ -202,7 +204,7 @@ export function LeadFollowersField({
           </button>
         ) : null}
       </div>
-      {open ? (
+      {open && !atLimit ? (
         <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-64 overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5">
           <p className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
             {addLabel}

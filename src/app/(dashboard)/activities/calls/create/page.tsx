@@ -9,7 +9,15 @@ interface CreateCallPageProps {
     relatedName?: string;
     contact?: string;
     mode?: string;
+    date?: string;
+    time?: string;
   }>;
+}
+
+function asStartTime(date?: string, time?: string): string | undefined {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  const clock = time && /^\d{2}:\d{2}$/.test(time) ? time : "09:00";
+  return `${date}T${clock}`;
 }
 
 export default async function CreateCallPage({
@@ -25,6 +33,7 @@ export default async function CreateCallPage({
         relatedKind: asRelatedKind(params.relatedKind),
         relatedName: params.relatedName,
         contact: params.contact,
+        startTime: asStartTime(params.date, params.time),
       }}
     />
   );

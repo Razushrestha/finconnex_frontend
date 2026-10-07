@@ -9,6 +9,11 @@ const ROLE_STYLE: Record<MeetingAttendeeRole, string> = {
   Host: "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]",
   Guest: "bg-slate-100 text-slate-600",
   "Main Applicant": "bg-emerald-50 text-emerald-700",
+  Client: "bg-sky-50 text-sky-700",
+  Broker: "bg-amber-50 text-amber-800",
+  CA: "bg-rose-50 text-rose-700",
+  LPA: "bg-indigo-50 text-indigo-700",
+  Internal: "bg-slate-100 text-slate-700",
 };
 
 interface MeetingParticipantsProps {

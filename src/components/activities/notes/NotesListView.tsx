@@ -18,6 +18,13 @@ import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  recordSortValue,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
   General: { soft: "bg-slate-100", text: "text-slate-600" },
@@ -53,6 +60,7 @@ export function NotesListView({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const selectedIds = controlledSelectedIds ?? localSelectedIds;
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   function setSelectedIds(ids: string[]) {
     if (onSelectedIdsChange) onSelectedIdsChange(ids);
@@ -65,28 +73,29 @@ export function NotesListView({
   const allNotes = notesOverride ?? listNotes();
 
   const filtered = useMemo(() => {
-    if (notesOverride) {
-      return [...notesOverride].sort(
-        (a, b) => Number(b.isPinned) - Number(a.isPinned),
-      );
-    }
-    let data: Note[] = [...allNotes];
-    if (typeFilter !== "All") {
-      data = data.filter((n) => n.noteType === typeFilter);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (n) =>
-          n.title.toLowerCase().includes(q) ||
-          n.body.toLowerCase().includes(q) ||
-          n.relatedTo.toLowerCase().includes(q) ||
-          n.createdBy.toLowerCase().includes(q),
-      );
+    let data: Note[] = notesOverride
+      ? [...notesOverride]
+      : [...allNotes];
+    if (!notesOverride) {
+      if (typeFilter !== "All") {
+        data = data.filter((n) => n.noteType === typeFilter);
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        data = data.filter(
+          (n) =>
+            n.title.toLowerCase().includes(q) ||
+            n.body.toLowerCase().includes(q) ||
+            n.relatedTo.toLowerCase().includes(q) ||
+            n.createdBy.toLowerCase().includes(q),
+        );
+      }
     }
     data.sort((a, b) => Number(b.isPinned) - Number(a.isPinned));
-    return data;
-  }, [search, typeFilter, notesOverride, allNotes]);
+    return sortRows(data, columnSort, (note, field) =>
+      field === "type" ? note.noteType : recordSortValue(note, field),
+    );
+  }, [search, typeFilter, notesOverride, allNotes, columnSort]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice(
@@ -171,19 +180,54 @@ export function NotesListView({
               </th>
               <th data-col-id="flags" className="w-12 px-4 py-2.5" />
               <th data-col-id="title" className="px-4 py-2.5">
-                Title
+                <SortableColumnHeader
+                  label="Title"
+                  field="title"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="relatedTo" className="px-4 py-2.5">
-                Related To
+                <SortableColumnHeader
+                  label="Related To"
+                  field="relatedTo"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="type" className="px-4 py-2.5">
-                Type
+                <SortableColumnHeader
+                  label="Type"
+                  field="type"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="createdBy" className="px-4 py-2.5">
-                Created By
+                <SortableColumnHeader
+                  label="Created By"
+                  field="createdBy"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="createdAt" className="px-4 py-2.5">
-                Created At
+                <SortableColumnHeader
+                  label="Created At"
+                  field="createdAt"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
             </tr>
           </thead>

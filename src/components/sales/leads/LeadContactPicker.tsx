@@ -80,16 +80,17 @@ function toContactSource(leadSource: string): ContactSource {
   return coerceLeadSource(leadSource);
 }
 
+/** Leads support at most primary + secondary applicants. */
+export const MAX_LEAD_CONTACTS = 2;
+
 function contactSearchPlaceholder(count: number) {
   if (count === 0) return "Add primary contact";
   if (count === 1) return "Add secondary contact";
-  return "Add another contact";
+  return "Contact limit reached";
 }
 
-function roleLabel(index: number, total: number) {
-  if (index === 0) return "Primary";
-  if (total <= 2) return "Secondary";
-  return `Secondary ${index}`;
+function roleLabel(index: number) {
+  return index === 0 ? "Primary" : "Secondary";
 }
 
 function AddField({
@@ -272,19 +273,27 @@ export function LeadContactPicker({
   }
 
   function startAdd(prefill = "") {
+    if (contacts.length >= MAX_LEAD_CONTACTS) return;
     setAdding(true);
     setOpen(false);
     resetAddForm(prefill);
   }
 
   function pick(contact: ContactCardData) {
+    if (contacts.length >= MAX_LEAD_CONTACTS) {
+      setQuery("");
+      setOpen(false);
+      setAdding(false);
+      setSeekingMore(false);
+      return;
+    }
     if (selectedIds.has(contact.id)) {
       setQuery("");
       setOpen(false);
       setAdding(false);
       return;
     }
-    onChange([...contacts, toLinked(contact)]);
+    onChange([...contacts, toLinked(contact)].slice(0, MAX_LEAD_CONTACTS));
     setQuery("");
     setOpen(false);
     setAdding(false);
@@ -305,6 +314,10 @@ export function LeadContactPicker({
   }
 
   async function saveNewContact() {
+    if (contacts.length >= MAX_LEAD_CONTACTS) {
+      setAddError("Only primary and secondary contacts are allowed");
+      return;
+    }
     const firstName = addFirstName.trim();
     const middleName = addMiddleName.trim();
     const lastName = addLastName.trim();
@@ -363,7 +376,7 @@ export function LeadContactPicker({
         middleName,
         lastName,
       };
-      onChange([...contacts, linked]);
+      onChange([...contacts, linked].slice(0, MAX_LEAD_CONTACTS));
       setTick((n) => n + 1);
       setQuery("");
       setOpen(false);
@@ -374,10 +387,11 @@ export function LeadContactPicker({
     }
   }
 
+  const atContactLimit = contacts.length >= MAX_LEAD_CONTACTS;
   const nextRole = contacts.length === 0 ? "Primary" : "Secondary";
-  const showSearch = !adding && (contacts.length === 0 || seekingMore);
-  const addMoreLabel =
-    contacts.length <= 1 ? "Add secondary contact" : "Add another contact";
+  const showSearch =
+    !adding && !atContactLimit && (contacts.length === 0 || seekingMore);
+  const addMoreLabel = "Add secondary contact";
 
   return (
     <div className="space-y-2" ref={wrapRef}>
@@ -394,11 +408,11 @@ export function LeadContactPicker({
                     className={cn(
                       "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       index === 0
-                        ? "bg-[var(--brand-primary)]/12 text-[var(--brand-primary)]"
-                        : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-slate-300",
+                        ? "bg-[#5A32A3]/12 text-[#5A32A3]"
+                        : "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
                     )}
                   >
-                    {roleLabel(index, contacts.length)}
+                    {roleLabel(index)}
                   </span>
                   <span className="truncate text-[13px] font-medium text-slate-800 dark:text-slate-100">
                     {contact.name}
@@ -411,7 +425,7 @@ export function LeadContactPicker({
                   <button
                     type="button"
                     onClick={() => makePrimary(index)}
-                    className="mt-0.5 text-[11px] font-medium text-[var(--brand-primary)] hover:underline"
+                    className="mt-0.5 text-[11px] font-medium text-[#5A32A3] hover:underline"
                   >
                     Make primary
                   </button>
@@ -430,7 +444,10 @@ export function LeadContactPicker({
         </ul>
       ) : null}
 
-      {contacts.length > 0 && !adding && !seekingMore ? (
+      {contacts.length > 0 &&
+      contacts.length < MAX_LEAD_CONTACTS &&
+      !adding &&
+      !seekingMore ? (
         <button
           type="button"
           onClick={() => {
@@ -438,9 +455,9 @@ export function LeadContactPicker({
             setOpen(true);
             setQuery("");
           }}
-          className="inline-flex items-center gap-2 text-[12px] font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]"
+          className="inline-flex items-center gap-2 text-[12px] font-medium text-[#5A32A3] hover:text-[#4a2888]"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-[var(--brand-primary)]/45">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-[#5A32A3]/45">
             <Plus className="h-3 w-3" strokeWidth={2.5} />
           </span>
           {addMoreLabel}
@@ -467,7 +484,7 @@ export function LeadContactPicker({
           {open ? (
             <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-full overflow-hidden rounded-xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5 dark:bg-zinc-950">
               <div className="px-2 pt-2 pb-1">
-                <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[var(--brand-primary)] dark:bg-zinc-900">
+                <label className="flex h-8 items-center gap-1.5 rounded-lg bg-slate-50 px-2 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3] dark:bg-zinc-900">
                   <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                   <input
                     value={query}
@@ -519,7 +536,7 @@ export function LeadContactPicker({
                   event.preventDefault();
                   startAdd(query.trim());
                 }}
-                className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2.5 text-left text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-violet-50 dark:border-zinc-800"
+                className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2.5 text-left text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50 dark:border-zinc-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {query.trim()
@@ -541,7 +558,7 @@ export function LeadContactPicker({
               className={cn(
                 "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                 contacts.length === 0
-                  ? "bg-[var(--brand-primary)]/12 text-[var(--brand-primary)]"
+                  ? "bg-[#5A32A3]/12 text-[#5A32A3]"
                   : "bg-slate-100 text-slate-600",
               )}
             >
@@ -626,7 +643,7 @@ export function LeadContactPicker({
             <button
               type="button"
               onClick={saveNewContact}
-              className="h-8 rounded-md bg-[var(--brand-primary)] px-3 text-[12px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
+              className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888]"
             >
               Save contact
             </button>

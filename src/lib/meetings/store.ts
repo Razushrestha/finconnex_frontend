@@ -152,6 +152,9 @@ export function updateMeeting(
       | "location"
       | "startDateTime"
       | "endDateTime"
+      | "previousStartDateTime"
+      | "previousEndDateTime"
+      | "rescheduleReason"
       | "type"
       | "meetingLink"
       | "relatedTo"
@@ -174,6 +177,9 @@ export function updateMeeting(
       location: current.location ?? "",
       startDateTime: current.startDateTime,
       endDateTime: current.endDateTime,
+      previousStartDateTime: current.previousStartDateTime ?? "",
+      previousEndDateTime: current.previousEndDateTime ?? "",
+      rescheduleReason: current.rescheduleReason ?? "",
       type: current.type,
       meetingLink: current.meetingLink ?? "",
       relatedTo: current.relatedTo ?? "",
@@ -190,6 +196,9 @@ export function updateMeeting(
       location: next.location ?? "",
       startDateTime: next.startDateTime,
       endDateTime: next.endDateTime,
+      previousStartDateTime: next.previousStartDateTime ?? "",
+      previousEndDateTime: next.previousEndDateTime ?? "",
+      rescheduleReason: next.rescheduleReason ?? "",
       type: next.type,
       meetingLink: next.meetingLink ?? "",
       relatedTo: next.relatedTo ?? "",
@@ -212,6 +221,32 @@ export function updateMeeting(
   );
   emitLeadActivityChange();
   return next;
+}
+
+/** Reschedule meeting: keep prior times, move status to Rescheduled. */
+export function rescheduleMeeting(
+  id: string,
+  input: {
+    startDateTime: string;
+    endDateTime: string;
+    reason?: string;
+    notifyAttendees?: boolean;
+  },
+): Meeting | null {
+  const found = findMeetingById(id);
+  if (!found) return null;
+  return updateMeeting(id, {
+    previousStartDateTime: found.meeting.startDateTime,
+    previousEndDateTime: found.meeting.endDateTime,
+    startDateTime: input.startDateTime,
+    endDateTime: input.endDateTime,
+    rescheduleReason: input.reason?.trim()
+      ? `${input.reason.trim()}${input.notifyAttendees ? " · attendees notified" : ""}`
+      : input.notifyAttendees
+        ? "Attendees notified"
+        : undefined,
+    status: "Rescheduled",
+  });
 }
 
 export function findMeetingById(id: string) {

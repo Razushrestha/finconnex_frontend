@@ -18,8 +18,6 @@ export function classifyFocus(email: Email, flags?: MailboxFlags): Exclude<Focus
   if (stored.focusOverride) return stored.focusOverride;
   const hay = `${email.subject} ${email.body} ${email.from} ${email.templateUsed ?? ""}`;
   if (OTHER_HINTS.test(hay)) return "other";
-  const labels = stored.labels ?? [];
-  if (labels.includes("Friends") && !labels.includes("Work")) return "other";
   return "focused";
 }
 

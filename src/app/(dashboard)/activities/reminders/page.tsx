@@ -27,6 +27,8 @@ import {
 import { reminderMatchesDeepFilters } from "@/lib/filters/records";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import { toggleColumnSort } from "@/lib/tables/column-sort";
 import {
   ActivityToolbar,
   TIMELINE_VIEW_TOGGLE,
@@ -245,6 +247,18 @@ export default function RemindersPage() {
     setSortField(field);
     setSortDirection(direction);
   }
+
+  function handleHeaderSort(field: string) {
+    const next = toggleColumnSort(
+      sortField ? { field: sortField, direction: sortDirection } : null,
+      field,
+    );
+    handleSortChange(next.field, next.direction);
+  }
+
+  const reminderListSort = sortField
+    ? { field: sortField, direction: sortDirection }
+    : null;
 
   const allVisibleSelected =
     visibleReminders.length > 0 &&
@@ -571,25 +585,60 @@ export default function RemindersPage() {
                       />
                     </th>
                     <th data-col-id="reminder" className="px-4 py-2.5">
-                      Reminder
+                      <SortableColumnHeader
+                        label="Reminder"
+                        field="title"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="type" className="px-4 py-2.5">
-                      Type
+                      <SortableColumnHeader
+                        label="Type"
+                        field="type"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="when" className="px-4 py-2.5">
-                      When
+                      <SortableColumnHeader
+                        label="When"
+                        field="dateTime"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="method" className="px-4 py-2.5">
-                      Method
+                      <SortableColumnHeader
+                        label="Method"
+                        field="notificationMethod"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="relatedTo" className="px-4 py-2.5">
-                      Related To
+                      <SortableColumnHeader
+                        label="Related To"
+                        field="relatedTo"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="status" className="px-4 py-2.5">
-                      Status
+                      <SortableColumnHeader
+                        label="Status"
+                        field="status"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="owner" className="px-4 py-2.5">
-                      Owner
+                      <SortableColumnHeader
+                        label="Owner"
+                        field="owner"
+                        sort={reminderListSort}
+                        onSort={handleHeaderSort}
+                      />
                     </th>
                     <th data-col-id="actions" className="px-4 py-2.5 text-right">
                       Actions

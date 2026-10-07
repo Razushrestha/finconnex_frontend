@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { resolveWorkspaceBrand } from "@/lib/settings/brand";
-import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import {
   Package,
   BadgePercent,
@@ -28,6 +28,7 @@ import {
   X,
   CalendarClock,
   Timer,
+  Scale,
   ChevronsLeft,
   Link2,
   Zap,
@@ -45,46 +46,17 @@ type NavItem = {
   children?: NavChildItem[];
 };
 
-function hrefPath(href: string): string {
-  const q = href.indexOf("?");
-  return (q === -1 ? href : href.slice(0, q)) || "/";
-}
-
-function hrefView(href: string): string | null {
-  const q = href.indexOf("?");
-  if (q === -1) return null;
-  return new URLSearchParams(href.slice(q + 1)).get("view");
-}
-
-function isNavActive(pathname: string, href: string, search = ""): boolean {
-  const targetPath = hrefPath(href);
-  const pathMatch =
-    pathname === targetPath ||
-    (targetPath !== "/" && pathname.startsWith(`${targetPath}/`));
-  if (!pathMatch) return false;
-
-  if (targetPath === "/") {
-    const targetView = hrefView(href);
-    const currentView = new URLSearchParams(
-      search.startsWith("?") ? search.slice(1) : search,
-    ).get("view");
-    if (targetView) return currentView === targetView;
-    return !currentView || currentView === "executive";
-  }
-
-  return true;
+function isNavActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function isChildNavActive(
   pathname: string,
   href: string,
   siblings: NavChildItem[],
-  search = "",
 ): boolean {
-  if (!isNavActive(pathname, href, search)) return false;
-  const matches = siblings.filter((item) =>
-    isNavActive(pathname, item.href, search),
-  );
+  if (!isNavActive(pathname, href)) return false;
+  const matches = siblings.filter((item) => isNavActive(pathname, item.href));
   if (matches.length === 0) return false;
   const bestMatch = matches.reduce((longest, item) =>
     item.href.length > longest.href.length ? item : longest,
@@ -101,11 +73,7 @@ const childNavClass = (active: boolean) =>
   );
 
 const dashboardItems: NavItem[] = [
-  {
-    label: "Dashboard",
-    href: "/",
-    icon: Package,
-  },
+  { label: "Dashboard", href: "/", icon: Package },
   { label: "Work Queue", href: "/work-queue", icon: Rows4 },
   {
     label: "Sales",
@@ -128,7 +96,6 @@ const dashboardItems: NavItem[] = [
       { label: "Emails", href: "/activities/emails" },
       { label: "Meetings", href: "/activities/meetings" },
       { label: "Notes", href: "/activities/notes" },
-      { label: "Attachments", href: "/activities/attachments" },
       { label: "Reminders", href: "/activities/reminders" },
     ],
   },
@@ -184,12 +151,14 @@ const dashboardItems: NavItem[] = [
     label: "Finance",
     icon: LineChart,
     children: [
+      { label: "Hub", href: "/finance" },
       { label: "Estimates", href: "/finance/estimates" },
       { label: "Quotations", href: "/finance/quotations" },
       { label: "Invoices", href: "/finance/invoices" },
-      { label: "Credit notes", href: "/finance/credit-notes" },
+      { label: "Credit Notes", href: "/finance/credit-notes" },
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
+      { label: "Service Agreements", href: "/finance/agreements" },
       { label: "Equifax", href: "/finance/equifax" },
     ],
   },
@@ -202,22 +171,10 @@ const dashboardItems: NavItem[] = [
   { label: "Calculator", href: "/calculator", icon: Calculator },
   { label: "Journeys", href: "/journeys", icon: Route },
   { label: "Automations", href: "/automations", icon: Zap },
+  { label: "Rules", href: "/rules", icon: Scale },
   { label: "Users", href: "/users", icon: Users },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
-
-function BrandLogo({ src }: { src: string }) {
-  const resolved = useResolvedImageSrc(src);
-  if (!resolved) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={resolved}
-      alt=""
-      className="h-8 w-8 shrink-0 rounded-md object-contain"
-    />
-  );
-}
 
 interface SidebarProps {
   collapsed?: boolean;
@@ -235,8 +192,6 @@ export function Sidebar({
   onToggleSidebar,
 }: SidebarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
   const chatRef = React.useRef<HTMLInputElement>(null);
   const crm = useCrmSettings();
   const brand = resolveWorkspaceBrand({
@@ -249,7 +204,7 @@ export function Sidebar({
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
     dashboardItems.forEach((item) => {
-      if (item.children?.some((c) => isNavActive(pathname, c.href, search))) {
+      if (item.children?.some((c) => isNavActive(pathname, c.href))) {
         initial.add(item.label);
       }
     });
@@ -260,13 +215,13 @@ export function Sidebar({
     setExpanded((prev) => {
       const next = new Set(prev);
       dashboardItems.forEach((item) => {
-        if (item.children?.some((c) => isNavActive(pathname, c.href, search))) {
+        if (item.children?.some((c) => isNavActive(pathname, c.href))) {
           next.add(item.label);
         }
       });
       return next;
     });
-  }, [pathname, search]);
+  }, [pathname]);
 
   const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
   const mobileOpen = mobileOpenProp ?? internalMobileOpen;
@@ -362,7 +317,14 @@ export function Sidebar({
               collapsed && "md:text-base",
             )}
           >
-            <BrandLogo src={logoSrc} />
+            {logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoSrc}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-md object-contain"
+              />
+            ) : null}
             <span className={collapsed ? "md:hidden" : undefined}>
               {brand.appName}
             </span>
@@ -443,15 +405,10 @@ export function Sidebar({
           <nav className="flex flex-col gap-0.5">
             {dashboardItems.map((item) => {
               const hasChildren = !!item.children?.length;
-              const onDashboardHome =
-                item.label === "Dashboard" && pathname === "/";
               const isActive =
-                onDashboardHome ||
-                (item.href && isNavActive(pathname, item.href, search)) ||
+                (item.href && isNavActive(pathname, item.href)) ||
                 (hasChildren &&
-                  item.children!.some((c) =>
-                    isNavActive(pathname, c.href, search),
-                  ));
+                  item.children!.some((c) => isNavActive(pathname, c.href)));
               const isOpen = expanded.has(item.label);
               const Icon = item.icon!;
 
@@ -527,7 +484,6 @@ export function Sidebar({
                           pathname,
                           child.href,
                           item.children!,
-                          search,
                         );
                         return (
                           <Link

@@ -116,10 +116,16 @@ export default function ScheduleMeetingPage({
   const [calendarId, setCalendarId] = useState("");
   const [title, setTitle] = useState(params.get("title") ?? "");
   const [teamMember, setTeamMember] = useState("Calendar Default");
-  const [date, setDate] = useState(todayIso);
-  const [time, setTime] = useState("");
+  const dateParam = params.get("date");
+  const timeParam = params.get("time");
+  const [date, setDate] = useState(
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayIso,
+  );
+  const [time, setTime] = useState(timeParam ?? "");
   const [duration, setDuration] = useState("30 min");
-  const [whenMode, setWhenMode] = useState<"default" | "custom">("default");
+  const [whenMode, setWhenMode] = useState<"default" | "custom">(
+    dateParam || timeParam ? "custom" : "default",
+  );
   const [recurring, setRecurring] = useState(false);
   const [repeatRule, setRepeatRule] = useState<ReminderRepeatRule>({
     ...defaultReminderRepeatRule,
@@ -203,12 +209,12 @@ export default function ScheduleMeetingPage({
   useEffect(() => {
     if (initial?.time) return;
     if (whenMode === "custom") {
-      if (!time) setTime(nowHHmm());
+      if (!time) setTime(timeParam && /^\d{2}:\d{2}$/.test(timeParam) ? timeParam : nowHHmm());
       return;
     }
     if (time && timeSlots.includes(time)) return;
     setTime(timeSlots[0] ?? "");
-  }, [time, timeSlots, whenMode]);
+  }, [time, timeSlots, whenMode, timeParam]);
 
   function applyCalendar(
     page: BookingPage,

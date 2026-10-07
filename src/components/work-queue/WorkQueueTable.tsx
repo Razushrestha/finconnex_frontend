@@ -1,36 +1,41 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowUpDown,
   Check,
   ChevronLeft,
   ChevronRight,
-  Columns3,
   Edit,
   EllipsisVertical,
   FileText,
   Inbox,
   ListFilter,
   RefreshCw,
-  Rows3,
-  Ruler,
-  Settings2,
   Trash2,
   X,
 } from "lucide-react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
+import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import {
+  clampColumnWidth,
+  readColumnWidths,
+  writeColumnWidths,
+} from "@/lib/list-columns/widths";
 import type {
   QueueRow,
   QueueSortDirection,
   QueueSortField,
 } from "@/lib/work-queue/live";
 import { QUEUE_SORT_OPTIONS } from "@/lib/work-queue/live";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
 import {
   DEFAULT_MANAGE_COLUMNS,
   ManageColumnsModal,
+  orderManageColumnsByPin,
+  visibleManageColumns,
   type ManageColumn,
 } from "./ManageColumnsModal";
 import {
@@ -76,26 +81,7 @@ interface WorkQueueTableProps {
 
 const ACTIONS_COL = "96px";
 const SETTINGS_COL = "40px";
-
-/** Preferred track sizes keyed by Manage Column id. */
-const COL_TRACK: Record<string, string> = {
-  subject: "minmax(200px,2.2fr)",
-  dueDate: "minmax(100px,0.85fr)",
-  status: "minmax(100px,0.85fr)",
-  priority: "minmax(80px,0.7fr)",
-  relatedTo: "minmax(140px,1.2fr)",
-  contactName: "minmax(120px,1fr)",
-  fileHandler: "minmax(110px,0.95fr)",
-  tag: "minmax(90px,0.8fr)",
-  taskOwner: "minmax(110px,0.95fr)",
-  createdTime: "minmax(120px,0.95fr)",
-  modifiedBy: "minmax(110px,0.9fr)",
-  modifiedTime: "minmax(120px,0.95fr)",
-  closedTime: "minmax(120px,0.95fr)",
-  createdBy: "minmax(110px,0.9fr)",
-  description: "minmax(160px,1.4fr)",
-  lastActivityTime: "minmax(130px,1fr)",
-};
+const WIDTHS_KEY = "work-queue";
 
 const COL_MIN_PX: Record<string, number> = {
   subject: 200,
@@ -117,7 +103,7 @@ const COL_MIN_PX: Record<string, number> = {
 };
 
 const STORAGE_KEY = "finconnex.work-queue.manage-columns";
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const PAGE_SIZE_OPTIONS = [8, 10, 20, 50];
 
 function loadManageColumns(): ManageColumn[] {
   if (typeof window === "undefined") return DEFAULT_MANAGE_COLUMNS;
@@ -144,7 +130,7 @@ function loadManageColumns(): ManageColumn[] {
     const ordered = order
       .map((id) => merged.find((m) => m.id === id)!)
       .concat(merged.filter((m) => !order.includes(m.id)));
-    return ordered;
+    return orderManageColumnsByPin(ordered);
   } catch {
     return DEFAULT_MANAGE_COLUMNS;
   }
@@ -159,31 +145,33 @@ function persistManageColumns(cols: ManageColumn[]) {
 }
 
 function visibleColumns(columns: ManageColumn[]): ManageColumn[] {
-  const checked = columns.filter((c) => c.checked);
-  const pinned = checked.filter((c) => c.pinned || c.required);
-  const rest = checked.filter((c) => !c.pinned && !c.required);
-  return [...pinned, ...rest];
+  return visibleManageColumns(columns);
 }
 
-function buildGridTemplate(cols: ManageColumn[]): string {
-  const tracks = cols.map((c) => COL_TRACK[c.id] ?? "minmax(110px,1fr)");
+function columnPx(id: string, widths: Record<string, number>) {
+  return clampColumnWidth(widths[id] ?? COL_MIN_PX[id] ?? 110, COL_MIN_PX[id] ?? 64);
+}
+
+function buildGridTemplate(
+  cols: ManageColumn[],
+  widths: Record<string, number>,
+): string {
+  const tracks = cols.map((c) => `${columnPx(c.id, widths)}px`);
   return `${ACTIONS_COL} ${tracks.join(" ")} ${SETTINGS_COL}`;
 }
 
-function buildMinWidth(cols: ManageColumn[]): number {
+function buildMinWidth(
+  cols: ManageColumn[],
+  widths: Record<string, number>,
+): number {
   const gap = 12; // gap-x-3
   const n = cols.length + 2; // actions + settings
   const sum =
     96 +
     40 +
-    cols.reduce((acc, c) => acc + (COL_MIN_PX[c.id] ?? 110), 0) +
+    cols.reduce((acc, c) => acc + columnPx(c.id, widths), 0) +
     gap * (n - 1);
-  return sum;
-}
-
-function canCompleteQueueRow(row: QueueRow) {
-  const type = (row.itemType ?? "").toUpperCase();
-  return type === "TASK" || type === "CALL" || type === "MEETING" || type === "REMINDER";
+  return sum + 48;
 }
 
 function cellText(row: QueueRow, colId: string): string {
@@ -252,28 +240,22 @@ export function WorkQueueTable({
   onCompleteRow,
   source,
 }: WorkQueueTableProps) {
-  const router = useRouter();
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   const sortRef = React.useRef<HTMLDivElement>(null);
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
-  const [optionsMenuOpen, setOptionsMenuOpen] = React.useState(false);
-  const [pageSizeFlyoutOpen, setPageSizeFlyoutOpen] = React.useState(false);
-  const optionsButtonRef = React.useRef<HTMLButtonElement>(null);
-  const optionsPortalRef = React.useRef<HTMLDivElement>(null);
-  const [menuPos, setMenuPos] = React.useState<{ top: number; right: number }>({
-    top: 0,
-    right: 0,
-  });
-
   const [manageColumnsOpen, setManageColumnsOpen] = React.useState(false);
   const [manageColumns, setManageColumns] = React.useState<ManageColumn[]>(
     DEFAULT_MANAGE_COLUMNS,
   );
+  const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+  const colWidthsRef = React.useRef(colWidths);
+  colWidthsRef.current = colWidths;
 
   React.useEffect(() => {
+    setColWidths(readColumnWidths(WIDTHS_KEY));
     setManageColumns(loadManageColumns());
     void tryCrmTablePreference(() => getCrmTablePreference("work-queue")).then(
       (pref) => {
@@ -294,12 +276,12 @@ export function WorkQueueTable({
     );
   }, [manageColumns, source]);
   const gridTemplate = React.useMemo(
-    () => buildGridTemplate(visibleCols),
-    [visibleCols],
+    () => buildGridTemplate(visibleCols, colWidths),
+    [visibleCols, colWidths],
   );
   const tableMinWidth = React.useMemo(
-    () => buildMinWidth(visibleCols),
-    [visibleCols],
+    () => buildMinWidth(visibleCols, colWidths),
+    [visibleCols, colWidths],
   );
   const gridStyle = React.useMemo(
     () =>
@@ -324,26 +306,6 @@ export function WorkQueueTable({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [activeMenuId]);
-
-  // Close header options menu when clicking outside
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        optionsButtonRef.current?.contains(target) ||
-        optionsPortalRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setOptionsMenuOpen(false);
-    }
-    if (optionsMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [optionsMenuOpen]);
 
   React.useEffect(() => {
     if (!sortOpen) return;
@@ -609,8 +571,8 @@ export function WorkQueueTable({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-scroll overflow-y-auto [scrollbar-gutter:stable] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-slate-100">
+        <div className="min-h-[420px] w-max min-w-full" style={{ minWidth: tableMinWidth }}>
           <div
             style={gridStyle}
             className="sticky top-0 z-10 grid gap-x-3 border-b border-[var(--wq-line)] bg-white px-5 py-2 sm:px-6"
@@ -618,32 +580,39 @@ export function WorkQueueTable({
             <span aria-hidden />
             {visibleCols.map((col) => {
               const sortable = sortableIds.has(col.id);
-              const active = sortField === col.id;
               return (
-                <button
-                  key={col.id}
-                  type="button"
-                  disabled={!sortable}
-                  onClick={() => {
-                    if (!sortable) return;
-                    applySort(col.id as QueueSortField);
-                  }}
-                  className={cn(
-                    "flex min-w-0 items-center gap-1 truncate text-left text-[11px] font-semibold tracking-[0.04em] uppercase",
-                    sortable
-                      ? active
-                        ? "text-[var(--wq-accent)]"
-                        : "text-slate-400 hover:text-slate-700"
-                      : "cursor-default text-slate-400",
-                  )}
-                >
-                  <span className="truncate">{col.label}</span>
-                  {active ? (
-                    <span className="shrink-0 text-[10px] font-bold">
-                      {sortDirection === "asc" ? "↑" : "↓"}
-                    </span>
-                  ) : null}
-                </button>
+                <div key={col.id} className="relative min-w-0 pr-2.5">
+                  <SortableColumnHeader
+                    label={col.label}
+                    field={col.id}
+                    sort={
+                      sortField
+                        ? { field: sortField, direction: sortDirection }
+                        : null
+                    }
+                    onSort={(field) => applySort(field as QueueSortField)}
+                    disabled={!sortable}
+                    className={cn(
+                      "text-[11px] font-bold tracking-[0.04em]",
+                      sortable ? "text-slate-400" : "cursor-default text-slate-400",
+                    )}
+                  />
+                  <ColumnResizeHandle
+                    label={`Resize ${col.label} column`}
+                    onDelta={(delta) => {
+                      setColWidths((prev) => ({
+                        ...prev,
+                        [col.id]: clampColumnWidth(
+                          (prev[col.id] ?? COL_MIN_PX[col.id] ?? 110) + delta,
+                          COL_MIN_PX[col.id] ?? 64,
+                        ),
+                      }));
+                    }}
+                    onCommit={() =>
+                      writeColumnWidths(WIDTHS_KEY, colWidthsRef.current)
+                    }
+                  />
+                </div>
               );
             })}
 
@@ -652,106 +621,14 @@ export function WorkQueueTable({
                 "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-6 sm:pr-6",
               )}
             >
-              <button
-                ref={optionsButtonRef}
-                type="button"
-                onClick={() => {
-                  if (!optionsMenuOpen && optionsButtonRef.current) {
-                    const rect =
-                      optionsButtonRef.current.getBoundingClientRect();
-                    setMenuPos({
-                      top: rect.bottom + 4,
-                      right: window.innerWidth - rect.right,
-                    });
-                  }
-                  setOptionsMenuOpen((v) => !v);
-                }}
-                aria-label="Table display options"
-                title="Column options"
-                className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </button>
-
-              {optionsMenuOpen && typeof document !== "undefined"
-                ? createPortal(
-                    <div
-                      ref={optionsPortalRef}
-                      style={{
-                        position: "fixed",
-                        top: menuPos.top,
-                        right: menuPos.right,
-                      }}
-                      className="z-50 w-56 border border-[var(--wq-line)] bg-white py-1 text-[13px] shadow-lg"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManageColumnsOpen(true);
-                          setOptionsMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
-                      >
-                        <Columns3 className="h-4 w-4 text-slate-400" />
-                        Manage Columns
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled
-                        className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-left text-slate-300"
-                      >
-                        <Ruler className="h-4 w-4 text-slate-300" />
-                        Reset Column Size
-                      </button>
-
-                      <div className="my-1 border-t border-[var(--wq-line)]" />
-
-                      <div
-                        className="relative"
-                        onMouseEnter={() => setPageSizeFlyoutOpen(true)}
-                        onMouseLeave={() => setPageSizeFlyoutOpen(false)}
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Rows3 className="h-4 w-4 text-slate-400" />
-                            Records per page
-                          </span>
-                          <span className="flex items-center gap-0.5 text-slate-400">
-                            {pageSize}
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </span>
-                        </button>
-
-                        {pageSizeFlyoutOpen ? (
-                          <div className="absolute right-full top-0 mr-1 w-28 border border-[var(--wq-line)] bg-white py-1 shadow-lg">
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                              <button
-                                key={size}
-                                type="button"
-                                onClick={() => {
-                                  onPageSizeChange?.(size);
-                                  setOptionsMenuOpen(false);
-                                }}
-                                className={cn(
-                                  "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-slate-700 hover:bg-slate-50",
-                                  pageSize === size &&
-                                    "font-semibold text-slate-900",
-                                )}
-                              >
-                                {size}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>,
-                    document.body,
-                  )
-                : null}
+              <TableDisplayOptionsMenu
+                storageKey={WIDTHS_KEY}
+                pageSize={pageSize}
+                onPageSizeChange={onPageSizeChange}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                onManageColumns={() => setManageColumnsOpen(true)}
+                onResetColumnSize={() => setColWidths({})}
+              />
             </div>
           </div>
 
@@ -770,42 +647,28 @@ export function WorkQueueTable({
           ) : (
             <ul className="m-0 list-none p-0" aria-label={title}>
               {rows.map((row) => {
+              const isMenuOpen = activeMenuId === row.id;
               const overdue =
                 row.dueLabel === "Yesterday" ||
                 row.dueLabel.includes("overdue");
-              const isMenuOpen = activeMenuId === row.id;
 
               return (
                 <li key={row.id} className="block">
                 <div
-                  role="link"
-                  tabIndex={0}
                   style={gridStyle}
-                  onClick={(e) => {
-                    if (
-                      (e.target as HTMLElement).closest(
-                        "button, [role='menu']",
-                      )
-                    ) {
-                      return;
-                    }
-                    router.push(row.href);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      router.push(row.href);
-                    }
-                  }}
                   className={cn(
-                    "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
+                    "group/row relative grid w-full items-center gap-x-3 border-b border-slate-200 px-5 py-2 text-left transition-colors hover:bg-slate-50/80 sm:px-6",
                     overdue && "bg-red-50/40 hover:bg-red-50/70",
                   )}
                 >
+                  <Link
+                    href={row.href}
+                    className="absolute inset-0 z-0"
+                    aria-label={`Open ${row.subject}`}
+                  />
                   <div
                     className={cn(
-                      "flex items-center gap-0.5 transition-opacity",
+                      "relative z-10 flex items-center gap-0.5 transition-opacity",
                       isMenuOpen
                         ? "opacity-100"
                         : "pointer-events-none opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100",
@@ -879,23 +742,21 @@ export function WorkQueueTable({
                     >
                       <FileText className="h-4 w-4" strokeWidth={2} />
                     </button>
-                    {canCompleteQueueRow(row) ? (
                     <button
                       type="button"
                       aria-label="Mark complete"
                       title="Mark complete"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onCompleteRow?.(row);
-                        }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onCompleteRow?.(row);
+                      }}
                       className="flex h-8 w-8 items-center justify-center"
                     >
                       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600">
                         <Check className="h-2.5 w-2.5" strokeWidth={3} />
                       </span>
                     </button>
-                    ) : null}
                   </div>
 
                   {visibleCols.map((col) => {
@@ -904,16 +765,9 @@ export function WorkQueueTable({
                       return (
                         <span
                           key={col.id}
-                          className="flex min-w-0 items-center gap-2 pr-3"
+                          className="relative z-[1] truncate pr-3 text-[13.5px] leading-[18px] font-normal text-slate-900 pointer-events-none"
                         >
-                          {row.itemType ? (
-                            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
-                              {row.itemType.replace(/_/g, " ").toLowerCase()}
-                            </span>
-                          ) : null}
-                          <span className="truncate text-[13.5px] leading-[18px] font-medium text-slate-900">
-                            {text}
-                          </span>
+                          {text}
                         </span>
                       );
                     }
@@ -921,7 +775,7 @@ export function WorkQueueTable({
                       return (
                         <span
                           key={col.id}
-                          className="text-[13px] leading-[18px] font-medium tabular-nums"
+                          className="relative z-[1] text-[13px] leading-[18px] font-medium tabular-nums pointer-events-none"
                           style={{ color: row.dueColor }}
                         >
                           {text}
@@ -932,7 +786,7 @@ export function WorkQueueTable({
                       return (
                         <span
                           key={col.id}
-                          className="truncate text-[13px] leading-[18px] font-medium text-[var(--wq-accent)]"
+                          className="relative z-[1] truncate text-[13px] leading-[18px] font-medium text-[var(--wq-accent)] pointer-events-none"
                         >
                           {text}
                         </span>
@@ -941,7 +795,7 @@ export function WorkQueueTable({
                     return (
                       <span
                         key={col.id}
-                        className="truncate text-[13px] leading-[18px] text-slate-600"
+                        className="relative z-[1] truncate text-[13px] leading-[18px] text-slate-600 pointer-events-none"
                         title={text || undefined}
                       >
                         {text}
@@ -949,7 +803,7 @@ export function WorkQueueTable({
                     );
                   })}
 
-                  <span aria-hidden />
+                  <span aria-hidden className="relative z-[1]" />
                 </div>
                 </li>
               );

@@ -27,10 +27,10 @@ describe("P2 product decisions", () => {
     expect(OWNER_AVATAR_DEFAULT).toBe(false);
     expect(ESCALATION_ENABLED).toBe(false);
     expect(PUSH_NOTIFICATIONS_FOR_CARD).toBe(false);
-    expect([...FOREVER_NEUTRAL_QUICK_ACTIONS]).toEqual(["note", "attachment"]);
+    expect([...FOREVER_NEUTRAL_QUICK_ACTIONS]).toEqual(["note"]);
   });
 
-  it("keeps note/attachment forever-neutral even with pending peers", () => {
+  it("keeps note forever-neutral even with pending peers", () => {
     const states = buildQuickActionStates(
       [
         {
@@ -45,9 +45,8 @@ describe("P2 product decisions", () => {
       new Date(2026, 6, 23),
     );
     const note = states.find((s) => s.kind === "note");
-    const att = states.find((s) => s.kind === "attachment");
     expect(note).toMatchObject({ urgency: "neutral", badgeCount: 0 });
-    expect(att).toMatchObject({ urgency: "neutral", badgeCount: 0 });
+    expect(states.find((s) => s.kind === "attachment")).toBeUndefined();
   });
 });
 

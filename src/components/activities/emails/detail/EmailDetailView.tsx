@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   Archive,
   ArrowLeft,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
   Download,
   Flag,
-  FolderInput,
   Forward,
   ListTree,
   Mail,
@@ -34,12 +32,10 @@ import {
   flagsFor,
   isMailboxUnread,
   labelTone,
-  moveToCustomFolder,
   setMailboxFlag,
   setMailboxRead,
   toggleMailboxFlag,
 } from "@/lib/emails/mailbox";
-import { listUserFolders } from "@/lib/emails/folders";
 import {
   draftFromEmail,
   meetingHref,
@@ -87,7 +83,6 @@ interface EmailDetailViewProps {
 export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewProps) {
   const router = useRouter();
   const [tick, setTick] = useState(0);
-  const [moveOpen, setMoveOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [reaction, setReaction] = useState<string | null>(null);
@@ -118,10 +113,6 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
     void tick;
     return flagsFor(email.id, email);
   }, [email, tick]);
-  const folders = useMemo(() => {
-    void tick;
-    return listUserFolders();
-  }, [tick]);
 
   const who = contactName(email);
   const labels = flags.labels ?? [];
@@ -190,51 +181,6 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
             <Trash2 className="h-3.5 w-3.5" />
             Delete
           </button>
-          <div className="relative">
-            <button
-              type="button"
-              className={toolBtn}
-              onClick={() => setMoveOpen((v) => !v)}
-            >
-              <FolderInput className="h-3.5 w-3.5" />
-              Move
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            {moveOpen ? (
-              <div className="absolute top-9 left-0 z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    moveToCustomFolder(email.id, null);
-                    setMoveOpen(false);
-                    refresh();
-                  }}
-                  className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
-                >
-                  Inbox
-                </button>
-                {folders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    onClick={() => {
-                      moveToCustomFolder(email.id, folder.id);
-                      setMoveOpen(false);
-                      goBack();
-                    }}
-                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-                {folders.length === 0 ? (
-                  <p className="px-3 py-2 text-[11px] text-slate-400">
-                    No folders yet — create one in Mail
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
           <button
             type="button"
             className={toolBtn}
@@ -576,13 +522,7 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
           <h3 className="mb-4 text-xs font-semibold tracking-wider text-slate-400 uppercase">
             Related CRM Profile
           </h3>
-          <CrmProfileCard
-            name={email.relatedTo || who}
-            initials={initials(who)}
-            role="Client / Lead"
-            company="FinConnex"
-            activeDeal={email.subject || "Related activity"}
-          />
+          <CrmProfileCard email={email} />
         </div>
         <div>
           <h3 className="mb-3 text-xs font-semibold tracking-wider text-slate-400 uppercase">

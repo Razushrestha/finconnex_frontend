@@ -17,7 +17,14 @@ import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { StatusColorPill } from "@/components/common/StatusColorPill";
-import type { CallStatus } from "@/lib/calls/types";
+import type { Call, CallStatus } from "@/lib/calls/types";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  recordSortValue,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 const CALL_STATUS_TONE: Record<CallStatus, string> = {
   Scheduled: "bg-sky-100 text-sky-800",
@@ -54,6 +61,7 @@ export function CallsListTable({
   const [tick, setTick] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const selected = controlledSelectedIds ?? localSelected;
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   function setSelected(ids: string[]) {
     if (onSelectedIdsChange) onSelectedIdsChange(ids);
@@ -79,9 +87,11 @@ export function CallsListTable({
     if (sortActive) {
       data.sort((a, b) => a.date.localeCompare(b.date));
     }
-    return data;
+    return sortRows(data, columnSort, (call: Call, field) =>
+      field === "type" ? call.callType : recordSortValue(call, field),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, sortActive, tick, filters]);
+  }, [scope, sortActive, tick, filters, columnSort]);
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
@@ -140,28 +150,84 @@ export function CallsListTable({
                 />
               </th>
               <th data-col-id="subject" className="px-3 py-2.5">
-                Subject
+                <SortableColumnHeader
+                  label="Subject"
+                  field="subject"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="relatedTo" className="px-3 py-2.5">
-                Related To
+                <SortableColumnHeader
+                  label="Related To"
+                  field="relatedTo"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="contact" className="px-3 py-2.5">
-                Contact
+                <SortableColumnHeader
+                  label="Contact"
+                  field="contact"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="type" className="px-3 py-2.5">
-                Type
+                <SortableColumnHeader
+                  label="Type"
+                  field="type"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="status" className="px-3 py-2.5">
-                Status
+                <SortableColumnHeader
+                  label="Status"
+                  field="status"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="date" className="px-3 py-2.5">
-                Date
+                <SortableColumnHeader
+                  label="Date"
+                  field="date"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="duration" className="px-3 py-2.5">
-                Duration
+                <SortableColumnHeader
+                  label="Duration"
+                  field="duration"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
               <th data-col-id="assignedTo" className="px-3 py-2.5">
-                Assigned To
+                <SortableColumnHeader
+                  label="Assigned To"
+                  field="assignedTo"
+                  sort={columnSort}
+                  onSort={(field) =>
+                    setColumnSort((current) => toggleColumnSort(current, field))
+                  }
+                />
               </th>
             </tr>
           </thead>

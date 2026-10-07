@@ -84,7 +84,6 @@ export function buildQuickActionStates(
     "meeting",
     "task",
     "note",
-    "attachment",
   ];
 
   return order.map((kind) => {

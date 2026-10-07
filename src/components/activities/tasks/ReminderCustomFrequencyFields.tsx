@@ -22,6 +22,8 @@ interface ReminderCustomFrequencyFieldsProps {
   start?: Date | null;
   due: Date | null;
   onChange: (next: ReminderRepeatRule) => void;
+  /** Label for the due/end option (tasks use “Task due date”). */
+  dueOptionLabel?: string;
 }
 
 export function ReminderCustomFrequencyFields({
@@ -29,6 +31,7 @@ export function ReminderCustomFrequencyFields({
   start = null,
   due,
   onChange,
+  dueOptionLabel = "Task due date",
 }: ReminderCustomFrequencyFieldsProps) {
   const until = reminderUntilChoice(value);
   const untilDate =
@@ -102,7 +105,7 @@ export function ReminderCustomFrequencyFields({
         <div className="mt-1.5 space-y-2">
           {(
             [
-              { id: "due", label: "Task due date" },
+              { id: "due", label: dueOptionLabel },
               { id: "on", label: "Custom date" },
               { id: "never", label: "Never" },
             ] as const

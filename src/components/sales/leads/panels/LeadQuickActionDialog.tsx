@@ -16,9 +16,12 @@ import {
   submitLeadQuickAction,
   type QuickActionKind,
 } from "@/lib/leads/panel-actions";
+import { openEmailIntent, openSmsIntent } from "@/lib/leads/contact-intents";
 import type { Priority } from "@/lib/tasks/types";
 import Link from "next/link";
 import {
+  ExternalLink,
+  Phone,
   Mail,
   MessageSquare,
   X,
@@ -28,6 +31,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LeadSideDrawer } from "./LeadSideDrawer";
 
 const TITLES: Record<QuickActionKind, string> = {
   call: "Call",
@@ -124,6 +128,8 @@ interface LeadQuickActionDialogProps {
   leadPhone?: string;
   leadId?: string;
   onSuccess?: (message: string) => void;
+  /** Work Queue–style right drawer instead of centered dialog. */
+  presentation?: "dialog" | "drawer";
 }
 
 export function LeadQuickActionDialog({
@@ -135,9 +141,11 @@ export function LeadQuickActionDialog({
   leadPhone,
   leadId,
   onSuccess,
+  presentation = "dialog",
 }: LeadQuickActionDialogProps) {
   const [draft, setDraft] = useState(() => defaultQuickActionDraft(kind));
   const [error, setError] = useState<string | null>(null);
+  const [intentError, setIntentError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   function update<K extends keyof typeof draft>(
@@ -159,6 +167,35 @@ export function LeadQuickActionDialog({
     }
     onOpenChange(false);
     onSuccess?.(result.message);
+  }
+
+  function runIntent() {
+    setIntentError(null);
+    if (kind === "call") {
+      void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+        const r = startCrmRecordCall({
+          phone: leadPhone,
+          name: leadName,
+          relatedTo: `Lead: ${leadName}`,
+          relatedType: "LEAD",
+          relatedId: leadId,
+        });
+        if (!r.ok) setIntentError(r.message);
+      });
+      return;
+    }
+    if (kind === "sms") {
+      const r = openSmsIntent(leadPhone, draft.body || draft.title);
+      if (!r.ok) setIntentError(r.message);
+      return;
+    }
+    if (kind === "email") {
+      const r = openEmailIntent(leadEmail, {
+        subject: draft.title,
+        body: draft.body,
+      });
+      if (!r.ok) setIntentError(r.message);
+    }
   }
 
   const fullFormHref = leadCreateHref(kind, leadName, {
@@ -188,16 +225,8 @@ export function LeadQuickActionDialog({
   const HistoryIcon = HISTORY_ICONS[kind];
   const historyCount = MOCK_PAST_RECORDS[kind]?.length ?? 0;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="max-w-md gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-md"
-      >
-        <DialogTitle className="sr-only">{TITLES[kind]}</DialogTitle>
-        <DialogDescription className="sr-only">
-          Create a {TITLES[kind].toLowerCase()} related to lead {leadName}.
-        </DialogDescription>
+  const content = (
+    <>
         <div className="flex items-center justify-between px-5 py-4">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-slate-900">
@@ -211,16 +240,49 @@ export function LeadQuickActionDialog({
               {kind === "email" && leadEmail ? ` · ${leadEmail}` : ""}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            aria-label={`Close ${TITLES[kind]} dialog`}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {presentation === "dialog" ? (
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label={`Close ${TITLES[kind]} dialog`}
+              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
         <div className="border-t border-slate-100" />
+
+        {isContactIntent && (
+          <div className="space-y-2 border-b border-slate-100 bg-slate-50/70 px-5 py-3">
+            <p className="text-[11px] font-medium text-slate-500">
+              Open on this device
+            </p>
+            <Button
+              type="button"
+              className="w-full justify-center gap-2 bg-violet-600 text-white hover:bg-violet-700"
+              onClick={runIntent}
+            >
+              {kind === "call" && <Phone className="h-4 w-4" />}
+              {kind === "sms" && <MessageSquare className="h-4 w-4" />}
+              {kind === "email" && <Mail className="h-4 w-4" />}
+              {kind === "call"
+                ? "Call now"
+                : kind === "sms"
+                  ? "Open SMS app"
+                  : "Open email app"}
+              <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+            </Button>
+            {intentError && (
+              <p className="text-xs text-red-600" role="alert">
+                {intentError}
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400">
+              Or log the activity below so it appears on the Lead Card timeline.
+            </p>
+          </div>
+        )}
 
         {showsHistory && (
           <div className="border-b border-slate-100">
@@ -399,6 +461,37 @@ export function LeadQuickActionDialog({
             </div>
           </div>
         </form>
+    </>
+  );
+
+  if (presentation === "drawer") {
+    return (
+      <LeadSideDrawer
+        open={open}
+        onClose={() => onOpenChange(false)}
+        title={TITLES[kind]}
+        subtitle={`Lead: ${leadName}`}
+        widthClassName="max-w-[440px]"
+        ariaLabel={TITLES[kind]}
+      >
+        {content}
+      </LeadSideDrawer>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-md"
+      >
+        <DialogTitle className="sr-only">{TITLES[kind]}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {isContactIntent
+            ? `Open ${TITLES[kind].toLowerCase()} for lead ${leadName}, or log the activity in CRM.`
+            : `Create a ${TITLES[kind].toLowerCase()} related to lead ${leadName}.`}
+        </DialogDescription>
+        {content}
       </DialogContent>
     </Dialog>
   );

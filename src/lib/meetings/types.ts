@@ -32,14 +32,27 @@ export const MEETING_ATTENDEE_ROLES = [
   "Host",
   "Guest",
   "Main Applicant",
+  "Client",
+  "Broker",
+  "CA",
+  "LPA",
+  "Internal",
 ] as const;
 export type MeetingAttendeeRole = (typeof MEETING_ATTENDEE_ROLES)[number];
+
+export type MeetingAttendanceStatus =
+  | "Invited"
+  | "Accepted"
+  | "Declined"
+  | "Tentative";
 
 export interface Attendee {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role?: MeetingAttendeeRole;
+  attendanceStatus?: MeetingAttendanceStatus;
 }
 
 export interface Meeting {
@@ -49,6 +62,10 @@ export interface Meeting {
   type: MeetingType;
   startDateTime: string;
   endDateTime: string;
+  /** Previous schedule kept when rescheduled (activity history). */
+  previousStartDateTime?: string;
+  previousEndDateTime?: string;
+  rescheduleReason?: string;
   location?: string;
   meetingLink?: string;
   attendees: Attendee[];

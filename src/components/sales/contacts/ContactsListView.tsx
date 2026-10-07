@@ -11,6 +11,7 @@ import { StatusColorPill } from "@/components/common/StatusColorPill";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
+  visibleManageColumns,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
 import Link from "next/link";
@@ -31,7 +32,13 @@ import {
   ContactCardPanelHost,
   type ContactPanelState,
 } from "@/components/sales/contacts/ContactCardPanelHost";
-import { notify } from "@/lib/notify/toast";
+import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
+import {
+  isSortableColumnId,
+  sortRows,
+  toggleColumnSort,
+  type ColumnSort,
+} from "@/lib/tables/column-sort";
 
 interface ContactsListViewProps {
   groups?: ContactGroup[];
@@ -52,6 +59,13 @@ const DEFAULT_CONTACT_COLUMNS: ManageColumn[] = [
 ];
 
 type ContactRow = ReturnType<typeof buildAllContactsShape>;
+
+function contactSortValue(contact: ContactRow, field: string): unknown {
+  if (field === "contact") return contact.name;
+  if (field === "created") return contact.createdDate;
+  if (field === "status") return contact.statusTitle;
+  return (contact as unknown as Record<string, unknown>)[field];
+}
 
 function buildAllContactsShape(groups: ContactGroup[]) {
   return groups.flatMap((group) =>
@@ -169,6 +183,8 @@ export function ContactsListView({
     DEFAULT_CONTACT_COLUMNS,
   );
   const [panel, setPanel] = useState<ContactPanelState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [columnSort, setColumnSort] = useState<ColumnSort>(null);
 
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
@@ -192,6 +208,12 @@ export function ContactsListView({
       if (!groupsProp) setGroups(listContactGroups());
     });
   }, [groupsProp]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
   const columnRenderers = useMemo(
     () =>
@@ -240,7 +262,7 @@ export function ContactsListView({
           })),
       );
 
-    return filtered.sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       if (sortValue === "name_asc") {
         return a.name.localeCompare(b.name);
       }
@@ -248,7 +270,6 @@ export function ContactsListView({
         return b.name.localeCompare(a.name);
       }
 
-      // Helper to convert "DD/MM/YYYY" to timestamp
       const parseDate = (dateStr: string) => {
         const [day, month, year] = dateStr.split("/").map(Number);
         return new Date(year, month - 1, day).getTime();
@@ -260,10 +281,11 @@ export function ContactsListView({
       if (sortValue === "oldest") {
         return timeA - timeB;
       }
-      // Default: "newest"
       return timeB - timeA;
     });
-  }, [groups, filters, sortValue]);
+
+    return sortRows(sorted, columnSort, contactSortValue);
+  }, [groups, filters, sortValue, columnSort]);
 
   const pagedContacts = useMemo(
     () => allContacts.slice(0, pageSize),
@@ -277,7 +299,7 @@ export function ContactsListView({
     pagedContacts.some((c) => selectedIds.has(c.id)) && !allSelected;
 
   const orderedVisibleColumns = useMemo(
-    () => manageColumns.filter((c) => c.checked),
+    () => visibleManageColumns(manageColumns),
     [manageColumns],
   );
 
@@ -330,7 +352,20 @@ export function ContactsListView({
                     columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
                   }
                 >
-                  {columnRenderers[col.id]?.th}
+                  {isSortableColumnId(col.id) ? (
+                    <SortableColumnHeader
+                      label={columnRenderers[col.id]?.th ?? col.label}
+                      field={col.id}
+                      sort={columnSort}
+                      onSort={(field) =>
+                        setColumnSort((current) =>
+                          toggleColumnSort(current, field),
+                        )
+                      }
+                    />
+                  ) : (
+                    columnRenderers[col.id]?.th
+                  )}
                 </th>
               ))}
 
@@ -409,9 +444,14 @@ export function ContactsListView({
       <ContactCardPanelHost
         panel={panel}
         onClose={() => setPanel(null)}
-        onQuickActionSuccess={(message) => notify(message)}
+        onQuickActionSuccess={(message) => setToast(message)}
       />
 
+      {toast && (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
