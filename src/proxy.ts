@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
   "/p/", // Client portal
   "/sign/", // E-signature
   "/book/", // Public booking
+  "/appointment/", // Guest reschedule / cancel from the confirmation email
   "/provide/", // Public document-request upload link
   "/s/", // Short / one-time booking links
   "/go/", // Smart-link URL shortener

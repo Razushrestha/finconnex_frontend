@@ -25,7 +25,6 @@ import {
 import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import {
   TASK_RELATED_ENTITY_KINDS,
-  liveRelatedRecords,
   rankRelatedRecordsByContact,
 } from "@/lib/activities/related-records";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
@@ -130,7 +129,8 @@ export function CreateMeetingForm({
       : undefined;
   const { options: relatedRemote, loading: relatedLoading } =
     useCrmRelatedRecords(form.relatedKind, extra);
-  const contactOptions = liveRelatedRecords("Contact");
+  const { options: contactOptions, loading: contactsLoading } =
+    useCrmRelatedRecords("Contact");
   const relatedOptions = rankRelatedRecordsByContact(
     relatedRemote,
     form.contactName,
@@ -260,7 +260,8 @@ export function CreateMeetingForm({
           value={form.contactName}
           onChange={(v) => update("contactName", v)}
           options={contactOptions}
-          placeholder="Search contact…"
+          loading={contactsLoading}
+          placeholder={contactsLoading ? "Loading contacts…" : "Search contact…"}
           allowCustom
           createLabel={(name) => `Use “${name}”`}
         />

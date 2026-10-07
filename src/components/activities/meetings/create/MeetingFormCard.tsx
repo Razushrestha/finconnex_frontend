@@ -17,7 +17,7 @@ import {
   liveRelatedRecords,
   rankRelatedRecordsByContact,
 } from "@/lib/activities/related-records";
-import { type RelatedEntityKind } from "@/lib/activities/shared";
+import { type RelatedEntityKind, type RelatedTo } from "@/lib/activities/shared";
 import { QuickAddContactForm } from "@/components/shared/QuickAddContactForm";
 import {
   availableCustomLocationKinds,
@@ -127,10 +127,20 @@ export function MeetingRelatedFields({
     relatedKind,
     extra,
   );
-  const contactOptions = useMemo(
-    () => liveRelatedRecords("Contact"),
-    [contactTick],
-  );
+  const { options: contactRemote, loading: contactsLoading } =
+    useCrmRelatedRecords("Contact");
+  const contactOptions = useMemo(() => {
+    const local = liveRelatedRecords("Contact");
+    const seen = new Set<string>();
+    const rows: RelatedTo[] = [];
+    for (const row of [...contactRemote, ...local]) {
+      const key = (row.id || row.name).trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+    return rows;
+  }, [contactRemote, contactTick]);
   const relatedOptions = useMemo(
     () => rankRelatedRecordsByContact(relatedRemote, contactName),
     [relatedRemote, contactName],
@@ -157,7 +167,8 @@ export function MeetingRelatedFields({
             value={contactName}
             onChange={(name) => onContactNameChange?.(name)}
             options={contactOptions}
-            placeholder="Search contact…"
+            loading={contactsLoading}
+            placeholder={contactsLoading ? "Loading contacts…" : "Search contact…"}
             onAddNew={(query) => {
               setAddContactQuery(query);
               setAddingContact(true);

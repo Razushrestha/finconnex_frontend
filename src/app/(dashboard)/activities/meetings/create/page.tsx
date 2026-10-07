@@ -18,6 +18,8 @@ import {
   createCrmMeeting,
   isCrmMeetingId,
   persistRemoteMeeting,
+  rescheduleCrmMeeting,
+  tryCrmMeeting,
   updateCrmMeeting,
 } from "@/lib/meetings/api";
 import { readRescheduledBooking } from "@/lib/booking/api";
@@ -54,9 +56,14 @@ function todayIso() {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-function formatSlot(date: string, time: string, duration: string) {
+function formatSlot(
+  date: string,
+  time: string,
+  duration: string,
+  timeZoneLabel?: string,
+) {
   const startTime = parseStartHHmm(time) || time.split(" - ")[0]?.trim() || "10:00";
-  const start = new Date(`${date}T${startTime}`);
+  const start = dateInTimezone(date, startTime.slice(0, 5), timeZoneLabel);
   const minutes = Number.parseInt(duration, 10) || 30;
   const end = new Date(start.getTime() + minutes * 60 * 1000);
   return {
@@ -87,6 +94,7 @@ export type ScheduleMeetingSeed = {
   appointmentId?: string;
   meetingId?: string;
   recordKind?: "booking" | "meeting";
+  status?: string;
 };
 
 export default function ScheduleMeetingPage({
@@ -232,7 +240,7 @@ export default function ScheduleMeetingPage({
       toast.error("Date & time is required");
       return;
     }
-    const first = formatSlot(date, time, duration);
+    const first = formatSlot(date, time, duration, timezone);
     if (Number.isNaN(first.start.getTime())) {
       toast.error("Enter a valid date and time");
       return;
@@ -291,6 +299,14 @@ export default function ScheduleMeetingPage({
       locationMode === "default" && selectedCalendar
         ? meetingTypeFromPage(selectedCalendar)
         : meetingType;
+    const emailSchedule = {
+      dateIso: date,
+      startHHmm: hhmm,
+      durationMinutes: minutes,
+      timeZoneLabel: timezone,
+      hostName: String(host || ""),
+      meetingType: String(meetingTypeValue || ""),
+    };
 
     setSending(true);
     try {
@@ -338,7 +354,9 @@ export default function ScheduleMeetingPage({
           agenda: agenda.trim() || undefined,
           notes: note || undefined,
         };
-        if (initial?.recordKind === "booking") {
+        let linkedMeetingId = initial?.meetingId || existingId;
+        const cancelledBooking = initial?.status === "Cancelled";
+        if (initial?.recordKind === "booking" && !cancelledBooking) {
           const fresh = await readRescheduledBooking(existingId, startDate.toISOString());
           const nextMeetingId = fresh?.meetingId;
           if (!nextMeetingId) {
@@ -346,6 +364,7 @@ export default function ScheduleMeetingPage({
               "The time was moved, but this booking has no meeting to store the title, location, and notes.",
             );
           }
+          linkedMeetingId = nextMeetingId;
           const updated = await updateCrmMeeting(nextMeetingId, patch);
           if (!updated) {
             throw new Error(
@@ -357,6 +376,30 @@ export default function ScheduleMeetingPage({
             joinUrlFromRecord(fresh?.raw),
             meetingLinkValue,
           );
+        } else if (cancelledBooking) {
+          const meetingId = initial?.meetingId || existingId;
+          linkedMeetingId = meetingId;
+          const updated =
+            (await tryCrmMeeting(() => updateCrmMeeting(meetingId, patch))) ||
+            (await tryCrmMeeting(() =>
+              rescheduleCrmMeeting(meetingId, patch.startDateTime!, patch.endDateTime),
+            ));
+          await fetch("/api/appointment/manage/reopen", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              meetingId,
+              guestName: contactName,
+              title: title.trim(),
+              dateIso: date,
+              startHHmm: hhmm,
+              durationMinutes: minutes,
+            }),
+          }).catch(() => undefined);
+          if (updated) {
+            emailedLink = firstHostJoinUrl(updated.meetingLink, meetingLinkValue);
+          }
         } else {
           const updated = await updateCrmMeeting(existingId, patch);
           if (!updated) throw new Error("Could not update this meeting");
@@ -370,9 +413,11 @@ export default function ScheduleMeetingPage({
               title: title.trim(),
               startLabel: first.startLabel,
               endLabel: first.endLabel,
+              ...emailSchedule,
               location,
               meetingLink: emailedLink,
               agenda: note,
+              meetingId: linkedMeetingId,
               relatedKind: inviteKind,
               relatedName: inviteName,
               relatedId: linkId,
@@ -438,9 +483,11 @@ export default function ScheduleMeetingPage({
         title: title.trim(),
         startLabel: first.startLabel,
         endLabel: first.endLabel,
+        ...emailSchedule,
         location,
         meetingLink: emailedLink,
         agenda: note,
+        meetingId: firstCreatedId,
         relatedKind: inviteKind,
         relatedName: inviteName,
         relatedId: linkId,
