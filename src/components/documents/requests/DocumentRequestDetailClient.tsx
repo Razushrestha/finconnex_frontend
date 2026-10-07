@@ -73,6 +73,12 @@ import { ViewDocumentModal } from "@/components/documents/requests/ViewDocumentM
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
 import { notify } from "@/lib/notify/toast";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import {
+  applyClientProvideBundles,
+  documentPackSignature,
+  fetchClientProvideInbox,
+} from "@/lib/documents/requests/provide-overlay";
+import { sendDocumentRequestInviteEmail } from "@/lib/documents/requests/invite-email";
 
 const DETAIL_PIPELINE: {
   status: DocumentRequestStatus;
@@ -83,6 +89,28 @@ const DETAIL_PIPELINE: {
   { status: "Received", label: "In progress" },
   { status: "Approved", label: "Completed" },
 ];
+
+async function hydrateClientFiles(request: DocumentRequest) {
+  for (const item of request.items ?? []) {
+    if (item.source !== "portal" || !item.fileName) continue;
+    if (getCachedRequestFile(request.id, item.id)) continue;
+    try {
+      const res = await fetch(
+        `/api/documents/provide/file?requestId=${encodeURIComponent(request.id)}&itemId=${encodeURIComponent(item.id)}&title=${encodeURIComponent(item.title)}`,
+        { credentials: "include", cache: "no-store" },
+      );
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      cacheRequestFile(
+        request.id,
+        item.id,
+        new File([blob], item.fileName, { type: blob.type || "application/octet-stream" }),
+      );
+    } catch {
+      /* review still shows the file name */
+    }
+  }
+}
 
 function mergeReviewItems(
   local: RequestedDocLine[] | undefined,
@@ -135,6 +163,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   const [editingReminders, setEditingReminders] = useState(false);
   const uploadFor = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     const local = getDocumentRequestById(id) ?? null;
@@ -145,7 +174,8 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
     void (async () => {
       const remote = await tryCrmDocumentRequest(() => getCrmDocumentRequest(id));
       if (cancelled || !remote) return;
-      const merged = {
+      const inbox = await fetchClientProvideInbox();
+      let merged: DocumentRequest = {
         ...local,
         ...remote,
         items: mergeReviewItems(local?.items, remote.items),
@@ -154,12 +184,55 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         messages: local?.messages ?? remote.messages,
         internalNotes: local?.internalNotes ?? remote.notes,
       };
+      if (inbox) {
+        merged = applyClientProvideBundles([merged], inbox)[0] ?? merged;
+      }
       upsertDocumentRequest(merged);
       setRequest(merged);
       setInternalNotes(merged.internalNotes ?? "");
+      void hydrateClientFiles(merged);
     })();
     return () => {
       cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let pulling = false;
+    async function pull() {
+      if (pulling || document.hidden) return;
+      pulling = true;
+      try {
+        const inbox = await fetchClientProvideInbox();
+        if (cancelled || !inbox) return;
+        setRequest((current) => {
+          if (!current) return current;
+          const next = applyClientProvideBundles([current], inbox)[0] ?? current;
+          if (documentPackSignature([current]) === documentPackSignature([next])) {
+            return current;
+          }
+          upsertDocumentRequest(next);
+          if (
+            next.status === "Received" &&
+            current.status !== "Received" &&
+            current.status !== "Approved" &&
+            isCrmDocumentRequestId(next.id)
+          ) {
+            void tryCrmDocumentRequest(() => receiveCrmDocumentRequest(next.id));
+          }
+          void hydrateClientFiles(next);
+          return next;
+        });
+      } finally {
+        pulling = false;
+      }
+    }
+    void pull();
+    const timer = window.setInterval(() => void pull(), 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
     };
   }, [id]);
 
@@ -237,21 +310,70 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
     }
   }
 
-  function sendReminder() {
-    if (!request) return;
-    save(
-      {
-        ...request,
-        timeline: appendTimeline(request, {
-          at: nowStamp(),
-          by: request.requestedBy,
-          label: "Invitation resent",
-          detail: request.requestedFrom,
+  async function sendReminder() {
+    if (!request || resending) return;
+    const clientEmail = request.clientEmail?.trim().toLowerCase() ?? "";
+    if (!clientEmail.includes("@")) {
+      flash("This request has no client email, so the invitation cannot be sent.");
+      return;
+    }
+    const documents = (request.items ?? []).map((item) => item.title).filter(Boolean);
+    setResending(true);
+    try {
+      const publishRes = await fetch("/api/documents/provide/publish", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId: request.id,
+          title: request.title,
+          clientName: request.clientName || request.requestedFrom,
+          clientEmail,
+          dueDate: request.dueDate,
+          notes: request.notes,
+          items: (request.items ?? []).map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            applicant: item.applicant,
+          })),
         }),
-      },
-      `Invitation resent to ${request.requestedFrom}`,
-      { patch: false },
-    );
+      });
+      const published = (await publishRes.json().catch(() => ({}))) as {
+        url?: string;
+        error?: string;
+      };
+      if (!publishRes.ok || !published.url) {
+        throw new Error(published.error || "Could not build the client upload link.");
+      }
+      await sendDocumentRequestInviteEmail({
+        to: clientEmail,
+        clientName: request.clientName || request.requestedFrom,
+        brokerName: request.requestedBy,
+        title: request.title,
+        documents,
+        provideUrl: published.url,
+        dueDate: request.dueDate,
+        notes: request.notes,
+      });
+      save(
+        {
+          ...request,
+          timeline: appendTimeline(request, {
+            at: nowStamp(),
+            by: request.requestedBy,
+            label: "Invitation resent",
+            detail: `Emailed to ${clientEmail}`,
+          }),
+        },
+        `Invitation emailed to ${clientEmail}`,
+        { patch: false },
+      );
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not email the invitation.");
+    } finally {
+      setResending(false);
+    }
   }
 
   function cancelRequest() {
@@ -508,8 +630,9 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 Your document request has been created successfully.
               </p>
               <p className="mt-0.5 text-[12px] text-emerald-800/80">
-                {request.requestedFrom} can now see this request in their client
-                portal.
+                {request.timeline?.some((event) => event.label === "Invite sent")
+                  ? `An upload link was emailed to ${request.clientEmail || request.requestedFrom}.`
+                  : "The request was saved. The email was not sent to the client."}
               </p>
             </div>
             <button
@@ -576,11 +699,12 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
               <>
                 <button
                   type="button"
-                  onClick={sendReminder}
+                  onClick={() => void sendReminder()}
+                  disabled={resending}
                   className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-8 rounded-lg text-[11px]")}
                 >
                   <Bell className="h-3.5 w-3.5" />
-                  Resend invitation
+                  {resending ? "Sending…" : "Resend invitation"}
                 </button>
                 <button
                   type="button"

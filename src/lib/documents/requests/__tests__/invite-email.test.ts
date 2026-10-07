@@ -17,6 +17,7 @@ describe("documentRequestInviteCopy", () => {
     expect(copy.text).toContain("https://app.example.com/provide/token");
     expect(copy.text).toContain("nepatronix web");
     expect(copy.html).toContain("Upload documents");
+    expect(copy.html).toContain("Finconne");
     expect(copy.html).toContain("Driver licence");
   });
 });

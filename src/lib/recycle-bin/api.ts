@@ -229,6 +229,70 @@ export async function listCrmRecycleBin(
     .map((row, index) => normalizeRecycleBinItem(row, index));
 }
 
+function recordMentionsEmail(row: unknown, email: string): boolean {
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [row];
+  while (stack.length) {
+    const current = stack.pop();
+    if (typeof current === "string") {
+      if (current.trim().toLowerCase() === email) return true;
+      continue;
+    }
+    if (!current || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    stack.push(...(Array.isArray(current) ? current : Object.values(current)));
+  }
+  return false;
+}
+
+function recycleEntityId(row: Record<string, unknown>): string {
+  return pickStr(row.recordId, row.entityId, row.sourceId, row.id);
+}
+
+/**
+ * The contact id to restore when create is blocked by a deleted duplicate.
+ * Prefers a row whose payload contains the email. When the bin has only one
+ * contact and the list is complete, that contact is the one holding the email.
+ */
+export function pickDeletedRecordId(
+  rows: Record<string, unknown>[],
+  email: string,
+  allowSole = false,
+): string {
+  const want = email.trim().toLowerCase();
+  if (!want.includes("@")) return "";
+  for (const row of rows) {
+    if (!recordMentionsEmail(row, want)) continue;
+    const id = recycleEntityId(row);
+    if (id) return id;
+  }
+  if (allowSole && rows.length === 1) return recycleEntityId(rows[0]!);
+  return "";
+}
+
+/** Pages the recycle bin until the deleted record for this email is found. */
+export async function findRecycleBinEntityIdByEmail(
+  entityType: string,
+  email: string,
+  allowSole = false,
+): Promise<string> {
+  const want = email.trim().toLowerCase();
+  if (!want.includes("@")) return "";
+  const collected: Record<string, unknown>[] = [];
+  let complete = false;
+  for (let page = 1; page <= 5; page += 1) {
+    const batch = await fetchRecords(entityType, { page, limit: 100 });
+    collected.push(...batch);
+    const matched = pickDeletedRecordId(batch, want, false);
+    if (matched) return matched;
+    if (batch.length < 100) {
+      complete = true;
+      break;
+    }
+  }
+  return complete ? pickDeletedRecordId(collected, want, allowSole) : "";
+}
+
 function recycleItemPath(entityType: string, id: string): string {
   return recycleBinPath(
     `/${encodeURIComponent(entityType)}/${encodeURIComponent(id)}`,
@@ -238,10 +302,16 @@ function recycleItemPath(entityType: string, id: string): string {
 export async function restoreCrmRecycleBinItem(
   entityType: string,
   id: string,
+  init?: RequestInit,
 ): Promise<void> {
+  const headers: Record<string, string> = {};
+  new Headers(init?.headers).forEach((value, key) => {
+    headers[key] = value;
+  });
   await crmWorkspaceFetch(`${recycleItemPath(entityType, id)}/restore`, {
     method: "POST",
     body: "{}",
+    headers,
   });
 }
 

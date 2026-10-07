@@ -7,6 +7,11 @@ import {
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
+import { dropAutomaticToast, silentRequest } from "@/lib/notify/fetch-notifier";
+import {
+  findRecycleBinEntityIdByEmail,
+  restoreCrmRecycleBinItem,
+} from "@/lib/recycle-bin/api";
 import type {
   ContactCardData,
   ContactSource,
@@ -445,6 +450,28 @@ export async function getCrmContact(
   return null;
 }
 
+function announceContactCreated() {
+  if (typeof window === "undefined") return;
+  void import("@/lib/notify/toast").then(({ toast }) => toast.success("Contact created"));
+}
+
+/** A soft-deleted contact still owns the email. Put it back and use that record. */
+async function reviveDeletedContactByEmail(
+  email: string,
+  allowSole = false,
+): Promise<NormalizedCrmContact | null> {
+  const id = await findRecycleBinEntityIdByEmail("CONTACT", email, allowSole);
+  if (!isUuid(id)) return null;
+  await restoreCrmRecycleBinItem("CONTACT", id, silentRequest());
+  const want = email.trim().toLowerCase();
+  const rows = await listCrmContacts({ search: email.trim(), limit: 50 }).catch(() => []);
+  const match = rows.find(
+    (row) => row.contact.email.trim().toLowerCase() === want,
+  );
+  if (match) return match;
+  return getCrmContact(id);
+}
+
 export async function createCrmContact(input: {
   firstName: string;
   lastName: string;
@@ -499,6 +526,15 @@ export async function createCrmContact(input: {
     data = await post(payload);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (/recycle bin|deleted contact/i.test(message)) {
+      dropAutomaticToast("POST contacts");
+      const revived = await reviveDeletedContactByEmail(input.email, true).catch(() => null);
+      if (revived) {
+        announceContactCreated();
+        return revived;
+      }
+      throw err;
+    }
     if (/409|already exists|conflict|emailExists/i.test(message)) throw err;
     const stripped = { ...payload };
     delete stripped.ownerId;

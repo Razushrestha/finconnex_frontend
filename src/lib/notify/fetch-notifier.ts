@@ -40,6 +40,21 @@ const pending = new Map<string, ReturnType<typeof setTimeout>>();
 const latestAttempt = new Map<string, number>();
 const groups = new Map<string, { count: number; at: number }>();
 
+/**
+ * Drops a failure toast already queued for this write. Used when the app
+ * recovers from the error itself, such as restoring a deleted contact.
+ */
+export function dropAutomaticToast(key: string) {
+  const started = Date.now();
+  for (const existing of [...latestAttempt.keys()]) {
+    if (existing !== key && !existing.startsWith(`${key}/`)) continue;
+    const next = Math.max(started, (latestAttempt.get(existing) ?? 0) + 1);
+    latestAttempt.set(existing, next);
+    clearTimeout(pending.get(existing));
+    pending.delete(existing);
+  }
+}
+
 /** `init` with automatic toasts turned off for this one request. */
 export function silentRequest(init: RequestInit = {}): RequestInit {
   const headers = new Headers(init.headers);

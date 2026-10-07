@@ -230,6 +230,20 @@ async function deliverViaCrm(input: DeliverInput, auth: CrmMailAuth): Promise<"c
 }
 
 /**
+ * The sender booking confirmations use when this app cannot send itself:
+ * the workspace mailbox behind the booking's manage token. SendGrid is not
+ * called.
+ */
+export async function deliverThroughBookingMailbox(
+  input: DeliverInput,
+  bookingToken: string,
+): Promise<"crm"> {
+  const token = bookingToken.trim();
+  if (!token) throw new Error("The booking mailbox did not return a send token.");
+  return deliverViaCrm(input, { bookingToken: token });
+}
+
+/**
  * Sends through this app's own SendGrid key when one is set. When that account
  * cannot send (for example it is out of credits), the same HTML goes through
  * the CRM mailbox instead of being dropped for a plain-text copy.

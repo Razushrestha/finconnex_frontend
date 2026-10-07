@@ -208,6 +208,21 @@ describe("deliverMail without a SendGrid key", () => {
     );
   });
 
+  it("sends a document invite through the booking mailbox and does not call SendGrid", async () => {
+    vi.stubEnv("SENDGRID_API_KEY", "SG.test-key");
+    vi.stubEnv("SENDGRID_FROM_EMAIL", "from@example.com");
+    const { deliverThroughBookingMailbox } = await vi.importActual<
+      typeof import("@/lib/emails/sendgrid-server")
+    >("@/lib/emails/sendgrid-server");
+    await deliverThroughBookingMailbox(
+      { to: ["ada@example.com"], subject: "Upload documents", text: "Hi", html: "<p>Upload</p>" },
+      "cancel-tok",
+    );
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://crm.test/v1/public/booking/manage/cancel-tok/mail",
+    ]);
+  });
+
   it("asks the CRM to send as the signed-in user otherwise", async () => {
     const deliver = await real();
     await deliver(

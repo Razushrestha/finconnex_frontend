@@ -1151,6 +1151,7 @@ export function CreateDocumentRequestForm({
           provideUrl,
           dueDate: due,
           notes: notes.trim() || undefined,
+          contactId: requestedFromId,
         });
       } catch (err) {
         inviteError =
