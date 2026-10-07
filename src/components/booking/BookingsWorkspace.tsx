@@ -62,6 +62,9 @@ import {
   type DashboardAppointment,
   type DashboardConsultant,
   type RelatedKind,
+  bookingNow,
+  bookingDisplayZone,
+  instantFromBookingWallClock,
 } from "@/lib/booking/dashboard";
 import { useCrmBooking } from "@/lib/booking/use-crm-booking";
 import {
@@ -293,13 +296,13 @@ function HomeView({
   onViewConsultants: () => void;
   onRefresh: () => void;
 }) {
-  const now = useMemo(() => new Date(), [appointments]);
+  const now = useMemo(() => bookingNow(), [appointments]);
   const [consultantFilter, setConsultantFilter] = useState("all");
   const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(bookingNow()));
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [month, setMonth] = useState(() => {
-    const d = new Date();
+    const d = bookingNow();
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [page, setPage] = useState(1);
@@ -1422,7 +1425,7 @@ function AppointmentDrawer({
 }) {
   const consultant = consultantById(row.consultantId);
   const initial = appointmentParts(row);
-  const minDate = todayIsoInTimezone();
+  const minDate = todayIsoInTimezone(bookingDisplayZone() ?? undefined);
   const [date, setDate] = useState(initial.date);
   const [time, setTime] = useState(initial.time);
   const [saving, setSaving] = useState(false);
@@ -1445,7 +1448,7 @@ function AppointmentDrawer({
       return;
     }
     const start = new Date(`${date}T${time}`);
-    if (Number.isNaN(start.getTime()) || start.getTime() < Date.now()) {
+    if (Number.isNaN(start.getTime()) || start.getTime() < bookingNow().getTime()) {
       setError("Choose today or a future date and time.");
       return;
     }
@@ -1462,8 +1465,9 @@ function AppointmentDrawer({
     setError("");
     try {
       const when = {
-        startDateTime: start.toISOString(),
-        endDateTime: end.toISOString(),
+        // Typed on the host's clock; sent as the real instant.
+        startDateTime: instantFromBookingWallClock(start).toISOString(),
+        endDateTime: instantFromBookingWallClock(end).toISOString(),
       };
       if (row.recordKind === "meeting") {
         const meeting = await tryCrmMeeting(() => updateCrmMeeting(row.id, when));
@@ -2143,7 +2147,7 @@ type ConsultantMeetings = {
 function meetingsByConsultant(
   consultants: DashboardConsultant[],
   appointments: DashboardAppointment[],
-  now = Date.now(),
+  now = bookingNow().getTime(),
 ): Map<string, ConsultantMeetings> {
   const byId = new Map<string, ConsultantMeetings>();
   const byName = new Map<string, ConsultantMeetings>();

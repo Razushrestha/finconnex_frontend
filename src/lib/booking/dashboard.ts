@@ -80,13 +80,96 @@ export function dateKeyFromDate(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+/**
+ * The time zone the admin's booking screens read times in: the signed-in
+ * host's own zone (what they set in their availability), not the browser's,
+ * so a host working Sydney hours from Kathmandu still sees 9:00 AM, while a
+ * guest sees the same booking in the zone they booked in. Null: the browser.
+ *
+ * The booking screens work in plain local Dates, so a zoned instant is turned
+ * into a Date whose local fields are that zone's wall clock; "now" is read
+ * the same way (bookingNow) and a wall-clock Date is turned back into the
+ * real instant before it is sent (instantFromBookingWallClock).
+ */
+let displayZone: string | null = null;
+
+export function setBookingDisplayZone(zone: string | null | undefined): void {
+  const next = zone?.trim() || null;
+  if (next) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: next });
+    } catch {
+      displayZone = null;
+      return;
+    }
+  }
+  displayZone = next;
+}
+
+export function bookingDisplayZone(): string | null {
+  return displayZone;
+}
+
+/** `instant` as a Date whose local fields read `zone`'s wall clock. */
+function wallClockIn(instant: Date, zone: string): Date {
+  if (Number.isNaN(instant.getTime())) return instant;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+}
+
+/** Now, on the booking screens' clock. */
+export function bookingNow(): Date {
+  return displayZone ? wallClockIn(new Date(), displayZone) : new Date();
+}
+
+/** The real instant a wall-clock Date on the booking screens stands for. */
+export function instantFromBookingWallClock(local: Date): Date {
+  if (!displayZone || Number.isNaN(local.getTime())) return local;
+  // Read the wall clock as if it were UTC, then correct by the zone's offset
+  // at that moment (twice, so a daylight-saving edge settles).
+  const asUtc = Date.UTC(
+    local.getFullYear(),
+    local.getMonth(),
+    local.getDate(),
+    local.getHours(),
+    local.getMinutes(),
+    local.getSeconds(),
+  );
+  let guess = asUtc;
+  for (let i = 0; i < 2; i += 1) {
+    const seen = wallClockIn(new Date(guess), displayZone);
+    const seenUtc = Date.UTC(
+      seen.getFullYear(),
+      seen.getMonth(),
+      seen.getDate(),
+      seen.getHours(),
+      seen.getMinutes(),
+      seen.getSeconds(),
+    );
+    guess += asUtc - seenUtc;
+  }
+  return new Date(guess);
+}
+
 export function parseAppointmentStart(iso: string) {
   const raw = iso?.trim() ?? "";
   if (!raw) return new Date(NaN);
-  // An instant with a zone ("…Z", "…+05:45") is converted to this browser's
-  // clock; reading only its digits showed a UTC time as if it were local.
+  // An instant with a zone ("…Z", "…+05:45") is read on the booking screens'
+  // clock (the host's zone, else this browser's); reading only its digits
+  // showed a UTC time as if it were local.
   if (/T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
-    return new Date(raw);
+    const instant = new Date(raw);
+    return displayZone ? wallClockIn(instant, displayZone) : instant;
   }
   const ymd = raw.match(
     /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/,
@@ -144,7 +227,7 @@ function inRange(date: Date, start: Date, end: Date) {
 export function appointmentMatchesKpi(
   row: DashboardAppointment,
   key: BookingKpiKey,
-  now = new Date(),
+  now = bookingNow(),
 ): boolean {
   if (key === "upcoming") {
     const start = parseAppointmentStart(row.start);
@@ -169,7 +252,7 @@ export function appointmentMatchesKpi(
 export function appointmentMatchesPriorKpi(
   row: DashboardAppointment,
   key: BookingKpiKey,
-  now = new Date(),
+  now = bookingNow(),
 ): boolean {
   const start = parseAppointmentStart(row.start);
   if (Number.isNaN(start.getTime())) return false;
@@ -208,7 +291,7 @@ export function appointmentMatchesPriorKpi(
 
 export function bookingKpiStats(
   appointments: DashboardAppointment[],
-  now = new Date(),
+  now = bookingNow(),
 ) {
   const keys: BookingKpiKey[] = [
     "upcoming",

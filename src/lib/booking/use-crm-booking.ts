@@ -16,6 +16,7 @@ import {
   type DashboardAppointment,
   type DashboardConsultant,
   type RelatedKind,
+  setBookingDisplayZone,
 } from "@/lib/booking/dashboard";
 import { listCrmMeetings } from "@/lib/meetings/api";
 import { loadWorkspaceConsultants } from "@/lib/users/assignable";
@@ -375,6 +376,14 @@ export function useCrmBooking() {
       const hosts = [...(crmHosts ?? []), ...(crmConsultants ?? [])].filter(
         (host, index, list) => list.findIndex((item) => item.id === host.id) === index,
       );
+      // The signed-in host's own zone is the clock these screens read times
+      // on; set before any booking below is converted.
+      const me = (crmHosts ?? []).find(
+        (host) =>
+          (actor.id && host.crmUserId === actor.id) ||
+          (actor.email && host.email?.toLowerCase() === actor.email.toLowerCase()),
+      );
+      setBookingDisplayZone(me?.timezone);
       const people = [
         ...(actor.id || actor.name || actor.email
           ? [
