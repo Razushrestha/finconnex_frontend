@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   House,
@@ -12,6 +13,7 @@ import {
   Trash2,
   ChevronDown,
   FileText,
+  Search,
   X,
 } from "lucide-react";
 import {
@@ -75,6 +77,19 @@ import {
 } from "@/lib/users/assignable";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
+type SenderMenuPlacement = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+};
+
+/**
+ * Teammate picker for "Send on behalf of", searchable by name or email. The
+ * list is drawn at the end of <body> so a card that clips its overflow cannot
+ * cut it off, and opens upwards when there is not room below.
+ */
 export function SenderOnBehalfField({
   value,
   options,
@@ -87,27 +102,115 @@ export function SenderOnBehalfField({
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selected =
-    options.find(
-      (row) =>
-        row.id === value ||
-        row.name === value ||
-        assignableOwnerLabel(row) === value,
-    ) ?? null;
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const [menuAt, setMenuAt] = useState<SenderMenuPlacement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const isSelected = (row: AssignableOwner) =>
+    row.id === value ||
+    row.name === value ||
+    assignableOwnerLabel(row) === value;
+  const selected = options.find(isSelected) ?? null;
   const label = selected
     ? assignableOwnerLabel(selected)
     : value.trim() || "Select teammate";
 
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (row) =>
+        row.name.toLowerCase().includes(q) ||
+        row.email.toLowerCase().includes(q),
+    );
+  }, [options, query]);
+
+  function place() {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gap = 4;
+    const below = window.innerHeight - rect.bottom - gap - 8;
+    const above = rect.top - gap - 8;
+    const base = { left: rect.left, width: rect.width };
+    if (below >= 240 || below >= above) {
+      setMenuAt({ ...base, top: rect.bottom + gap, maxHeight: Math.max(160, below) });
+    } else {
+      setMenuAt({
+        ...base,
+        bottom: window.innerHeight - rect.top + gap,
+        maxHeight: Math.max(160, above),
+      });
+    }
+  }
+
+  function close() {
+    setOpen(false);
+    setQuery("");
+    setMenuAt(null);
+  }
+
+  function openMenu() {
+    place();
+    setActive(Math.max(0, options.findIndex(isSelected)));
+    setOpen(true);
+  }
+
+  function pick(row: AssignableOwner) {
+    onChange(row.name);
+    close();
+    triggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpen(false);
+      setQuery("");
+      setMenuAt(null);
+    }
+    function onMove(event: Event) {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      place();
+    }
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+  // Keep the highlighted row in view while arrowing through the list.
+  useEffect(() => {
+    if (!open) return;
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${active}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [active, open]);
+
   return (
-    <div className="relative z-20 mb-6">
+    <div className="relative mb-6">
       <label className="block text-[13px] font-medium text-slate-700">
         Send on behalf of:
       </label>
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => (open ? close() : openMenu())}
         className={cn(
           "relative mt-2 flex h-11 w-full items-center rounded-lg border bg-white px-3.5 pr-10 text-left text-[14px] outline-none focus:ring-2",
           invalid
@@ -119,47 +222,99 @@ export function SenderOnBehalfField({
         <span className="truncate">{label}</span>
         <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </button>
-      {open ? (
-        <ul
-          role="listbox"
-          className="relative z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-sm"
-        >
-          {options.length === 0 ? (
-            <li className="px-3 py-2 text-[13px] text-slate-400">
-              No teammates loaded
-            </li>
-          ) : (
-            options.map((row) => {
-              const itemLabel = assignableOwnerLabel(row);
-              const active =
-                row.id === value ||
-                row.name === value ||
-                itemLabel === value;
-              return (
-                <li key={row.id || itemLabel}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    className={cn(
-                      "flex w-full px-3 py-2 text-left text-[13px] hover:bg-violet-50",
-                      active
-                        ? "font-semibold text-[var(--brand-primary)]"
-                        : "text-slate-800",
-                    )}
-                    onClick={() => {
-                      onChange(row.name);
-                      setOpen(false);
-                    }}
-                  >
-                    {itemLabel}
-                  </button>
-                </li>
-              );
-            })
-          )}
-        </ul>
-      ) : null}
+      {open && menuAt && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                left: menuAt.left,
+                width: menuAt.width,
+                top: menuAt.top,
+                bottom: menuAt.bottom,
+                maxHeight: Math.min(menuAt.maxHeight, 320),
+              }}
+              className="z-[1000] flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+            >
+              <div className="relative border-b border-slate-100 p-2">
+                <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setActive(0);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      close();
+                      triggerRef.current?.focus();
+                    } else if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setActive((i) => Math.min(i + 1, matches.length - 1));
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setActive((i) => Math.max(i - 1, 0));
+                    } else if (event.key === "Enter") {
+                      event.preventDefault();
+                      const row = matches[active] ?? matches[0];
+                      if (row) pick(row);
+                    }
+                  }}
+                  placeholder="Search teammates by name or email"
+                  aria-label="Search teammates"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 outline-none focus:border-slate-300"
+                />
+              </div>
+              <ul
+                ref={listRef}
+                role="listbox"
+                aria-label="Teammates"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
+              >
+                {options.length === 0 ? (
+                  <li className="px-3 py-2 text-[13px] text-slate-400">
+                    No teammates loaded
+                  </li>
+                ) : matches.length === 0 ? (
+                  <li className="px-3 py-2 text-[13px] text-slate-400">
+                    No teammate matches “{query}”
+                  </li>
+                ) : (
+                  matches.map((row, index) => {
+                    const itemLabel = assignableOwnerLabel(row);
+                    const current = isSelected(row);
+                    return (
+                      <li
+                        key={row.id || itemLabel}
+                        role="option"
+                        aria-selected={current}
+                        data-index={index}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => pick(row)}
+                          onMouseEnter={() => setActive(index)}
+                          className={cn(
+                            "flex w-full px-3 py-2 text-left text-[13px]",
+                            current
+                              ? "font-semibold text-[var(--brand-primary)]"
+                              : "text-slate-800",
+                            index === active && "bg-[var(--brand-primary-faint)]",
+                          )}
+                        >
+                          <span className="min-w-0 truncate">{itemLabel}</span>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -1228,8 +1383,10 @@ export function CreateDocumentRequestForm({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/25 px-3 py-4 sm:px-5 sm:py-6 lg:pl-[12rem]">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+    // Laid out inside the dashboard's content area, not over the whole
+    // window: a fixed overlay slid under the sidebar and the bottom bar.
+    <div className="relative flex h-full min-h-0 w-full justify-center p-3 sm:p-5">
+      <div className="flex h-full min-h-0 w-full max-w-[1200px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-primary)] text-white">
             <FileText className="h-4 w-4" />
@@ -1257,7 +1414,7 @@ export function CreateDocumentRequestForm({
           </p>
         ) : null}
 
-        <div className="min-h-0 max-h-[calc(100dvh-11.5rem)] flex-1 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto flex min-h-full w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6">
             <div className="pt-3">
               <Stepper step={step} />
