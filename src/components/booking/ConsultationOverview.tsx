@@ -22,6 +22,7 @@ import {
   X,
   Users,
   type LucideIcon,
+  ChevronRight,
 } from "lucide-react";
 import { DescriptionEditor } from "@/components/booking/DescriptionEditor";
 import {
@@ -1125,6 +1126,35 @@ export function ConsultationOverview({
     useState<AvailabilityPanelId>("dates");
   const [notifyPanel, setNotifyPanel] = useState<NotifyPanelId>("email");
   const [editing, setEditing] = useState<"details" | "consultants" | null>(null);
+  const contentRef = useRef<HTMLElement>(null);
+
+  /**
+   * Where Next goes: through a section's own panels first (Dates and times →
+   * Appointment limits, Email → SMS → …), then to the next section.
+   */
+  const nextStop = useMemo((): { label: string; go: () => void } | null => {
+    if (section === "availability") {
+      const at = AVAILABILITY_PANELS.findIndex((p) => p.id === availabilityPanel);
+      const panel = AVAILABILITY_PANELS[at + 1];
+      if (panel) return { label: panel.title, go: () => setAvailabilityPanel(panel.id) };
+    }
+    if (section === "notify") {
+      const at = NOTIFY_PANELS.findIndex((p) => p.id === notifyPanel);
+      const panel = NOTIFY_PANELS[at + 1];
+      if (panel) return { label: panel.title, go: () => setNotifyPanel(panel.id) };
+    }
+    const at = SECTIONS.findIndex((item) => item.id === section);
+    const next = SECTIONS[at + 1];
+    if (!next) return null;
+    return {
+      label: next.title,
+      go: () => {
+        if (next.id === "availability") setAvailabilityPanel("dates");
+        if (next.id === "notify") setNotifyPanel(NOTIFY_PANELS[0].id);
+        setSection(next.id);
+      },
+    };
+  }, [section, availabilityPanel, notifyPanel]);
   const [shareOpen, setShareOpen] = useState(false);
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
@@ -1416,6 +1446,7 @@ export function ConsultationOverview({
         </aside>
 
         <section
+          ref={contentRef}
           className={cn(
             "min-h-0 min-w-0 flex-1 bg-white",
             section === "page" ? "flex flex-col overflow-hidden" : "overflow-y-auto",
@@ -1682,6 +1713,21 @@ export function ConsultationOverview({
                 }
               }}
             />
+          ) : null}
+          {nextStop && section !== "page" && !editing ? (
+            <div className="sticky bottom-0 z-10 flex justify-end border-t border-[#E5E7EB] bg-white/95 px-5 py-3 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  nextStop.go();
+                  contentRef.current?.scrollTo({ top: 0 });
+                }}
+                className={cn(FINANCE_PRIMARY_BUTTON_SM, "gap-1.5")}
+              >
+                Next: {nextStop.label}
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
           ) : null}
         </section>
       </div>
