@@ -40,6 +40,7 @@ import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import { loadSignature, saveSignature } from "@/lib/emails/signature";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { emailBrandFromValues } from "@/lib/emails/brand-mail";
 
 export function SettingsFormClient({
   categorySlug,
@@ -233,6 +234,9 @@ export function SettingsFormClient({
       </div>
 
       <div className="grid grid-cols-1 gap-x-5 gap-y-4 p-5 sm:p-6 xl:grid-cols-2">
+        {schemaKey === "organization/branding" ? (
+          <EmailGradientPreview values={values} />
+        ) : null}
         {schema.fields.map((field) => (
           <div
             key={field.id}
@@ -298,6 +302,39 @@ export function SettingsFormClient({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function EmailGradientPreview({ values }: { values: SettingsValues }) {
+  const brand = emailBrandFromValues({
+    primaryColor: values.primaryColor,
+    secondaryColor: values.secondaryColor,
+    appName: values.appName,
+  });
+  const blended = brand.primary.toLowerCase() !== brand.secondary.toLowerCase();
+  return (
+    <div className="xl:col-span-2">
+      <p className="text-[12px] font-semibold text-slate-700">Brand gradient</p>
+      <div
+        className="mt-2 rounded-xl px-4 py-4 text-white"
+        style={{
+          backgroundColor: brand.primary,
+          backgroundImage: blended
+            ? `linear-gradient(135deg, ${brand.primary} 0%, ${brand.secondary} 100%)`
+            : undefined,
+        }}
+      >
+        <div className="text-[10px] font-bold tracking-[0.14em] opacity-80">
+          FINCONNEX
+        </div>
+        <div className="mt-1 text-[18px] font-extrabold">
+          {brand.appName || "FinConnex"}
+        </div>
+      </div>
+      <p className="mt-1.5 text-[11px] text-slate-400">
+        Buttons, menus, and client emails blend these two colours.
+      </p>
     </div>
   );
 }

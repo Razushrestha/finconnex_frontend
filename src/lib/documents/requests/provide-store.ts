@@ -1,6 +1,7 @@
 import "server-only";
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type {
@@ -17,8 +18,22 @@ type ProvideManifest = {
 };
 
 const memory = new Map<string, ProvideManifest>();
+const memoryBytes = new Map<string, Buffer>();
+
+function isServerlessHost() {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT,
+  );
+}
 
 function storeDir() {
+  // Vercel runs the function from /var/task, which is read-only.
+  // mkdir '/var/task/data' throws ENOENT. /tmp is the writable disk.
+  if (isServerlessHost()) {
+    return path.join(/* turbopackIgnore: true */ tmpdir(), "finconnex-document-provide");
+  }
   return path.join(
     /* turbopackIgnore: true */ process.cwd(),
     "data",
@@ -61,12 +76,11 @@ export async function saveProvideFiles(input: {
   const key = safeName(input.requestId);
   if (!key) throw new Error("Missing document request id");
   const dir = requestDir(key);
-  await mkdir(dir, { recursive: true });
   const existing = await readManifest(key);
   const files = new Map((existing?.files ?? []).map((file) => [file.itemId, file]));
   for (const file of input.files) {
     const storedName = `${safeName(file.itemId) || "file"}-${safeName(file.fileName) || "upload"}`;
-    await writeFile(path.join(dir, storedName), file.bytes);
+    memoryBytes.set(`${key}/${storedName}`, file.bytes);
     files.set(file.itemId, {
       itemId: file.itemId,
       title: file.title,
@@ -81,25 +95,42 @@ export async function saveProvideFiles(input: {
     requestedCount: input.requestedCount,
     files: [...files.values()],
   };
-  await writeFile(manifestPath(key), JSON.stringify(manifest));
   memory.set(key, manifest);
+  try {
+    await mkdir(dir, { recursive: true });
+    for (const file of manifest.files) {
+      const bytes = memoryBytes.get(`${key}/${file.storedName}`);
+      if (bytes) await writeFile(path.join(dir, file.storedName), bytes);
+    }
+    await writeFile(manifestPath(key), JSON.stringify(manifest));
+  } catch (error) {
+    if (!isServerlessHost()) {
+      const detail = error instanceof Error ? error.message : "";
+      throw new Error(
+        /ENOENT|EACCES|EROFS|read-only/i.test(detail)
+          ? "The server could not store these documents. Try again."
+          : detail || "Could not save the documents.",
+      );
+    }
+  }
   return manifest;
 }
 
 export async function listProvideBundles(): Promise<ClientProvideBundle[]> {
   const dir = storeDir();
+  const byId = new Map<string, ProvideManifest>();
+  for (const manifest of memory.values()) byId.set(manifest.requestId, manifest);
   let names: string[] = [];
   try {
     names = await readdir(dir);
   } catch {
-    return [...memory.values()].map(toBundle);
+    names = [];
   }
-  const bundles: ClientProvideBundle[] = [];
   for (const name of names) {
     const manifest = await readManifest(name);
-    if (manifest) bundles.push(toBundle(manifest));
+    if (manifest) byId.set(manifest.requestId, manifest);
   }
-  return bundles;
+  return [...byId.values()].map(toBundle);
 }
 
 function toBundle(manifest: ProvideManifest): ClientProvideBundle {
@@ -129,11 +160,15 @@ export async function readProvideFile(
       (row) => wanted && row.title.trim().toLowerCase() === wanted,
     );
   if (!file) return null;
+  const key = safeName(requestId);
+  const cached = key ? memoryBytes.get(`${key}/${file.storedName}`) : undefined;
+  if (cached) return { file, bytes: cached };
   const dir = path.resolve(requestDir(requestId));
   const full = path.resolve(dir, file.storedName);
   if (!full.startsWith(`${dir}${path.sep}`)) return null;
   try {
     const bytes = await readFile(full);
+    if (key) memoryBytes.set(`${key}/${file.storedName}`, bytes);
     return { file, bytes };
   } catch {
     return null;

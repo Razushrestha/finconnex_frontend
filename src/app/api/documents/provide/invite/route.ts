@@ -8,10 +8,21 @@ import {
 import { deliverThroughBookingMailbox } from "@/lib/emails/sendgrid-server";
 import { parsePublicSlotDays, publicBookingPath } from "@/lib/booking/public-crm";
 import {
+  emailBrandFromSettings,
+  emailBrandFromValues,
+} from "@/lib/emails/brand-mail";
+import { normalizeCrmWorkspaceSettings } from "@/lib/settings/api";
+import {
+  documentRequestInviteCopy,
+  inviteDocuments,
+} from "@/lib/documents/requests/invite-email";
+import {
   bookingIdsForGuest,
   guestMailTokenFromBookings,
   mailTokenFromCreated,
 } from "@/lib/documents/requests/invite-mailbox";
+
+export const maxDuration = 60;
 
 /**
  * Sends the document-request invite through the workspace booking mailbox,
@@ -46,12 +57,43 @@ export async function POST(request: Request) {
     text?: string;
     html?: string;
     clientName?: string;
+    brokerName?: string;
+    title?: string;
+    documents?: unknown;
+    provideUrl?: string;
+    dueDate?: string;
+    notes?: string;
+    brand?: {
+      primary?: unknown;
+      secondary?: unknown;
+      gradient?: unknown;
+      appName?: unknown;
+    };
   };
   const to = String(body.to ?? "").trim().toLowerCase();
-  const subject = String(body.subject ?? "").trim();
-  const text = String(body.text ?? "").trim();
-  const html = String(body.html ?? "").trim();
   const clientName = String(body.clientName ?? "").trim() || to.split("@")[0] || "Client";
+  const documents = inviteDocuments(
+    Array.isArray(body.documents)
+      ? (body.documents as Array<string | { title?: string; description?: string }>)
+      : [],
+  );
+  const provideUrl = String(body.provideUrl ?? "").trim();
+  const brand = await workspaceEmailBrand(base, accessToken, body.brand);
+  const built = provideUrl
+    ? documentRequestInviteCopy({
+        clientName,
+        brokerName: String(body.brokerName ?? "").trim() || "your broker",
+        title: String(body.title ?? "").trim(),
+        documents,
+        provideUrl,
+        dueDate: String(body.dueDate ?? "").trim() || undefined,
+        notes: String(body.notes ?? "").trim() || undefined,
+        brand,
+      })
+    : null;
+  const subject = built?.subject || String(body.subject ?? "").trim();
+  const text = built?.text || String(body.text ?? "").trim();
+  const html = built?.html || String(body.html ?? "").trim();
   if (!to.includes("@") || !subject || !text) {
     return NextResponse.json(
       { error: "A client email and message are required." },
@@ -71,15 +113,10 @@ export async function POST(request: Request) {
       { to: [to], subject, text, html: html || undefined },
       token,
     );
-    const carrierId = createdBookingId;
+    // A temporary booking is only a mailbox. Cancelling it — which the dev
+    // server always does, and Vercel usually does not — drops the message
+    // the mailbox has not finished sending yet.
     createdBookingId = "";
-    if (carrierId) {
-      // The workspace mailer sends after this response. Cancelling the carrier
-      // booking in the same moment drops that message.
-      setTimeout(() => {
-        void cancelCarrierBooking(base, accessToken, workspaceId, carrierId);
-      }, 30_000);
-    }
     return NextResponse.json({ ok: true, delivered });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not send the email";
@@ -89,6 +126,40 @@ export async function POST(request: Request) {
     if (createdBookingId) {
       await cancelCarrierBooking(base, accessToken, workspaceId, createdBookingId);
     }
+  }
+}
+
+async function workspaceEmailBrand(
+  base: string,
+  accessToken: string,
+  fallback: {
+    primary?: unknown;
+    secondary?: unknown;
+    gradient?: unknown;
+    appName?: unknown;
+  } | undefined,
+) {
+  const posted = emailBrandFromValues(
+    fallback
+      ? {
+          primaryColor: fallback.primary,
+          secondaryColor: fallback.secondary,
+          emailGradient: fallback.gradient,
+          appName: fallback.appName,
+        }
+      : null,
+  );
+  try {
+    const json = await crmGet(base, accessToken, "/v1/settings");
+    const settings = normalizeCrmWorkspaceSettings(json);
+    const remote = emailBrandFromSettings(settings);
+    const savedGradient = settings.catalog?.["organization/branding"]?.emailGradient;
+    if (fallback && savedGradient === undefined) {
+      return { ...remote, gradient: posted.gradient };
+    }
+    return remote;
+  } catch {
+    return posted;
   }
 }
 

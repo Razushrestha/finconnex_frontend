@@ -1,15 +1,24 @@
 /**
- * Client invite for a document request. Same FinconneX card as appointment
- * emails, with the documents to provide and an Upload documents button.
+ * Client invite for a document request. Portal layout (header, document
+ * cards, button, backup link) in the workspace brand colour.
  */
 
-const ORG = "Finconnex Financial Services";
-const PHONE = "02 1234 5678";
-const EMAIL = "info@finconnex.com.au";
-const SITE = "https://www.finconnex.com.au";
-const NAVY = "#102A56";
-const BLUE = "#1D6FE8";
-const MUTED = "#5C6B82";
+import {
+  emailBrandFromValues,
+  emailFillStyle,
+  readClientEmailBrand,
+  type EmailBrand,
+} from "@/lib/emails/brand-mail";
+
+const ORG = "FinconneX";
+const INK = "#111827";
+const MUTED = "#4B5563";
+const LINE = "#E5E7EB";
+
+export type InviteDocument = {
+  title: string;
+  description?: string;
+};
 
 function escapeHtml(value: string) {
   return value
@@ -19,125 +28,101 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
-function detailRow(label: string, value: string, last = false) {
-  return `<tr>
-    <td style="padding:12px 16px;${last ? "" : "border-bottom:1px solid #e6eef8;"}width:120px;font-size:13px;color:${MUTED};vertical-align:top;">${escapeHtml(label)}</td>
-    <td style="padding:12px 16px;${last ? "" : "border-bottom:1px solid #e6eef8;"}font-size:14px;color:${NAVY};">${value}</td>
-  </tr>`;
-}
-
-function contactCell(label: string, value: string, href: string) {
-  return `<td style="padding:14px 8px 0;font-size:12px;line-height:1.45;color:${MUTED};">
-    <div style="font-size:11px;font-weight:700;letter-spacing:0.4px;color:${NAVY};">${escapeHtml(label)}</div>
-    <a href="${escapeHtml(href)}" style="color:${BLUE};text-decoration:none;">${escapeHtml(value)}</a>
-  </td>`;
+export function inviteDocuments(
+  documents: Array<string | { title?: string; description?: string } | null | undefined>,
+): InviteDocument[] {
+  return documents
+    .map((item) => {
+      if (typeof item === "string") return { title: item.trim() };
+      if (!item || typeof item !== "object") return { title: "" };
+      return {
+        title: item.title?.trim() ?? "",
+        description: item.description?.trim() || undefined,
+      };
+    })
+    .filter((item) => item.title);
 }
 
 export function documentRequestInviteCopy(input: {
   clientName: string;
   brokerName: string;
   title: string;
-  documents: string[];
+  documents: Array<string | InviteDocument>;
   provideUrl: string;
   dueDate?: string;
   notes?: string;
+  brand?: EmailBrand;
 }): { subject: string; html: string; text: string } {
-  const first = input.clientName.trim().split(/\s+/)[0] || "there";
+  const brand = input.brand ?? emailBrandFromValues(null);
+  const fill = emailFillStyle(brand);
+  const accent = brand.primary;
+  const client = input.clientName.trim() || "there";
   const broker = input.brokerName.trim() || "your broker";
-  const docs = input.documents.map((d) => d.trim()).filter(Boolean);
+  const docs = inviteDocuments(input.documents);
   const subject = `Documents requested: ${input.title.trim() || "Please provide these files"}`;
-
   const title = input.title.trim() || "your application";
-  const listHtml = docs.length
-    ? `<ol style="margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:${NAVY};">${docs
-        .map((d) => `<li>${escapeHtml(d)}</li>`)
-        .join("")}</ol>`
-    : `<span style="color:${MUTED};">Open the link to see what is needed.</span>`;
-  const listText = docs.length
-    ? docs.map((d, i) => `  ${i + 1}. ${d}`).join("\n")
-    : "  (see the link for the full list)";
   const due = input.dueDate?.trim() ?? "";
   const notes = input.notes?.trim() ?? "";
+  const count = docs.length;
+  const listText = docs.length
+    ? docs
+        .map((doc, index) => {
+          const extra = doc.description ? ` — ${doc.description}` : "";
+          return `  ${index + 1}. ${doc.title}${extra}`;
+        })
+        .join("\n")
+    : "  (see the link for the full list)";
   const dueText = due ? `\nPlease provide these by ${due}.\n` : "";
   const notesText = notes ? `\nNote from ${broker}:\n${notes}\n` : "";
+  const cards = docs.length
+    ? docs
+        .map(
+          (doc) => `<div style="border:1px solid ${LINE};border-radius:10px;padding:14px 16px;margin:0 0 10px;">
+  <div style="font-size:15px;font-weight:700;color:${INK};">${escapeHtml(doc.title)}</div>
+  ${doc.description ? `<div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">${escapeHtml(doc.description)}</div>` : ""}
+</div>`,
+        )
+        .join("")
+    : `<div style="border:1px solid ${LINE};border-radius:10px;padding:14px 16px;color:${MUTED};">Open the link to see what is needed.</div>`;
 
-  const html = `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#eef3fb;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3fb;padding:24px 12px;">
-  <tr><td align="center">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:${NAVY};">
-      <tr><td style="padding:28px 32px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td>
-              <div style="font-size:26px;font-weight:800;letter-spacing:-0.4px;color:${NAVY};">Finconne<span style="color:${BLUE};">X</span></div>
-              <div style="font-size:10px;letter-spacing:1.6px;color:#7B8BA3;font-weight:700;">FINANCIAL SERVICES</div>
-            </td>
-            <td align="right" style="border-left:3px solid ${BLUE};padding-left:12px;font-size:13px;color:#7B8BA3;">Your trusted<br/>finance partner</td>
-          </tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:12px 24px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f8ff;border-radius:18px;">
-          <tr><td style="padding:28px 24px;">
-            <div style="width:42px;height:42px;border-radius:21px;background:${BLUE};color:#ffffff;text-align:center;line-height:42px;font-size:20px;font-weight:700;">↑</div>
-            <div style="font-size:28px;line-height:1.2;font-weight:800;margin-top:14px;color:${NAVY};">Please upload<br/>your documents</div>
-            <p style="margin:14px 0 0;font-size:14px;line-height:1.5;color:${MUTED};">Hi ${escapeHtml(first)},<br/><strong style="color:${NAVY};">${escapeHtml(broker)}</strong> has asked you to provide the document${docs.length === 1 ? "" : "s"} below for <strong style="color:${NAVY};">${escapeHtml(title)}</strong>.</p>
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:18px 24px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e6eef8;border-radius:16px;">
-          ${detailRow("Request", `<strong>${escapeHtml(title)}</strong>`)}
-          ${detailRow("With", `<strong>${escapeHtml(broker)}</strong><br/><span style="color:${MUTED};font-weight:400;">${escapeHtml(ORG)}</span>`)}
-          ${detailRow("Documents", listHtml, !due && !notes)}
-          ${due ? detailRow("Due", `<strong>${escapeHtml(due)}</strong>`, !notes) : ""}
-          ${notes ? detailRow("Note", escapeHtml(notes), true) : ""}
-        </table>
-      </td></tr>
-      <tr><td style="padding:8px 24px 4px;">
-        <a href="${escapeHtml(input.provideUrl)}" style="display:block;background:${BLUE};color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;border-radius:10px;padding:14px 16px;">Upload documents</a>
-      </td></tr>
-      <tr><td style="padding:14px 24px 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7ff;border-radius:12px;">
-          <tr><td style="padding:14px 16px;font-size:13px;line-height:1.5;color:${NAVY};">
-            <strong>What happens next?</strong><br/>
-            <span style="color:${MUTED};">Open the button above, choose a file for each document, then press Send. Your broker will see the files on the dashboard.</span>
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td style="padding:16px 32px 8px;font-size:14px;line-height:1.6;color:${MUTED};">
-        If you have any questions, feel free to reach out to us.<br/><br/>
-        Regards,<br/>
-        <strong style="color:${NAVY};">${ORG}</strong>
-      </td></tr>
-      <tr><td style="padding:8px 24px 28px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e6eef8;">
-          <tr>
-            ${contactCell("Call Us", PHONE, `tel:${PHONE.replace(/\s/g, "")}`)}
-            ${contactCell("Email Us", EMAIL, `mailto:${EMAIL}`)}
-            ${contactCell("Visit Us", "www.finconnex.com.au", SITE)}
-          </tr>
-        </table>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${INK};max-width:560px;margin:0 auto;background:#ffffff;">
+  <div style="${fill}color:#ffffff;padding:22px 24px;">
+    <div style="font-size:11px;letter-spacing:1.4px;font-weight:700;opacity:0.85;">FINCONNEX</div>
+    <div style="margin-top:6px;font-size:26px;font-weight:800;line-height:1.2;">${escapeHtml(broker)}</div>
+  </div>
+  <div style="padding:22px 24px 8px;">
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.5;">Hi ${escapeHtml(client)},</p>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55;"><strong>${escapeHtml(broker)}</strong> has requested documents for your <strong>${escapeHtml(title)}</strong> application.</p>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.55;color:${MUTED};">A total of <strong style="color:${INK};">${count}</strong> document${count === 1 ? "" : "s"} ${count === 1 ? "has" : "have"} been requested from you. Please access your secure portal to review the requirements and upload your files.${due ? `<br/><br/>Please provide these by <strong style="color:${INK};">${escapeHtml(due)}</strong>.` : ""}</p>
+    <div style="margin:0 0 10px;font-size:12px;letter-spacing:1.2px;font-weight:700;color:${accent};">DOCUMENTS REQUESTED</div>
+    ${cards}
+    ${notes ? `<p style="margin:8px 0 16px;font-size:14px;line-height:1.5;color:${MUTED};">${escapeHtml(notes)}</p>` : ""}
+    <p style="margin:16px 0;font-size:14px;line-height:1.55;color:${MUTED};">Use the button to open your secure document portal. This link is unique to you and should not be shared with anyone.</p>
+    <p style="margin:0 0 18px;"><a href="${escapeHtml(input.provideUrl)}" style="display:inline-block;${fill}color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;border-radius:8px;padding:14px 18px;">Open secure document portal</a></p>
+    <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${MUTED};">If the button does not work, copy and paste this URL into your browser:</p>
+    <div style="border:1px solid ${LINE};border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.5;color:${accent};word-break:break-all;">${escapeHtml(input.provideUrl)}</div>
+    <div style="margin-top:16px;border:1px solid ${LINE};border-radius:10px;padding:14px 16px;">
+      <div style="font-size:11px;letter-spacing:1.2px;font-weight:700;color:${accent};">QUESTIONS</div>
+      <p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:${MUTED};">If you have any questions, contact your assigned consultant directly.</p>
+    </div>
+    <p style="margin:22px 0 8px;font-size:15px;line-height:1.5;">Regards,<br/><strong>${escapeHtml(ORG)}</strong></p>
+  </div>
+</div>`;
 
-  const text = `Hi ${first},
+  const text = `Hi ${client},
 
-${broker} has asked you to provide the following document${docs.length === 1 ? "" : "s"} for ${title}:
+${broker} has requested documents for your ${title} application.
+
+A total of ${count} document${count === 1 ? "" : "s"} ${count === 1 ? "has" : "have"} been requested from you.
 
 ${listText}
 ${dueText}${notesText}
-Upload documents: ${input.provideUrl}
+Open your secure document portal: ${input.provideUrl}
+
+If you have any questions, contact your assigned consultant directly.
 
 Regards,
 ${ORG}
-${PHONE} · ${EMAIL} · www.finconnex.com.au
 `;
 
   return { subject, html, text };
@@ -148,11 +133,12 @@ export async function sendDocumentRequestInviteEmail(input: {
   clientName: string;
   brokerName: string;
   title: string;
-  documents: string[];
+  documents: Array<string | InviteDocument>;
   provideUrl: string;
   dueDate?: string;
   notes?: string;
   contactId?: string;
+  brand?: EmailBrand;
 }): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("Invite email can only be sent from the browser");
@@ -161,7 +147,8 @@ export async function sendDocumentRequestInviteEmail(input: {
   if (!email.includes("@")) {
     throw new Error("A valid client email is required to send the request");
   }
-  const copy = documentRequestInviteCopy(input);
+  const brand = input.brand ?? readClientEmailBrand();
+  const copy = documentRequestInviteCopy({ ...input, brand });
   const res = await fetch("/api/documents/provide/invite", {
     method: "POST",
     credentials: "include",
@@ -172,6 +159,13 @@ export async function sendDocumentRequestInviteEmail(input: {
       text: copy.text,
       html: copy.html,
       clientName: input.clientName,
+      brokerName: input.brokerName,
+      title: input.title,
+      documents: input.documents,
+      provideUrl: input.provideUrl,
+      dueDate: input.dueDate,
+      notes: input.notes,
+      brand,
     }),
   });
   if (res.ok) return;

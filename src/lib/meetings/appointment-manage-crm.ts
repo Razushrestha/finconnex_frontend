@@ -70,6 +70,8 @@ async function resolveMeetingId(record: AppointmentManageRecord, auth: CrmAuth, 
   return id;
 }
 
+const loggedSyncFailures = new Set<string>();
+
 /** Writes the guest's new date and time onto the CRM meeting the appointment summary reads. */
 export async function syncAppointmentToCrm(
   record: AppointmentManageRecord,
@@ -86,23 +88,44 @@ export async function syncAppointmentToCrm(
 
   const start = dateInTimezone(record.dateIso, record.startHHmm, record.timeZone);
   const end = new Date(start.getTime() + record.durationMinutes * 60 * 1000);
-  const path =
+  const path = `/v1/workspaces/${workspaceId}/meetings/${meetingId}/${action === "cancel" ? "cancel" : "reschedule"}`;
+  const bodies =
     action === "cancel"
-      ? `/v1/workspaces/${workspaceId}/meetings/${meetingId}/cancel`
-      : `/v1/workspaces/${workspaceId}/meetings/${meetingId}`;
-  const res = await crmCall(auth, path, {
-    method: action === "cancel" ? "POST" : "PATCH",
-    body: JSON.stringify(
-      action === "cancel"
-        ? { remarks: record.remarks ?? "" }
-        : { startAt: start.toISOString(), endAt: end.toISOString() },
-    ),
-  });
-  if (!res?.ok) {
-    console.error(
-      `[appointment] CRM ${action} failed (${res?.status ?? "no-response"}) for meeting ${meetingId}.`,
-    );
-    return false;
+      ? ["{}", record.remarks?.trim() ? JSON.stringify({ reason: record.remarks.trim() }) : ""]
+      : [JSON.stringify({ startAt: start.toISOString(), endAt: end.toISOString() })];
+  let res: Response | null = null;
+  let detail = "";
+  for (const body of bodies) {
+    if (!body) continue;
+    res = await crmCall(auth, path, { method: "POST", body });
+    if (!res) return false;
+    if (res.ok) return true;
+    detail = (await res.text().catch(() => "")).slice(0, 180);
+    if (
+      action === "cancel" &&
+      (res.status === 404 ||
+        res.status === 409 ||
+        /already|invalid transition|cancelled/i.test(detail))
+    ) {
+      return true;
+    }
+    if (res.status !== 400) break;
   }
-  return true;
+  if (
+    action === "cancel" &&
+    res &&
+    (res.status === 404 ||
+      res.status === 409 ||
+      /already|invalid transition|cancelled/i.test(detail))
+  ) {
+    return true;
+  }
+  const key = `${action}:${meetingId}:${res?.status ?? "none"}`;
+  if (!loggedSyncFailures.has(key)) {
+    loggedSyncFailures.add(key);
+    console.error(
+      `[appointment] CRM ${action} failed (${res?.status ?? "no-response"}) for meeting ${meetingId}.${detail ? ` ${detail}` : ""}`,
+    );
+  }
+  return false;
 }

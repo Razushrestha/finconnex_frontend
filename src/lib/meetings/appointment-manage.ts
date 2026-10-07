@@ -13,6 +13,8 @@ export type AppointmentManageRecord = {
   reference: string;
   status: "scheduled" | "cancelled" | "deleted";
   remarks?: string;
+  /** Set after the CRM has accepted this version, so the dashboard does not send it again. */
+  crmSyncedAt?: string;
   updatedAt: string;
 };
 
@@ -108,7 +110,7 @@ export function reopenGuestRecord(
   record: AppointmentManageRecord,
   next: { dateIso: string; startHHmm: string; durationMinutes?: number; updatedAt?: string },
 ): AppointmentManageRecord {
-  const { remarks: _remarks, ...rest } = record;
+  const { remarks: _remarks, crmSyncedAt: _synced, ...rest } = record;
   return {
     ...rest,
     status: "scheduled",
@@ -237,6 +239,47 @@ export function assignGuestClocks<
     usedClocks.add(pair.clock);
   }
   return { assigned, unused: clocks.filter((clock) => !usedClocks.has(clock)) };
+}
+
+/** True when this saved appointment is the one the staff member just deleted. */
+export function appointmentDeleteMatch(
+  record: {
+    token?: string;
+    meetingId?: string;
+    title?: string;
+    guestName?: string;
+    hostName?: string;
+    dateIso?: string;
+    startHHmm?: string;
+  },
+  target: {
+    ids?: string[];
+    title?: string;
+    guestName?: string;
+    hostName?: string;
+    start?: string;
+  },
+) {
+  const ids = new Set(
+    (target.ids ?? []).map((id) => id.trim()).filter((id) => id.length > 0),
+  );
+  if (record.meetingId && ids.has(record.meetingId)) return true;
+  if (record.token && ids.has(record.token)) return true;
+  const title = (target.title ?? "").trim().toLowerCase();
+  const recordTitle = (record.title ?? "").trim().toLowerCase();
+  if (!title || title !== recordTitle) return false;
+  const guest = (target.guestName ?? "").trim().toLowerCase();
+  const recordGuest = (record.guestName ?? "").trim().toLowerCase();
+  if (!guest || guest !== recordGuest) return false;
+  const host = (target.hostName ?? "").trim().toLowerCase();
+  const recordHost = (record.hostName ?? "").trim().toLowerCase();
+  if (host && recordHost && host !== recordHost) return false;
+  const start = (target.start ?? "").slice(0, 16);
+  if (start && record.dateIso && record.startHHmm) {
+    const clock = `${record.dateIso}T${record.startHHmm}`.slice(0, 16);
+    if (clock !== start) return false;
+  }
+  return true;
 }
 
 /** One row per meeting, keeping the client's latest choice. */

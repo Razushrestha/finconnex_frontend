@@ -1,4 +1,13 @@
 import { publicManageUrl, publicRescheduleUrl } from "@/lib/booking/types";
+import {
+  emailBrandFromValues,
+  emailFillStyle,
+  type EmailBrand,
+} from "@/lib/emails/brand-mail";
+
+const INK = "#111827";
+const MUTED = "#4B5563";
+const LINE = "#E5E7EB";
 
 export function nextBookingRef() {
   const key = "booking:ref-seq:v1";
@@ -29,13 +38,14 @@ export function bookingConfirmEmailHtml(input: {
   workspaceName?: string;
   /** Extra Invite Guest(s) recipient — they get the details, not manage links. */
   invited?: boolean;
+  brand?: EmailBrand;
 }): { subject: string; html: string; text: string } {
+  const brand = input.brand ?? emailBrandFromValues(null);
+  const fill = emailFillStyle(brand);
+  const accent = brand.primary;
   const origin = (input.origin ?? "").replace(/\/$/, "");
   const reschedule = `${origin}${publicRescheduleUrl(input.slug, input.manageToken)}`;
   const manage = `${origin}${publicManageUrl(input.slug, input.manageToken)}`;
-  const joinLine = input.joinUrl
-    ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.5;color:#111">Join meeting: <a href="${escapeHtml(input.joinUrl)}" style="color:#2563eb">${escapeHtml(input.joinUrl)}</a></p>`
-    : "";
   const joinText = input.joinUrl ? `Join meeting: ${input.joinUrl}\n\n` : "";
   const greeting = input.invited
     ? "Hi there!"
@@ -48,19 +58,47 @@ export function bookingConfirmEmailHtml(input: {
     : `You've scheduled an appointment with ${input.hostName} for ${input.title} on ${input.dateLabel} at ${input.timeLabel} (${input.timezoneLabel})`;
   const manageHtml = input.invited
     ? ""
-    : `<p style="font-size:14px;line-height:1.6;margin:24px 0 0">Something amiss? You can always <a href="${escapeHtml(reschedule)}" style="color:#2563eb">reschedule</a> or <a href="${escapeHtml(manage)}" style="color:#2563eb">cancel</a> your appointment.</p>`;
+    : `<p style="font-size:14px;line-height:1.6;margin:24px 0 0;color:${MUTED};">Something amiss? You can always <a href="${escapeHtml(reschedule)}" style="color:${accent};">reschedule</a> or <a href="${escapeHtml(manage)}" style="color:${accent};">cancel</a> your appointment.</p>`;
   const manageText = input.invited
     ? ""
     : `Something amiss? Reschedule: ${reschedule}\nCancel: ${manage}\n\n`;
-  const html = `<div style="font-family:Arial,sans-serif;color:#111;max-width:560px;margin:0 auto;padding:8px 0">
-<p style="font-size:18px;font-weight:700;margin:0 0 16px">${greeting}</p>
-<p style="font-size:14px;line-height:1.6;margin:0">${intro}</p>
-<p style="font-size:14px;margin:16px 0 0">Number is:<strong>${escapeHtml(input.reference)}</strong>.</p>
-${joinLine}
-${manageHtml}
-<p style="font-size:14px;margin:28px 0 0">See you soon,</p>
-<p style="font-size:14px;font-weight:700;margin:4px 0 0">${escapeHtml(input.hostName)}</p>
-<p style="font-size:12px;color:#94a3b8;margin:20px 0 0">${escapeHtml(input.workspaceName || "FinConnex")}<br/>Powered by FinConnex Bookings</p>
+  const headerName = input.workspaceName?.trim() || input.hostName;
+  const actionUrl = input.joinUrl || (input.invited ? "" : manage);
+  const actionLabel = input.joinUrl ? "Join meeting" : "Manage appointment";
+  const actionBlock = actionUrl
+    ? `<p style="margin:16px 0;font-size:14px;line-height:1.55;color:${MUTED};">Use the button to open this appointment. This link is unique to you and should not be shared with anyone.</p>
+    <p style="margin:0 0 18px;"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;${fill}color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;border-radius:8px;padding:14px 18px;">${actionLabel}</a></p>
+    <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${MUTED};">If the button does not work, copy and paste this URL into your browser:</p>
+    <div style="border:1px solid ${LINE};border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.5;color:${accent};word-break:break-all;">${escapeHtml(actionUrl)}</div>`
+    : "";
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:${INK};max-width:560px;margin:0 auto;background:#ffffff;">
+  <div style="${fill}color:#ffffff;padding:22px 24px;">
+    <div style="font-size:11px;letter-spacing:1.4px;font-weight:700;opacity:0.85;">FINCONNEX</div>
+    <div style="margin-top:6px;font-size:26px;font-weight:800;line-height:1.2;">${escapeHtml(headerName)}</div>
+  </div>
+  <div style="padding:22px 24px 8px;">
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.5;">${greeting}</p>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${intro}</p>
+    <div style="margin:0 0 10px;font-size:12px;letter-spacing:1.2px;font-weight:700;color:${accent};">APPOINTMENT</div>
+    <div style="border:1px solid ${LINE};border-radius:10px;padding:14px 16px;margin:0 0 10px;">
+      <div style="font-size:15px;font-weight:700;color:${INK};">${escapeHtml(input.title)}</div>
+      <div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">With ${escapeHtml(input.hostName)}</div>
+      <div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">${escapeHtml(input.dateLabel)} at ${escapeHtml(input.timeLabel)}</div>
+      <div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">${escapeHtml(input.timezoneLabel)}</div>
+    </div>
+    <div style="border:1px solid ${LINE};border-radius:10px;padding:14px 16px;margin:0 0 10px;">
+      <div style="font-size:15px;font-weight:700;color:${INK};">Booking reference</div>
+      <div style="margin-top:4px;font-size:13px;line-height:1.45;color:${MUTED};">Number is:<strong style="color:${INK};">${escapeHtml(input.reference)}</strong>.</div>
+    </div>
+    ${actionBlock}
+    ${manageHtml}
+    <div style="margin-top:16px;border:1px solid ${LINE};border-radius:10px;padding:14px 16px;">
+      <div style="font-size:11px;letter-spacing:1.2px;font-weight:700;color:${accent};">QUESTIONS</div>
+      <p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:${MUTED};">If you have any questions, contact your assigned consultant directly.</p>
+    </div>
+    <p style="margin:22px 0 0;font-size:15px;line-height:1.5;">See you soon,<br/><strong>${escapeHtml(input.hostName)}</strong></p>
+    <p style="font-size:12px;color:#94a3b8;margin:16px 0 8px">${escapeHtml(input.workspaceName || "FinConnex")}<br/>Powered by FinConnex Bookings</p>
+  </div>
 </div>`;
   const text = `${input.invited ? "Hi there!" : `Hi there, ${input.guestName} !`}
 

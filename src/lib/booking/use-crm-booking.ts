@@ -207,21 +207,6 @@ export function hideAppointments(ids: Array<string | undefined>) {
   window.localStorage.setItem(HIDDEN_APPOINTMENTS_KEY, JSON.stringify([...next]));
 }
 
-function revealFreshCancellations(clocks: GuestClock[]) {
-  if (typeof window === "undefined") return;
-  const hidden = hiddenAppointmentIds();
-  let changed = false;
-  for (const clock of clocks) {
-    if (clock.status !== "cancelled") continue;
-    for (const id of [clock.meetingId, clock.token]) {
-      if (id && hidden.delete(id)) changed = true;
-    }
-  }
-  if (changed) {
-    window.localStorage.setItem(HIDDEN_APPOINTMENTS_KEY, JSON.stringify([...hidden]));
-  }
-}
-
 function visibleAppointments(rows: DashboardAppointment[]) {
   const hidden = hiddenAppointmentIds();
   if (!hidden.size) return rows;
@@ -245,7 +230,12 @@ function rowsWithGuestClocks(rows: DashboardAppointment[], clocks: GuestClock[])
   const next = rows.flatMap((row, index) => {
     const clock = assigned[index];
     if (!clock) return [row];
-    if (clock.status === "deleted") return [];
+    if (clock.status === "deleted") {
+      const sameId =
+        !!clock.meetingId &&
+        (clock.meetingId === row.meetingId || clock.meetingId === row.id);
+      return sameId ? [] : [row];
+    }
     const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
     const notes = guestAppointmentNotes(row.notes, clock.remarks);
     return [
@@ -566,7 +556,6 @@ export function useCrmBooking() {
       })
         .then(async (res) => (res.ok ? ((await res.json()) as GuestClock[]) : []))
         .catch(() => [] as GuestClock[]);
-      revealFreshCancellations(clocks);
       const listed = visibleAppointments(
         (
           meetingsUnavailable ? appointmentsFromGuestClocks(clocks) : rowsWithGuestClocks(mapped, clocks)
@@ -618,7 +607,6 @@ export function useCrmBooking() {
           .catch(() => [] as GuestClock[]);
         const current = appointmentsRef.current;
         if (stopped || !current.length || !clocks.length) return;
-        revealFreshCancellations(clocks);
         const next = visibleAppointments(rowsWithGuestClocks(current, clocks));
         const stamp = (rows: DashboardAppointment[]) =>
           rows

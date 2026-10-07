@@ -13,6 +13,7 @@ import {
   matchGuestClock,
   reopenGuestRecord,
   matchAppointmentMeetingId,
+  appointmentDeleteMatch,
   slotPeriod,
 } from "@/lib/meetings/appointment-manage";
 
@@ -268,6 +269,7 @@ describe("appointment manage helpers", () => {
         reference: "AP-21489",
         status: "cancelled",
         remarks: "i am busy and busy",
+        crmSyncedAt: "2026-10-07T06:11:05.387Z",
         updatedAt: "2026-10-07T06:11:05.387Z",
       },
       { dateIso: "2026-10-20", startHHmm: "15:00", durationMinutes: 90, updatedAt: "2026-10-07T06:20:00.000Z" },
@@ -276,5 +278,45 @@ describe("appointment manage helpers", () => {
     expect(next.dateIso).toBe("2026-10-20");
     expect(next.startHHmm).toBe("15:00");
     expect(next.remarks).toBeUndefined();
+    expect(next.crmSyncedAt).toBeUndefined();
+  });
+
+  it("matches a deleted appointment by meeting id, and not a different host's booking", () => {
+    const cancelled = {
+      meetingId: "6009b1c3-d550-4891-8672-14712db2883a",
+      title: "10/7/2026 Test",
+      guestName: "Raju shrestha",
+      hostName: "nepatronix web",
+      dateIso: "2026-10-16",
+      startHHmm: "13:00",
+    };
+    expect(
+      appointmentDeleteMatch(cancelled, {
+        ids: ["6009b1c3-d550-4891-8672-14712db2883a"],
+        title: "Consultation",
+        guestName: "Someone else",
+      }),
+    ).toBe(true);
+    expect(
+      appointmentDeleteMatch(
+        { ...cancelled, meetingId: "ac74f878-14e3-4061-ac0e-972a60d4af08", hostName: "Mohit Chapagain" },
+        {
+          ids: ["booking-1"],
+          title: "10/7/2026 Test",
+          guestName: "Raju shrestha",
+          hostName: "nepatronix web",
+          start: "2026-10-16T13:00",
+        },
+      ),
+    ).toBe(false);
+    expect(
+      appointmentDeleteMatch(cancelled, {
+        ids: [],
+        title: "10/7/2026 Test",
+        guestName: "Raju shrestha",
+        hostName: "nepatronix web",
+        start: "2026-10-16T13:00",
+      }),
+    ).toBe(true);
   });
 });

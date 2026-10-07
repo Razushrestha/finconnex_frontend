@@ -31,6 +31,7 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { bookingConfirmEmailHtml } from "@/lib/booking/guest-confirm-email";
+import { readClientEmailBrand, type EmailBrand } from "@/lib/emails/brand-mail";
 import { inviteGuestEmailsFromAnswers } from "@/lib/booking/invite-guests";
 import { resolveEmailRouting } from "@/lib/booking/email-config";
 import {
@@ -317,7 +318,7 @@ export function confirmEmailCopy(
   page: BookingPage,
   booking: Booking,
   dateFormat?: string,
-  opts?: { invited?: boolean },
+  opts?: { invited?: boolean; brand?: EmailBrand },
 ) {
   const start = parseLocalDateTime(booking.start);
   const dateLabel = formatDatePattern(start, normalizeDateFormat(dateFormat));
@@ -355,6 +356,7 @@ export function confirmEmailCopy(
     manageToken: booking.manageToken,
     origin,
     invited: opts?.invited,
+    brand: opts?.brand ?? readClientEmailBrand(),
   });
 }
 
@@ -397,8 +399,11 @@ export async function dispatchBookingNotifications(input: {
     });
     if (contact) {
       const route = routing("customer", tokens.email);
+      const brand = readClientEmailBrand();
       if (input.event === "confirmed") {
-        const copy = confirmEmailCopy(input.page, input.booking, row.dateFormat);
+        const copy = confirmEmailCopy(input.page, input.booking, row.dateFormat, {
+          brand,
+        });
         emailTasks.push(
           sendEmailSafe(tokens.email, copy.subject, copy.html, {
             html: copy.html,
@@ -419,6 +424,7 @@ export async function dispatchBookingNotifications(input: {
         if (input.event === "confirmed") {
           const copy = confirmEmailCopy(input.page, input.booking, row.dateFormat, {
             invited: true,
+            brand,
           });
           emailTasks.push(
             sendEmailSafe(extra, copy.subject, copy.html, {

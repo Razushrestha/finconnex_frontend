@@ -879,7 +879,8 @@ const CURATED: Record<string, SettingsSchema> = {
 
   "organization/branding": {
     title: "Branding",
-    description: "Primary brand colours and logos for the CRM shell.",
+    description:
+      "Primary and secondary colours. Buttons, menus, and client emails blend them into a gradient.",
     fields: [
       {
         id: "primaryColor",
@@ -907,7 +908,7 @@ const CURATED: Record<string, SettingsSchema> = {
         label: "Secondary colour",
         type: "color",
         defaultValue: "#0F172A",
-        help: "Sidebar and footer background. Text contrast is chosen automatically.",
+        help: "Second colour of the site gradient, and the sidebar and footer background.",
         options: [
           { label: "Navy", value: "#0F172A" },
           { label: "Slate", value: "#334155" },

@@ -20,12 +20,14 @@ import {
 import { initials } from "@/lib/activities/shared";
 import {
   formatRelativeFromDisplay,
+  hideDeletedDocumentRequest,
   upsertDocumentRequest,
   type DocumentRequest,
   type DocumentRequestType,
 } from "@/lib/documents/requests/types";
 import {
   approveCrmDocumentRequest,
+  deleteCrmDocumentRequest,
   expireCrmDocumentRequest,
   isCrmDocumentRequestId,
   receiveCrmDocumentRequest,
@@ -205,6 +207,8 @@ function RowActions({
 }) {
   const [open, setOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notifyCancel, setNotifyCancel] = useState(false);
   const [editingReminders, setEditingReminders] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
@@ -365,6 +369,27 @@ function RowActions({
     );
   }
 
+  async function deleteRequest() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      if (isCrmDocumentRequestId(request.id)) {
+        await deleteCrmDocumentRequest(request.id);
+      }
+      hideDeletedDocumentRequest(request.id);
+      setOpen(false);
+      setConfirmDelete(false);
+      onRefresh?.();
+      onToast?.("Request deleted");
+    } catch (err) {
+      onToast?.(
+        err instanceof Error ? err.message : "Could not delete this request",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div ref={ref} className="relative flex justify-end">
       <div className="inline-flex overflow-hidden rounded-lg border border-[#E5E7EB]">
@@ -388,6 +413,7 @@ function RowActions({
             e.stopPropagation();
             setOpen((v) => !v);
             setConfirmCancel(false);
+            setConfirmDelete(false);
             setNotifyCancel(false);
           }}
           className="flex h-8 w-8 items-center justify-center border-l border-[#E5E7EB] text-slate-400 hover:bg-slate-50 hover:text-slate-700"
@@ -413,7 +439,30 @@ function RowActions({
           style={menuStyle}
           className="overflow-y-auto overscroll-contain rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
         >
-          {confirmCancel ? (
+          {confirmDelete ? (
+            <div className="px-3 py-2">
+              <p className="text-[12px] leading-snug text-slate-600">
+                Delete this request? It will be removed from the list.
+              </p>
+              <div className="mt-2 flex gap-1.5">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  className="h-7 rounded-md bg-rose-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-60"
+                  onClick={() => void deleteRequest()}
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+                <button
+                  type="button"
+                  className="h-7 rounded-md px-2 text-[11px] font-semibold text-slate-500 hover:bg-slate-50"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          ) : confirmCancel ? (
             <div className="px-3 py-2">
               <p className="text-[12px] leading-snug text-slate-600">
                 Cancel this request? The client will no longer need to upload.
@@ -510,6 +559,16 @@ function RowActions({
                 onClick={() => setConfirmCancel(true)}
               >
                 Cancel request
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50"
+                onClick={() => {
+                  setConfirmCancel(false);
+                  setConfirmDelete(true);
+                }}
+              >
+                Delete
               </button>
             </>
           )}

@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle2, FileText, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import type { PublicProvideSession } from "@/lib/documents/requests/public-provide";
+
+const SEND_BUTTON_STYLE = {
+  backgroundColor: "var(--primary, #5A32A3)",
+  color: "#ffffff",
+} as const;
 
 export function ProvideDocumentsClient({
   token,
@@ -162,10 +166,8 @@ export function ProvideDocumentsClient({
           type="button"
           disabled={busy || missing > 0}
           onClick={() => void onSend()}
-          className={cn(
-            "mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-primary)] text-sm font-semibold text-white",
-            "disabled:opacity-50",
-          )}
+          style={SEND_BUTTON_STYLE}
+          className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {busy ? "Sending…" : "Send"}

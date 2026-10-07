@@ -101,7 +101,10 @@ export async function POST(request: Request, ctx: Ctx) {
       files,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not save the documents";
+    const raw = error instanceof Error ? error.message : "Could not save the documents";
+    const message = /ENOENT|mkdir|\/var\/task|read-only file system/i.test(raw)
+      ? "The server could not store these documents. Try Send again."
+      : raw;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 

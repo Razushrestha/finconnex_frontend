@@ -334,13 +334,40 @@ function isLiveDocumentRequestId(id: string) {
   );
 }
 
+const DELETED_REQUESTS_KEY = "documents:deleted-request-ids:v1";
+
+export function deletedDocumentRequestIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.sessionStorage.getItem(DELETED_REQUESTS_KEY);
+    const ids = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(
+      Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export function hideDeletedDocumentRequest(id: string) {
+  const ids = deletedDocumentRequestIds();
+  ids.add(id);
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(DELETED_REQUESTS_KEY, JSON.stringify([...ids]));
+  }
+  removeDocumentRequest(id);
+}
+
 export function replaceDocumentRequests(list: DocumentRequest[]) {
+  const hidden = deletedDocumentRequestIds();
   const previous = readStore() ?? [];
   const remoteIds = new Set(list.map((row) => row.id));
   const localOnly = previous.filter(
     (row) => !isLiveDocumentRequestId(row.id) && !remoteIds.has(row.id),
   );
-  writeStore([...localOnly, ...list.map(normalize)]);
+  writeStore(
+    [...localOnly, ...list.map(normalize)].filter((row) => !hidden.has(row.id)),
+  );
 }
 
 export function removeDocumentRequest(id: string): DocumentRequest | null {

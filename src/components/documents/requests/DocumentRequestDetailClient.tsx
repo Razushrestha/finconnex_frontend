@@ -317,7 +317,12 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
       flash("This request has no client email, so the invitation cannot be sent.");
       return;
     }
-    const documents = (request.items ?? []).map((item) => item.title).filter(Boolean);
+    const documents = (request.items ?? [])
+      .filter((item) => item.title?.trim())
+      .map((item) => ({
+        title: item.title,
+        description: item.description,
+      }));
     setResending(true);
     try {
       const publishRes = await fetch("/api/documents/provide/publish", {

@@ -1147,7 +1147,10 @@ export function CreateDocumentRequestForm({
           clientName: String(draft.clientName || requestedFrom || "Client"),
           brokerName,
           title,
-          documents: documentTitles,
+          documents: items.map((item) => ({
+            title: item.title,
+            description: item.description,
+          })),
           provideUrl,
           dueDate: due,
           notes: notes.trim() || undefined,

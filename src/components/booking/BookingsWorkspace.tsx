@@ -73,6 +73,7 @@ import {
   tryCrmBooking,
 } from "@/lib/booking/api";
 import {
+  cancelCrmMeeting,
   deleteCrmMeeting,
   tryCrmMeeting,
   updateCrmMeeting,
@@ -376,23 +377,31 @@ function HomeView({
 
   async function removeAppointment(row: DashboardAppointment) {
     if (!window.confirm(`Delete appointment “${row.guestName}”? This also removes it for the client.`)) return;
-    hideAppointments([row.id, row.meetingId]);
+    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    const bookingId = row.recordKind === "booking" ? row.id : "";
+    hideAppointments([row.id, row.meetingId, bookingId]);
     if (detail?.id === row.id) setDetail(null);
-    onRefresh();
     await fetch("/api/appointment/manage/remove", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        meetingId: row.meetingId || row.id,
+        meetingId,
+        bookingId,
         title: row.eventTypeName || row.topic,
+        guestName: row.guestName,
+        hostName: row.consultantName,
+        start: row.start,
       }),
     }).catch(() => undefined);
-    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
-    if (meetingId) await tryCrmMeeting(() => deleteCrmMeeting(meetingId));
-    if (row.recordKind !== "meeting" && row.status !== "Cancelled") {
+    onRefresh();
+    if (meetingId) {
+      await tryCrmMeeting(() => deleteCrmMeeting(meetingId));
+      await tryCrmMeeting(() => cancelCrmMeeting(meetingId));
+    }
+    if (bookingId) {
       await tryCrmBooking(() =>
-        cancelCrmBooking(row.id, "Deleted from upcoming appointments"),
+        cancelCrmBooking(bookingId, "Deleted from upcoming appointments"),
       );
     }
     toast.success("Appointment deleted");
