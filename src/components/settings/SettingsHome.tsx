@@ -13,6 +13,7 @@ import {
   UserRound,
   ArrowRight,
   type LucideIcon,
+  Puzzle,
 } from "lucide-react";
 import {
   SETTINGS_CONTROL_PANEL,
@@ -26,6 +27,7 @@ const ICONS: Record<SettingsNavIcon, LucideIcon> = {
   pipeline: Kanban,
   automation: GitBranch,
   channels: Mail,
+  integrations: Puzzle,
   data: Database,
   documents: FolderOpen,
   billing: CreditCard,

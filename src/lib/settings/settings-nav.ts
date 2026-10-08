@@ -24,7 +24,8 @@ export type SettingsNavIcon =
   | "data"
   | "billing"
   | "me"
-  | "documents";
+  | "documents"
+  | "integrations";
 
 /** Operator control panel — the Settings home and left rail. */
 export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
@@ -205,7 +206,7 @@ export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
   {
     id: "channels",
     title: "Email & calendar",
-    description: "Outbound mail, signatures, and calendar sync.",
+    description: "Outbound mail and signatures.",
     href: "/settings/communication",
     icon: "channels",
     links: [
@@ -221,22 +222,20 @@ export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
         href: "/settings/communication/email-signatures",
         live: true,
       },
+    ],
+  },
+  {
+    id: "integrations",
+    title: "Integrations",
+    description:
+      "Calendars, video meetings, payments, credit checks, messaging, storage and automation apps.",
+    href: "/settings/integrations",
+    icon: "integrations",
+    links: [
       {
-        title: "Google Calendar",
-        blurb: "Connect Google",
-        href: "/settings/integrations/google-calendar",
-        live: true,
-      },
-      {
-        title: "Outlook Calendar",
-        blurb: "Connect Outlook",
-        href: "/settings/integrations/outlook-calendar",
-        live: true,
-      },
-      {
-        title: "Calendly",
-        blurb: "Booking links",
-        href: "/settings/integrations/calendly",
+        title: "All integrations",
+        blurb: "Connect apps",
+        href: "/settings/integrations",
         live: true,
       },
     ],
