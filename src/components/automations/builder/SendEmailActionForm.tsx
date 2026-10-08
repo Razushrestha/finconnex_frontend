@@ -117,10 +117,18 @@ export function SendEmailActionForm({
         subject,
       });
       const next = stripAllSignatures(html).trim();
-      setBody(signature && body.includes(signature) ? appendSignature(next, signature) : next);
+      setBody(
+        signature && body.includes(signature)
+          ? appendSignature(next, signature)
+          : next,
+      );
       setAskOpen(false);
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : "Google AI could not write this email.");
+      setAiError(
+        err instanceof Error
+          ? err.message
+          : "Google AI could not write this email.",
+      );
     } finally {
       setAiBusy(false);
     }
@@ -129,7 +137,11 @@ export function SendEmailActionForm({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="px-4 py-3">
-        <EmailRecipientsField entityType={entityType} config={config} onChange={onChange} />
+        <EmailRecipientsField
+          entityType={entityType}
+          config={config}
+          onChange={onChange}
+        />
       </div>
 
       <div className="flex items-center gap-2 border-t border-slate-100 px-4 py-3">
@@ -139,8 +151,8 @@ export function SendEmailActionForm({
         </span>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="space-y-2 border-t border-slate-100 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-sm text-muted-foreground">
             Subject<span className="text-rose-500">*</span>
           </span>
@@ -151,55 +163,61 @@ export function SendEmailActionForm({
             placeholder="Add a subject"
             aria-label="Subject"
           />
+        </div>
+        {/* On their own row: beside the subject they left it one word wide
+            in the sidebar. */}
+        <div className="flex items-center justify-end gap-2">
           <SubjectImproveButton
             current={subject}
             body={body}
             onPick={(next) => set({ subject: next })}
           />
-        </div>
-        <div className="relative" ref={templatesRef}>
-          <button
-            type="button"
-            onClick={() => setTemplatesOpen((v) => !v)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-faint)]"
-          >
-            <LayoutTemplate className="h-3.5 w-3.5" />
-            Templates
-          </button>
-          {templatesOpen ? (
-            <div className="absolute top-9 right-0 z-30 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-              <div className="relative border-b border-slate-100 p-2">
-                <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                <input
-                  autoFocus
-                  value={templateQuery}
-                  onChange={(e) => setTemplateQuery(e.target.value)}
-                  placeholder="Search templates"
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-[12px] outline-none"
-                />
+          <div className="relative" ref={templatesRef}>
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen((v) => !v)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-faint)]"
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+              Templates
+            </button>
+            {templatesOpen ? (
+              <div className="absolute top-9 right-0 z-30 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                <div className="relative border-b border-slate-100 p-2">
+                  <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    autoFocus
+                    value={templateQuery}
+                    onChange={(e) => setTemplateQuery(e.target.value)}
+                    placeholder="Search templates"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-[12px] outline-none"
+                  />
+                </div>
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {visibleTemplates.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => applyTemplate(item)}
+                      className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
+                    >
+                      <span className="text-[12px] font-semibold text-slate-800">
+                        {item.name}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {item.category} · {item.subject}
+                      </span>
+                    </button>
+                  ))}
+                  {visibleTemplates.length === 0 ? (
+                    <p className="px-3 py-4 text-[12px] text-slate-400">
+                      No templates match “{templateQuery}”
+                    </p>
+                  ) : null}
+                </div>
               </div>
-              <div className="max-h-72 overflow-y-auto py-1">
-                {visibleTemplates.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => applyTemplate(item)}
-                    className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
-                  >
-                    <span className="text-[12px] font-semibold text-slate-800">{item.name}</span>
-                    <span className="text-[11px] text-slate-400">
-                      {item.category} · {item.subject}
-                    </span>
-                  </button>
-                ))}
-                {visibleTemplates.length === 0 ? (
-                  <p className="px-3 py-4 text-[12px] text-slate-400">
-                    No templates match “{templateQuery}”
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -209,19 +227,26 @@ export function SendEmailActionForm({
           onChange={setBody}
           placeholder="Write your email…"
           compactToolbar
+          wrapToolbar
           fillHeight
           className="flex h-[360px] min-h-0 flex-col"
         />
       </div>
 
-      {aiError ? <p className="px-4 pb-2 text-xs text-rose-600">{aiError}</p> : null}
+      {aiError ? (
+        <p className="px-4 pb-2 text-xs text-rose-600">{aiError}</p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3">
         <button
           type="button"
           onClick={insertSignature}
           disabled={!signature}
-          title={signature ? "Add your signature" : "Set up a signature in Emails first"}
+          title={
+            signature
+              ? "Add your signature"
+              : "Set up a signature in Emails first"
+          }
           className={cn(
             "inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-700 hover:bg-slate-50",
             !signature && "cursor-not-allowed opacity-50",

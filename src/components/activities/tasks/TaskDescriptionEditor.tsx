@@ -189,6 +189,11 @@ interface TaskDescriptionEditorProps {
   variant?: "full" | "notes";
   /** Keep primary formatting on the bar; tuck the rest into ⋯ */
   compactToolbar?: boolean;
+  /**
+   * Wrap the toolbar onto more rows instead of scrolling it sideways, for a
+   * narrow column where scrolled-off buttons would be out of sight.
+   */
+  wrapToolbar?: boolean;
 }
 
 function preventFocusLoss(event: React.MouseEvent) {
@@ -1549,6 +1554,7 @@ export function TaskDescriptionEditor({
   fillHeight,
   variant = "full",
   compactToolbar = false,
+  wrapToolbar = false,
 }: TaskDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
@@ -2052,8 +2058,13 @@ export function TaskDescriptionEditor({
   return (
     <div className={cn("relative w-full rounded-md border border-border bg-background", fillHeight && "flex h-full min-h-0 flex-col", className)}>
       <div className="flex w-full items-stretch rounded-t-md border-b border-slate-200 bg-slate-50/90">
-        <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
-          <div className="flex h-11 min-w-max items-center gap-0.5 px-1.5">
+        <div className={cn("min-w-0 flex-1", !wrapToolbar && "overflow-x-auto no-scrollbar")}>
+          <div
+            className={cn(
+              "flex items-center gap-0.5 px-1.5",
+              wrapToolbar ? "min-h-11 flex-wrap py-1" : "h-11 min-w-max",
+            )}
+          >
           {variant === "notes" ? (
             <>
               <ToolButton

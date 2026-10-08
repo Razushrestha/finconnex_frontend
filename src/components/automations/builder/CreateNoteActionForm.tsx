@@ -68,6 +68,7 @@ export function CreateNoteActionForm({
         </div>
       }
       hideCreatedBy
+      wrapToolbar
       noteType={noteType}
       onNoteTypeChange={(type) => set({ noteType: type })}
       createdBy=""

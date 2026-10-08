@@ -38,6 +38,8 @@ interface NoteEditorCardProps {
   relatedSlot?: React.ReactNode;
   /** Hides Created By, for a caller where the author is not chosen here. */
   hideCreatedBy?: boolean;
+  /** Wrap the body editor's toolbar, for a narrow column. */
+  wrapToolbar?: boolean;
 }
 
 export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
@@ -62,6 +64,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
   errors,
   relatedSlot,
   hideCreatedBy = false,
+  wrapToolbar = false,
 }) => {
   const extra =
     relatedKind && relatedName
@@ -268,6 +271,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
           value={body}
           onChange={onBodyChange}
           error={submitted && Boolean(errors.body)}
+          wrapToolbar={wrapToolbar}
           placeholder="Start typing your notes here... Type @ to assign someone."
         />
         {submitted && errors.body ? (
