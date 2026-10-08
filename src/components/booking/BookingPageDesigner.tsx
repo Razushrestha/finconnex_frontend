@@ -17,6 +17,7 @@ import {
   User,
   Pencil,
   Trash2,
+  Images,
 } from "lucide-react";
 import {
   crmEventTypeIdOf,
@@ -39,6 +40,7 @@ import {
 import { toast } from "@/lib/notify/toast";
 import { fitImageDataUrl } from "@/lib/booking/image-fit";
 import { ImageEditModal } from "@/components/booking/ImageEditModal";
+import { BackgroundLibraryModal } from "@/components/booking/BackgroundLibraryModal";
 import {
   assignedCalendarMembers,
   calendarDefaultHost,
@@ -1899,6 +1901,7 @@ function BackgroundImageField({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   return (
     <div>
@@ -1946,15 +1949,35 @@ function BackgroundImageField({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 px-3 text-[13px] text-slate-500"
-        >
-          <span className="truncate">Upload</span>
-          <Upload className="h-3.5 w-3.5" />
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex h-10 items-center justify-between rounded-lg border border-slate-200 px-3 text-[13px] text-slate-500"
+          >
+            <span className="truncate">Upload</span>
+            <Upload className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="flex h-10 items-center justify-between rounded-lg border border-slate-200 px-3 text-[13px] text-slate-500"
+          >
+            <span className="truncate">Free photos</span>
+            <Images className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
+      {picking ? (
+        <BackgroundLibraryModal
+          onCancel={() => setPicking(false)}
+          onPick={(image) => {
+            setPicking(false);
+            // Only the link is kept; the page loads the photo from its source.
+            onChange(image.imageUrl, opacity || 100);
+          }}
+        />
+      ) : null}
       {editing ? (
         <ImageEditModal
           src={editing}

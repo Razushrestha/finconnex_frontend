@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { useContentArea } from "@/hooks/useContentArea";
+import { isLinkedImage } from "@/lib/booking/background-library";
 import { fitImageDataUrl } from "@/lib/booking/image-fit";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,9 @@ export function ImageEditModal({
   onApply: (result: { dataUrl: string; opacity: number }) => void;
 }) {
   const area = useContentArea(true);
+  // A library photo is kept as its link: it can be faded, but cropping or
+  // rotating would mean copying its pixels onto our own server.
+  const linked = isLinkedImage(src);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [loadError, setLoadError] = useState("");
   const [turns, setTurns] = useState(0);
@@ -150,13 +154,20 @@ export function ImageEditModal({
   // Redrawn whenever the rotation or mirroring changes.
   const preview = useMemo(() => {
     if (!image) return null;
+    if (linked) {
+      return {
+        url: src,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      };
+    }
     const canvas = transformed(image, turns, flipX, flipY);
     return {
       url: canvas.toDataURL("image/png"),
       width: canvas.width,
       height: canvas.height,
     };
-  }, [image, turns, flipX, flipY]);
+  }, [image, turns, flipX, flipY, linked, src]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -247,6 +258,10 @@ export function ImageEditModal({
   }
 
   async function apply() {
+    if (linked) {
+      onApply({ dataUrl: src, opacity });
+      return;
+    }
     if (!image) return;
     setSaving(true);
     setSaveError("");
@@ -334,119 +349,134 @@ export function ImageEditModal({
                   className="h-full w-full"
                   style={{ opacity: opacity / 100 }}
                 />
-                {/* Everything outside the crop is dimmed, within the image only. */}
-                <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                  <div
-                    className="absolute shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]"
-                    style={{
-                      left: `${crop.x * 100}%`,
-                      top: `${crop.y * 100}%`,
-                      width: `${crop.w * 100}%`,
-                      height: `${crop.h * 100}%`,
-                    }}
-                  />
-                </div>
-                <div
-                  className="absolute border-2 border-white"
-                  style={{
-                    left: `${crop.x * 100}%`,
-                    top: `${crop.y * 100}%`,
-                    width: `${crop.w * 100}%`,
-                    height: `${crop.h * 100}%`,
-                    cursor: "move",
-                  }}
-                  onPointerDown={(e) => startDrag("move", e)}
-                >
-                  {(["nw", "ne", "sw", "se"] as const).map((corner) => (
-                    <span
-                      key={corner}
-                      onPointerDown={(e) => startDrag(corner, e)}
-                      aria-hidden
-                      className={cn(
-                        "absolute h-3.5 w-3.5 rounded-sm border-2 border-white bg-[var(--brand-primary)]",
-                        corner === "nw" && "-top-2 -left-2 cursor-nwse-resize",
-                        corner === "ne" && "-top-2 -right-2 cursor-nesw-resize",
-                        corner === "sw" &&
-                          "-bottom-2 -left-2 cursor-nesw-resize",
-                        corner === "se" &&
-                          "-right-2 -bottom-2 cursor-nwse-resize",
-                      )}
-                    />
-                  ))}
-                </div>
+                {linked ? null : (
+                  <>
+                    {/* Everything outside the crop is dimmed, within the image only. */}
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                      <div
+                        className="absolute shadow-[0_0_0_9999px_rgba(15,23,42,0.45)]"
+                        style={{
+                          left: `${crop.x * 100}%`,
+                          top: `${crop.y * 100}%`,
+                          width: `${crop.w * 100}%`,
+                          height: `${crop.h * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="absolute border-2 border-white"
+                      style={{
+                        left: `${crop.x * 100}%`,
+                        top: `${crop.y * 100}%`,
+                        width: `${crop.w * 100}%`,
+                        height: `${crop.h * 100}%`,
+                        cursor: "move",
+                      }}
+                      onPointerDown={(e) => startDrag("move", e)}
+                    >
+                      {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+                        <span
+                          key={corner}
+                          onPointerDown={(e) => startDrag(corner, e)}
+                          aria-hidden
+                          className={cn(
+                            "absolute h-3.5 w-3.5 rounded-sm border-2 border-white bg-[var(--brand-primary)]",
+                            corner === "nw" &&
+                              "-top-2 -left-2 cursor-nwse-resize",
+                            corner === "ne" &&
+                              "-top-2 -right-2 cursor-nesw-resize",
+                            corner === "sw" &&
+                              "-bottom-2 -left-2 cursor-nesw-resize",
+                            corner === "se" &&
+                              "-right-2 -bottom-2 cursor-nwse-resize",
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
 
           <div className="mt-3 space-y-3">
-            <div>
-              <p className="mb-2 text-[12px] font-semibold text-slate-700">
-                Crop
+            {linked ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-500">
+                This is a library photo, kept as a link to its source, so it can
+                be faded here but not cropped or rotated.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {ASPECTS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => chooseAspect(item.id)}
-                    aria-pressed={aspect === item.id}
-                    className={cn(
-                      tool,
-                      aspect === item.id &&
-                        "border-[var(--brand-primary)] bg-[var(--brand-primary-faint)] text-[var(--brand-primary)]",
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <p className="mb-2 text-[12px] font-semibold text-slate-700">
+                    Crop
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {ASPECTS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => chooseAspect(item.id)}
+                        aria-pressed={aspect === item.id}
+                        className={cn(
+                          tool,
+                          aspect === item.id &&
+                            "border-[var(--brand-primary)] bg-[var(--brand-primary-faint)] text-[var(--brand-primary)]",
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div>
-              <p className="mb-2 text-[12px] font-semibold text-slate-700">
-                Rotate &amp; mirror
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className={tool}
-                  onClick={() => rotate(-1)}
-                >
-                  <RotateCcw className="h-4 w-4" /> Rotate left
-                </button>
-                <button
-                  type="button"
-                  className={tool}
-                  onClick={() => rotate(1)}
-                >
-                  <RotateCw className="h-4 w-4" /> Rotate right
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    tool,
-                    flipX &&
-                      "border-[var(--brand-primary)] text-[var(--brand-primary)]",
-                  )}
-                  aria-pressed={flipX}
-                  onClick={() => setFlipX((v) => !v)}
-                >
-                  <FlipHorizontal2 className="h-4 w-4" /> Mirror
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    tool,
-                    flipY &&
-                      "border-[var(--brand-primary)] text-[var(--brand-primary)]",
-                  )}
-                  aria-pressed={flipY}
-                  onClick={() => setFlipY((v) => !v)}
-                >
-                  <FlipVertical2 className="h-4 w-4" /> Flip vertical
-                </button>
-              </div>
-            </div>
+                <div>
+                  <p className="mb-2 text-[12px] font-semibold text-slate-700">
+                    Rotate &amp; mirror
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={tool}
+                      onClick={() => rotate(-1)}
+                    >
+                      <RotateCcw className="h-4 w-4" /> Rotate left
+                    </button>
+                    <button
+                      type="button"
+                      className={tool}
+                      onClick={() => rotate(1)}
+                    >
+                      <RotateCw className="h-4 w-4" /> Rotate right
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        tool,
+                        flipX &&
+                          "border-[var(--brand-primary)] text-[var(--brand-primary)]",
+                      )}
+                      aria-pressed={flipX}
+                      onClick={() => setFlipX((v) => !v)}
+                    >
+                      <FlipHorizontal2 className="h-4 w-4" /> Mirror
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        tool,
+                        flipY &&
+                          "border-[var(--brand-primary)] text-[var(--brand-primary)]",
+                      )}
+                      aria-pressed={flipY}
+                      onClick={() => setFlipY((v) => !v)}
+                    >
+                      <FlipVertical2 className="h-4 w-4" /> Flip vertical
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <div className="mb-2 flex items-center justify-between">

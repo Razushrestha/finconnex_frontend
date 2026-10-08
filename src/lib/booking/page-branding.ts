@@ -241,5 +241,7 @@ export function brandingBackgroundStyle(
       : image,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    // A linked library photo whose host cannot be reached leaves plain white.
+    backgroundColor: "#ffffff",
   };
 }
