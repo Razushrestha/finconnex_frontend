@@ -561,9 +561,17 @@ export function ConsultationNotifyPanel({
                 const on = tileOn(tile.id);
                 return (
                   <div key={tile.id} className="relative">
+                    {/* A click opens the options; enabling or disabling is
+                        always chosen there, never a side effect of a click. */}
                     <button
                       type="button"
-                      onClick={() => toggleTile(tile.id)}
+                      aria-haspopup="menu"
+                      aria-expanded={menuId === tile.id}
+                      onClick={() =>
+                        setMenuId((current) =>
+                          current === tile.id ? null : tile.id,
+                        )
+                      }
                       className={cn(
                         "flex h-[92px] w-[112px] flex-col items-center justify-center gap-2 rounded-xl border text-[12px] font-medium",
                         on
@@ -606,17 +614,19 @@ export function ConsultationNotifyPanel({
                         >
                           {on ? "Disable" : "Enable"}
                         </button>
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
-                          onClick={() => {
-                            const row = rows.find((item) => item.id === tile.id);
-                            if (row) setEditing(row);
-                            setMenuId(null);
-                          }}
-                        >
-                          Edit
-                        </button>
+                        {panel !== "whatsapp" ? (
+                          <button
+                            type="button"
+                            className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
+                            onClick={() => {
+                              const row = rows.find((item) => item.id === tile.id);
+                              if (row) setEditing(row);
+                              setMenuId(null);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

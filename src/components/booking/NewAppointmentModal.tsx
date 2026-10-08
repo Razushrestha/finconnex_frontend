@@ -1,39 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useContentArea } from "@/hooks/useContentArea";
 import ScheduleMeetingPage, {
   type ScheduleMeetingSeed,
 } from "@/app/(dashboard)/activities/meetings/create/page";
 import { cn } from "@/lib/utils";
-
-type ContentArea = { left: number; top: number; width: number; height: number };
-
-/**
- * The dashboard's content area (its <main>, between the sidebar and the
- * bottom bar), followed as it resizes. The dialog is laid out inside it: a
- * full-window overlay slid under the sidebar and the bottom bar.
- */
-function useContentArea(active: boolean): ContentArea | null {
-  const [area, setArea] = useState<ContentArea | null>(null);
-  useEffect(() => {
-    if (!active) return;
-    const main = document.querySelector("main");
-    if (!main) return;
-    const measure = () => {
-      const rect = main.getBoundingClientRect();
-      setArea({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
-    };
-    // A ResizeObserver reports once as soon as it starts observing.
-    const observer = new ResizeObserver(measure);
-    observer.observe(main);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [active]);
-  return active ? area : null;
-}
 
 /** Booking "New Appointment" opens the Schedule Meeting form in a dialog. */
 export function NewAppointmentModal({

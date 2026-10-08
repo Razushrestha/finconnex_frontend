@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 
+import { useContentArea } from "@/hooks/useContentArea";
 import { fitImageDataUrl } from "@/lib/booking/image-fit";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +110,7 @@ export function ImageEditModal({
   onCancel: () => void;
   onApply: (result: { dataUrl: string; opacity: number }) => void;
 }) {
+  const area = useContentArea(true);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [loadError, setLoadError] = useState("");
   const [turns, setTurns] = useState(0);
@@ -275,8 +277,13 @@ export function ImageEditModal({
     "inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 hover:bg-slate-50";
 
   return createPortal(
+    // Over the working area beside the sidebar, never over the sidebar.
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 p-4"
+      className={cn(
+        "fixed z-[1000] flex items-center justify-center bg-slate-900/50 p-4",
+        !area && "inset-0",
+      )}
+      style={area ?? undefined}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -313,8 +320,7 @@ export function ImageEditModal({
                 className="relative max-w-full touch-none select-none"
                 style={{
                   aspectRatio: `${preview.width} / ${preview.height}`,
-                  maxHeight: 380,
-                  height: 380,
+                  height: "min(380px, 34vh)",
                 }}
                 onPointerMove={onDrag}
                 onPointerUp={endDrag}
@@ -372,7 +378,7 @@ export function ImageEditModal({
             )}
           </div>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-3 space-y-3">
             <div>
               <p className="mb-2 text-[12px] font-semibold text-slate-700">
                 Crop
