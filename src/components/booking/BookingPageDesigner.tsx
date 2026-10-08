@@ -15,6 +15,8 @@ import {
   Tag,
   Upload,
   User,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   crmEventTypeIdOf,
@@ -32,9 +34,11 @@ import {
   type BookingPageBranding,
   type BookingPageLayout,
   type BookingPageService,
+  brandingBackgroundStyle,
 } from "@/lib/booking/page-branding";
 import { toast } from "@/lib/notify/toast";
 import { fitImageDataUrl } from "@/lib/booking/image-fit";
+import { ImageEditModal } from "@/components/booking/ImageEditModal";
 import {
   assignedCalendarMembers,
   calendarDefaultHost,
@@ -83,12 +87,14 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
       if (alive && res?.services?.length) setServices(res.services);
     });
     if (eventTypeId) {
-      void tryCrmBooking(() => getBookingEventTypePage(eventTypeId)).then((res) => {
-        if (!alive || !res) return;
-        const loaded = normalizeBookingPageBranding(res.branding);
-        setBranding(loaded);
-        writeLocalBookingPageBranding(page.id, loaded);
-      });
+      void tryCrmBooking(() => getBookingEventTypePage(eventTypeId)).then(
+        (res) => {
+          if (!alive || !res) return;
+          const loaded = normalizeBookingPageBranding(res.branding);
+          setBranding(loaded);
+          writeLocalBookingPageBranding(page.id, loaded);
+        },
+      );
     }
     return () => {
       alive = false;
@@ -197,7 +203,9 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
                         branding={branding}
                         saving={saving === "header"}
                         onChange={setBranding}
-                        onSave={() => save({ header: branding.header }, "header")}
+                        onSave={() =>
+                          save({ header: branding.header }, "header")
+                        }
                       />
                     ) : null}
                     {panel.id === "footer" ? (
@@ -205,7 +213,9 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
                         branding={branding}
                         saving={saving === "footer"}
                         onChange={setBranding}
-                        onSave={() => save({ footer: branding.footer }, "footer")}
+                        onSave={() =>
+                          save({ footer: branding.footer }, "footer")
+                        }
                       />
                     ) : null}
                     {panel.id === "workspace" ? (
@@ -213,7 +223,9 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
                         branding={branding}
                         saving={saving === "workspace"}
                         onChange={setBranding}
-                        onSave={() => save({ workspace: branding.workspace }, "workspace")}
+                        onSave={() =>
+                          save({ workspace: branding.workspace }, "workspace")
+                        }
                       />
                     ) : null}
                     {panel.id === "services" ? (
@@ -288,7 +300,9 @@ function BasicThemePreview({
 }) {
   // Basic books in steps, like the live page: Event Type, then Date, Time &
   // User, then Your Info. The preview can be clicked through them.
-  const [stage, setStage] = useState<"service" | "schedule" | "details">("service");
+  const [stage, setStage] = useState<"service" | "schedule" | "details">(
+    "service",
+  );
   const [day, setDay] = useState(5);
   const [slot, setSlot] = useState("09:00 am");
   const title =
@@ -298,7 +312,14 @@ function BasicThemePreview({
   const color = branding.primaryColor;
   const host = calendarDefaultHost(page);
   const timezone = page.timezone || "Asia/Kathmandu";
-  const morning = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am"];
+  const morning = [
+    "09:00 am",
+    "09:15 am",
+    "09:30 am",
+    "09:45 am",
+    "10:00 am",
+    "10:15 am",
+  ];
   const afternoon = ["12:00 pm", "12:15 pm", "12:30 pm", "12:45 pm"];
   const week = [
     { date: 5, day: "MON", open: true },
@@ -315,27 +336,32 @@ function BasicThemePreview({
       label: "Consultation",
       icon: Clock,
       summary:
-        stage !== "service" ? `${page.title} · ${formatDurationHours(page.durationMinutes)}` : null,
+        stage !== "service"
+          ? `${page.title} · ${formatDurationHours(page.durationMinutes)}`
+          : null,
     },
     {
       id: "schedule" as const,
       label: "Date, Time & Consultant",
       icon: CalendarClock,
       summary:
-        stage === "details" ? `${String(day).padStart(2, "0")} Oct 2026 ${slot} · ${host}` : null,
+        stage === "details"
+          ? `${String(day).padStart(2, "0")} Oct 2026 ${slot} · ${host}`
+          : null,
     },
     { id: "details" as const, label: "Your Info", icon: User, summary: null },
   ];
-  const reached = { service: true, schedule: stage !== "service", details: stage === "details" };
+  const reached = {
+    service: true,
+    schedule: stage !== "service",
+    details: stage === "details",
+  };
 
   return (
     <div
       className="min-h-full bg-white"
       style={{
-        backgroundImage: branding.backgroundImageUrl
-          ? `url(${branding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(branding),
       }}
     >
       <div className="px-5 pt-6 @lg:px-8">
@@ -343,7 +369,9 @@ function BasicThemePreview({
       </div>
       {branding.showBanner ? (
         <div className="px-5 pt-8 pb-6 text-center @lg:px-8">
-          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">Welcome!</h2>
+          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">
+            Welcome!
+          </h2>
           <p className="mx-auto mt-2 max-w-xl text-[13px] text-slate-500">
             Book your appointment in a few simple steps. Choose a service, pick
             your date and time, and fill in your details. See you soon!
@@ -363,7 +391,9 @@ function BasicThemePreview({
                 onClick={() => setStage(item.id)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left disabled:cursor-default",
-                  active ? "bg-slate-50" : reached[item.id] && "hover:bg-slate-50",
+                  active
+                    ? "bg-slate-50"
+                    : reached[item.id] && "hover:bg-slate-50",
                 )}
               >
                 <Icon
@@ -373,7 +403,11 @@ function BasicThemePreview({
                 <span
                   className={cn(
                     "min-w-0 flex-1 text-[13px]",
-                    item.summary ? "text-slate-800" : active ? "font-medium" : "text-slate-500",
+                    item.summary
+                      ? "text-slate-800"
+                      : active
+                        ? "font-medium"
+                        : "text-slate-500",
                   )}
                   style={active && !item.summary ? { color } : undefined}
                 >
@@ -413,7 +447,9 @@ function BasicThemePreview({
                 Your appointment will be booked with {host}
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[14px] font-semibold text-slate-800">October, 2026</p>
+                <p className="text-[14px] font-semibold text-slate-800">
+                  October, 2026
+                </p>
                 <div className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600">
                   {timezone}
                 </div>
@@ -429,12 +465,20 @@ function BasicThemePreview({
                       onClick={() => setDay(item.date)}
                       className={cn(
                         "flex h-12 flex-col items-center justify-center rounded-md leading-tight shadow-[0_1px_4px_rgba(15,23,42,0.08)] ring-1 ring-slate-100 @md:h-14",
-                        selected ? "text-white" : item.open ? "text-slate-800" : "text-slate-300",
+                        selected
+                          ? "text-white"
+                          : item.open
+                            ? "text-slate-800"
+                            : "text-slate-300",
                       )}
                       style={selected ? { background: color } : undefined}
                     >
-                      <span className="text-[13px] @md:text-[15px]">{item.date}</span>
-                      <span className="text-[8px] @md:text-[10px]">{item.day}</span>
+                      <span className="text-[13px] @md:text-[15px]">
+                        {item.date}
+                      </span>
+                      <span className="text-[8px] @md:text-[10px]">
+                        {item.day}
+                      </span>
                     </button>
                   );
                 })}
@@ -526,10 +570,7 @@ function ModernThemePreview({
     <div
       className="relative min-h-full overflow-hidden bg-white"
       style={{
-        backgroundImage: branding.backgroundImageUrl
-          ? `url(${branding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(branding),
       }}
     >
       <div className="px-5 pt-6 @lg:px-10">
@@ -537,7 +578,10 @@ function ModernThemePreview({
       </div>
       {branding.showBanner ? (
         <div className="px-5 pt-10 pb-8 @lg:px-10">
-          <h2 className="text-[22px] font-semibold @lg:text-[28px]" style={{ color }}>
+          <h2
+            className="text-[22px] font-semibold @lg:text-[28px]"
+            style={{ color }}
+          >
             Welcome!
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] text-slate-500">
@@ -596,7 +640,9 @@ function ModernThemePreview({
                   {page.title.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-[13px] text-slate-800">{page.title}</span>
+                  <span className="block truncate text-[13px] text-slate-800">
+                    {page.title}
+                  </span>
                   <span className="block text-[11px] text-slate-500">
                     ( {formatDurationHours(page.durationMinutes)} )
                   </span>
@@ -607,7 +653,9 @@ function ModernThemePreview({
                 <p className="text-slate-500">{timezone}</p>
               </div>
               <div className="space-y-3 bg-white p-3">
-                <p className="text-[13px] text-slate-800">Please enter your details</p>
+                <p className="text-[13px] text-slate-800">
+                  Please enter your details
+                </p>
                 {["Name", "Email", "Contact Number"].map((label) => (
                   <div key={label}>
                     <p className="mb-1 text-[11px] text-slate-600">
@@ -680,7 +728,16 @@ function ClassicThemePreview({
     "Booking";
   const color = branding.primaryColor;
   const host = calendarDefaultHost(page);
-  const slots = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am", "10:30 am", "10:45 am"];
+  const slots = [
+    "09:00 am",
+    "09:15 am",
+    "09:30 am",
+    "09:45 am",
+    "10:00 am",
+    "10:15 am",
+    "10:30 am",
+    "10:45 am",
+  ];
   const weekdays = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
   const leadingBlanks = 3;
   const cells = [
@@ -689,16 +746,14 @@ function ClassicThemePreview({
   ];
   // Monday-first grid: columns 5 and 6 are Saturday and Sunday.
   const isWeekend = (date: number) => (date + leadingBlanks - 1) % 7 >= 5;
-  const card = "rounded-xl bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100";
+  const card =
+    "rounded-xl bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100";
 
   return (
     <div
       className="min-h-full bg-slate-50/60"
       style={{
-        backgroundImage: branding.backgroundImageUrl
-          ? `url(${branding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(branding),
       }}
     >
       <div className="px-5 pt-6 @lg:px-10">
@@ -706,7 +761,9 @@ function ClassicThemePreview({
       </div>
       {branding.showBanner ? (
         <div className="px-5 pt-8 pb-2 text-center @lg:px-10">
-          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">Welcome!</h2>
+          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">
+            Welcome!
+          </h2>
           <p className="mx-auto mt-2 max-w-2xl text-[13px] text-slate-500">
             Book your appointment in a few simple steps. Choose a service, pick
             your date and time, and fill in your details. See you soon!
@@ -741,16 +798,22 @@ function ClassicThemePreview({
               </span>
               Date, Time & Consultant
             </p>
-            <p className="text-[12px] text-slate-500">Your appointment will be booked with {host}</p>
+            <p className="text-[12px] text-slate-500">
+              Your appointment will be booked with {host}
+            </p>
           </div>
           <div className="mt-4 grid gap-6 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
             <div>
               <p className="mb-3 text-center text-[13px] text-slate-700">
-                <span style={{ color }}>‹</span>&nbsp;&nbsp; October 2026 &nbsp;&nbsp;<span style={{ color }}>›</span>
+                <span style={{ color }}>‹</span>&nbsp;&nbsp; October 2026
+                &nbsp;&nbsp;<span style={{ color }}>›</span>
               </p>
               <div className="grid grid-cols-7 gap-y-1 text-center">
                 {weekdays.map((d) => (
-                  <span key={d} className="text-[10px] font-medium text-slate-400">
+                  <span
+                    key={d}
+                    className="text-[10px] font-medium text-slate-400"
+                  >
                     {d}
                   </span>
                 ))}
@@ -765,7 +828,11 @@ function ClassicThemePreview({
                       onClick={() => date && setDay(date)}
                       className={cn(
                         "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[12px]",
-                        selected ? "font-semibold text-white" : open ? "font-semibold text-slate-800" : "text-slate-400",
+                        selected
+                          ? "font-semibold text-white"
+                          : open
+                            ? "font-semibold text-slate-800"
+                            : "text-slate-400",
                       )}
                       style={selected ? { background: color } : undefined}
                     >
@@ -776,7 +843,9 @@ function ClassicThemePreview({
               </div>
             </div>
             <div>
-              <p className="text-[13px] font-semibold text-slate-800">Slot Availability</p>
+              <p className="text-[13px] font-semibold text-slate-800">
+                Slot Availability
+              </p>
               <div className="mt-2 rounded-md border border-slate-200 px-3 py-2 text-[12px] text-slate-600">
                 {page.timezone || "Asia/Kathmandu"}
               </div>
@@ -794,7 +863,11 @@ function ClassicThemePreview({
                     className="h-8 rounded-md border text-[11px]"
                     style={
                       slot === item
-                        ? { background: color, borderColor: color, color: "#fff" }
+                        ? {
+                            background: color,
+                            borderColor: color,
+                            color: "#fff",
+                          }
                         : { borderColor: color, color }
                     }
                   >
@@ -884,16 +957,20 @@ function FreshThemePreview({
     THU: "Thursday",
     FRI: "Friday",
   };
-  const slots = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am"];
+  const slots = [
+    "09:00 am",
+    "09:15 am",
+    "09:30 am",
+    "09:45 am",
+    "10:00 am",
+    "10:15 am",
+  ];
 
   return (
     <div
       className="min-h-full bg-white"
       style={{
-        backgroundImage: branding.backgroundImageUrl
-          ? `url(${branding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(branding),
       }}
     >
       <div className="px-5 pt-6 @lg:px-10">
@@ -936,7 +1013,10 @@ function FreshThemePreview({
               Select a Day
             </p>
             <div className="flex items-center justify-center gap-1 @md:gap-3">
-              <ChevronRight className="h-5 w-5 shrink-0 rotate-180" style={{ color }} />
+              <ChevronRight
+                className="h-5 w-5 shrink-0 rotate-180"
+                style={{ color }}
+              />
               <div className="grid min-w-0 max-w-[520px] flex-1 grid-cols-7 gap-1.5 @md:gap-3">
                 {week.map((item) => {
                   const selected = item.open && item.date === day;
@@ -955,7 +1035,11 @@ function FreshThemePreview({
                       )}
                       style={
                         selected
-                          ? { background: color, borderColor: color, color: "#fff" }
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
                           : item.open
                             ? { borderColor: color, color: "#334155" }
                             : undefined
@@ -965,7 +1049,9 @@ function FreshThemePreview({
                       <span className="text-[13px] font-semibold @md:text-[16px]">
                         {item.date}
                       </span>
-                      <span className="text-[8px] @md:text-[10px]">{item.day}</span>
+                      <span className="text-[8px] @md:text-[10px]">
+                        {item.day}
+                      </span>
                     </button>
                   );
                 })}
@@ -992,7 +1078,9 @@ function FreshThemePreview({
                   </span>
                 </span>
               </button>
-              <p className="text-[12px] text-slate-500">Times are in {timezone}</p>
+              <p className="text-[12px] text-slate-500">
+                Times are in {timezone}
+              </p>
             </div>
             <div className="mx-auto mt-6 max-w-[420px]">
               <p className="text-[15px] text-slate-700">Select a Time</p>
@@ -1115,10 +1203,7 @@ function CompactThemePreview({
     <div
       className="min-h-full bg-white"
       style={{
-        backgroundImage: branding.backgroundImageUrl
-          ? `url(${branding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(branding),
       }}
     >
       <div className="px-5 pt-6 @lg:px-10">
@@ -1133,7 +1218,9 @@ function CompactThemePreview({
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#A5A3E8] text-[11px] font-bold text-white">
               {page.title.slice(0, 2).toUpperCase()}
             </span>
-            <p className="text-[15px] font-semibold text-slate-900">{page.title}</p>
+            <p className="text-[15px] font-semibold text-slate-900">
+              {page.title}
+            </p>
           </div>
           <div className="mt-5 space-y-3 text-[13px] text-slate-500">
             <p className="flex items-center gap-2">
@@ -1175,7 +1262,9 @@ function CompactThemePreview({
                 key={day ?? `blank-${i}`}
                 className={cn(
                   "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[13px]",
-                  day === selectedDay ? "font-semibold text-white" : "text-slate-700",
+                  day === selectedDay
+                    ? "font-semibold text-white"
+                    : "text-slate-700",
                 )}
                 style={day === selectedDay ? { background: color } : undefined}
               >
@@ -1245,14 +1334,26 @@ function PreviewHeader({
   title: string;
   compact?: boolean;
 }) {
-  if (!branding.header.titleVisible && !(branding.header.logoVisible && branding.header.logoUrl)) {
+  if (
+    !branding.header.titleVisible &&
+    !(branding.header.logoVisible && branding.header.logoUrl)
+  ) {
     return null;
   }
   return (
-    <div className={cn("flex items-center gap-3", !compact && "border-b border-slate-100 px-6 py-4")}>
+    <div
+      className={cn(
+        "flex items-center gap-3",
+        !compact && "border-b border-slate-100 px-6 py-4",
+      )}
+    >
       {branding.header.logoVisible && branding.header.logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={branding.header.logoUrl} alt="" className="h-8 w-8 rounded object-cover" />
+        <img
+          src={branding.header.logoUrl}
+          alt=""
+          className="h-8 w-8 rounded object-cover"
+        />
       ) : null}
       {branding.header.titleVisible ? (
         <p className="text-[16px] font-semibold text-slate-900">{title}</p>
@@ -1263,7 +1364,13 @@ function PreviewHeader({
 
 function colorWash(hex: string, alpha: number) {
   const raw = hex.replace("#", "");
-  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const full =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : raw;
   const n = Number.parseInt(full, 16);
   if (!Number.isFinite(n)) return `rgba(90, 50, 163, ${alpha})`;
   const r = (n >> 16) & 255;
@@ -1314,7 +1421,9 @@ function ThemePanel({
             onClick={() => onChange({ ...branding, layout })}
             className={cn(
               "relative rounded-lg border bg-white p-2 text-left",
-              branding.layout === layout ? "border-[var(--brand-primary)]" : "border-slate-200",
+              branding.layout === layout
+                ? "border-[var(--brand-primary)]"
+                : "border-slate-200",
             )}
           >
             {branding.layout === layout ? (
@@ -1351,7 +1460,9 @@ function ThemePanel({
         <p className="text-[12px] font-semibold text-slate-700">Show Banner</p>
         <button
           type="button"
-          onClick={() => onChange({ ...branding, showBanner: !branding.showBanner })}
+          onClick={() =>
+            onChange({ ...branding, showBanner: !branding.showBanner })
+          }
           className={cn(
             "relative h-5 w-9 rounded-full transition",
             branding.showBanner ? "bg-[var(--brand-primary)]" : "bg-slate-300",
@@ -1369,10 +1480,12 @@ function ThemePanel({
       <p className="mt-4 mb-2 text-[12px] font-semibold text-slate-700">
         Background Image
       </p>
-      <ImageField
+      <BackgroundImageField
         value={branding.backgroundImageUrl}
-        placeholder="Upload"
-        onChange={(url) => onChange({ ...branding, backgroundImageUrl: url })}
+        opacity={branding.backgroundOpacity}
+        onChange={(backgroundImageUrl, backgroundOpacity) =>
+          onChange({ ...branding, backgroundImageUrl, backgroundOpacity })
+        }
       />
       <div className="mt-4 flex items-center justify-between">
         <p className="text-[12px] font-semibold text-slate-700">
@@ -1381,11 +1494,16 @@ function ThemePanel({
         <button
           type="button"
           onClick={() =>
-            onChange({ ...branding, showUserAsCards: !branding.showUserAsCards })
+            onChange({
+              ...branding,
+              showUserAsCards: !branding.showUserAsCards,
+            })
           }
           className={cn(
             "relative h-5 w-9 rounded-full transition",
-            branding.showUserAsCards ? "bg-[var(--brand-primary)]" : "bg-slate-300",
+            branding.showUserAsCards
+              ? "bg-[var(--brand-primary)]"
+              : "bg-slate-300",
           )}
           aria-pressed={branding.showUserAsCards}
         >
@@ -1432,7 +1550,10 @@ function HeaderPanel({
         value={branding.header.title}
         placeholder="Enter your title"
         onVisible={(titleVisible) =>
-          onChange({ ...branding, header: { ...branding.header, titleVisible } })
+          onChange({
+            ...branding,
+            header: { ...branding.header, titleVisible },
+          })
         }
         onChange={(title) =>
           onChange({ ...branding, header: { ...branding.header, title } })
@@ -1444,7 +1565,10 @@ function HeaderPanel({
           <EyeToggle
             on={branding.header.logoVisible}
             onChange={(logoVisible) =>
-              onChange({ ...branding, header: { ...branding.header, logoVisible } })
+              onChange({
+                ...branding,
+                header: { ...branding.header, logoVisible },
+              })
             }
           />
         </div>
@@ -1624,7 +1748,10 @@ function SeoPanel({
         <input
           value={branding.seo.title}
           onChange={(event) =>
-            onChange({ ...branding, seo: { ...branding.seo, title: event.target.value } })
+            onChange({
+              ...branding,
+              seo: { ...branding.seo, title: event.target.value },
+            })
           }
           className="h-10 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-[var(--brand-primary)]"
         />
@@ -1681,7 +1808,13 @@ function LabeledInput({
   );
 }
 
-function EyeToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+function EyeToggle({
+  on,
+  onChange,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
   return (
     <button
       type="button"
@@ -1689,7 +1822,11 @@ function EyeToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => v
       className="text-slate-400 hover:text-slate-700"
       aria-label={on ? "Hide" : "Show"}
     >
-      {on ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+      {on ? (
+        <Eye className="h-3.5 w-3.5" />
+      ) : (
+        <EyeOff className="h-3.5 w-3.5" />
+      )}
     </button>
   );
 }
@@ -1722,7 +1859,11 @@ function ImageField({
             void fitImageDataUrl(reader.result)
               .then(onChange)
               .catch((err: unknown) =>
-                toast.error(err instanceof Error ? err.message : "This image could not be used."),
+                toast.error(
+                  err instanceof Error
+                    ? err.message
+                    : "This image could not be used.",
+                ),
               );
           };
           reader.readAsDataURL(file);
@@ -1733,14 +1874,109 @@ function ImageField({
         onClick={() => inputRef.current?.click()}
         className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 px-3 text-[13px] text-slate-500"
       >
-        <span className="truncate">{value ? "Image selected" : placeholder}</span>
+        <span className="truncate">
+          {value ? "Image selected" : placeholder}
+        </span>
         <Upload className="h-3.5 w-3.5" />
       </button>
     </div>
   );
 }
 
-function SaveButton({ saving, onClick }: { saving: boolean; onClick: () => void }) {
+/**
+ * The page background: upload opens the editor (crop, rotate, mirror,
+ * opacity) before the image is used; a chosen image can be edited again or
+ * removed.
+ */
+function BackgroundImageField({
+  value,
+  opacity,
+  onChange,
+}: {
+  value: string | null;
+  opacity: number;
+  onChange: (value: string | null, opacity: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") setEditing(reader.result);
+          };
+          reader.onerror = () => toast.error("This image could not be read.");
+          reader.readAsDataURL(file);
+        }}
+      />
+      {value ? (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 p-1.5">
+          <span
+            aria-hidden
+            className="h-10 w-14 shrink-0 rounded-md border border-slate-100 bg-cover bg-center"
+            style={{ backgroundImage: `url(${value})`, opacity: opacity / 100 }}
+          />
+          <span className="min-w-0 flex-1 truncate text-[12px] text-slate-600">
+            Opacity {opacity}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditing(value)}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(null, 100)}
+            aria-label="Delete background image"
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 px-2 text-[12px] font-medium text-rose-600 hover:bg-rose-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 px-3 text-[13px] text-slate-500"
+        >
+          <span className="truncate">Upload</span>
+          <Upload className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {editing ? (
+        <ImageEditModal
+          src={editing}
+          opacity={value && editing === value ? opacity : 100}
+          onCancel={() => setEditing(null)}
+          onApply={({ dataUrl, opacity: nextOpacity }) => {
+            onChange(dataUrl, nextOpacity);
+            setEditing(null);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SaveButton({
+  saving,
+  onClick,
+}: {
+  saving: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"

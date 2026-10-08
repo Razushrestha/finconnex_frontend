@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 export const BOOKING_PAGE_LAYOUTS = [
   "basic",
   "modern",
@@ -15,6 +16,8 @@ export type BookingPageBranding = {
   showUserAsCards: boolean;
   buttonText: string;
   backgroundImageUrl: string | null;
+  /** How strongly the background image shows, 0 (hidden) to 100 (full). */
+  backgroundOpacity: number;
   header: {
     title: string;
     titleVisible: boolean;
@@ -62,6 +65,7 @@ export function defaultBookingPageBranding(): BookingPageBranding {
     showUserAsCards: false,
     buttonText: "Book Appointment",
     backgroundImageUrl: null,
+    backgroundOpacity: 100,
     header: {
       title: "",
       titleVisible: true,
@@ -96,7 +100,9 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding {
+export function normalizeBookingPageBranding(
+  raw: unknown,
+): BookingPageBranding {
   const current = asRecord(raw);
   const header = asRecord(current.header);
   const footer = asRecord(current.footer);
@@ -106,7 +112,10 @@ export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding 
   if (BOOKING_PAGE_LAYOUTS.includes(current.layout as BookingPageLayout)) {
     next.layout = current.layout as BookingPageLayout;
   }
-  if (typeof current.primaryColor === "string" && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(current.primaryColor)) {
+  if (
+    typeof current.primaryColor === "string" &&
+    /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(current.primaryColor)
+  ) {
     next.primaryColor = current.primaryColor;
   }
   next.showBanner = current.showBanner !== false;
@@ -116,6 +125,15 @@ export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding 
   }
   if (typeof current.backgroundImageUrl === "string") {
     next.backgroundImageUrl = current.backgroundImageUrl || null;
+  }
+  if (
+    typeof current.backgroundOpacity === "number" &&
+    Number.isFinite(current.backgroundOpacity)
+  ) {
+    next.backgroundOpacity = Math.min(
+      100,
+      Math.max(0, Math.round(current.backgroundOpacity)),
+    );
   }
   next.header = {
     title: typeof header.title === "string" ? header.title : "",
@@ -142,7 +160,8 @@ export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding 
     linkedinVisible: on(footer.linkedinVisible),
   };
   next.workspace = {
-    displayName: typeof workspace.displayName === "string" ? workspace.displayName : "",
+    displayName:
+      typeof workspace.displayName === "string" ? workspace.displayName : "",
   };
   next.seo = {
     title: typeof seo.title === "string" ? seo.title : "",
@@ -155,7 +174,9 @@ export function normalizeBookingPageBranding(raw: unknown): BookingPageBranding 
 }
 
 /** This consultation's cached theme; the Basic defaults when it has none. */
-export function readLocalBookingPageBranding(pageId: string): BookingPageBranding {
+export function readLocalBookingPageBranding(
+  pageId: string,
+): BookingPageBranding {
   if (typeof window === "undefined") return defaultBookingPageBranding();
   try {
     return normalizeBookingPageBranding(
@@ -166,7 +187,10 @@ export function readLocalBookingPageBranding(pageId: string): BookingPageBrandin
   }
 }
 
-export function writeLocalBookingPageBranding(pageId: string, branding: BookingPageBranding) {
+export function writeLocalBookingPageBranding(
+  pageId: string,
+  branding: BookingPageBranding,
+) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(`${STORE}:${pageId}`, JSON.stringify(branding));
@@ -195,3 +219,27 @@ export const BOOKING_PAGE_COLORS = [
   "#84CC16",
   "#6366F1",
 ];
+
+/**
+ * The page background for a branding: its image, faded to the chosen
+ * opacity. The fade is a white veil over the image (the page underneath is
+ * white), so only the background fades and never the content on top of it.
+ */
+export function brandingBackgroundStyle(
+  branding: Pick<
+    BookingPageBranding,
+    "backgroundImageUrl" | "backgroundOpacity"
+  >,
+): CSSProperties {
+  if (!branding.backgroundImageUrl) return {};
+  const opacity = Math.min(100, Math.max(0, branding.backgroundOpacity ?? 100));
+  const veil = (100 - opacity) / 100;
+  const image = `url(${branding.backgroundImageUrl})`;
+  return {
+    backgroundImage: veil
+      ? `linear-gradient(rgba(255,255,255,${veil}), rgba(255,255,255,${veil})), ${image}`
+      : image,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+  };
+}
