@@ -60,3 +60,21 @@ next-env.d.ts
 /scripts/probe-*.mjs
 /scripts/_pdf_extract.txt
 
+# Local scratch, extracts, and design dumps (not part of the app)
+.tmp-sla-pdf/
+.cursor-pdf-preview-leadcard.png
+.srs_extract.txt
+.tmp-fin-srs.txt
+/45-Day-CRM-Sprint-Plan.docx
+/45-Day-CRM-Sprint-Plan_final.pdf
+/a38ccc93-8ab5-4108-8654-0b0a4086ae1e (2).pdf
+/CRM Workqueue App (Standalone).html
+/Finconnex_CRM_Software_Requirements_Specification.pdf
+/lead-card-spec-v3 (1) (2).pdf
+src/lib/work-queue/_client-gap-ref.txt
+
+# OS junk
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
