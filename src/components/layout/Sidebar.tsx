@@ -72,7 +72,7 @@ const childNavClass = (active: boolean) =>
   cn(
     "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
     active
-      ? "bg-[color-mix(in_srgb,var(--brand-primary)_28%,transparent)] font-medium text-[var(--brand-primary)]"
+      ? "bg-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] font-medium text-[var(--brand-on-secondary)]"
       : "text-[color-mix(in_srgb,var(--brand-on-secondary)_70%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
   );
 
@@ -444,7 +444,7 @@ export function Sidebar({
         </Link>
         {/* Dashboard section */}
         <div className={cn("mb-2 px-1", hideLabel)}>
-          <span className="text-[11px] font-semibold tracking-wider text-[var(--brand-primary)]">
+          <span className="text-[11px] font-semibold tracking-wider text-[color-mix(in_srgb,var(--brand-on-secondary)_55%,transparent)]">
             DASHBOARD
           </span>
         </div>
@@ -475,7 +475,7 @@ export function Sidebar({
                         "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "font-medium text-[var(--brand-primary)]"
+                          ? "bg-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] font-medium text-[var(--brand-on-secondary)]"
                           : "text-[color-mix(in_srgb,var(--brand-on-secondary)_78%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
                       )}
                     >
@@ -483,7 +483,7 @@ export function Sidebar({
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
                           isActive
-                            ? "text-[var(--brand-primary)]"
+                            ? "text-[var(--brand-on-secondary)]"
                             : "text-[color-mix(in_srgb,var(--brand-on-secondary)_62%,transparent)]",
                         )}
                         strokeWidth={1.75}
@@ -507,7 +507,7 @@ export function Sidebar({
                         "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "font-medium text-[var(--brand-primary)]"
+                          ? "bg-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] font-medium text-[var(--brand-on-secondary)]"
                           : "text-[color-mix(in_srgb,var(--brand-on-secondary)_78%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
                       )}
                     >
@@ -515,7 +515,7 @@ export function Sidebar({
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
                           isActive
-                            ? "text-[var(--brand-primary)]"
+                            ? "text-[var(--brand-on-secondary)]"
                             : "text-[color-mix(in_srgb,var(--brand-on-secondary)_62%,transparent)]",
                         )}
                         strokeWidth={1.75}
