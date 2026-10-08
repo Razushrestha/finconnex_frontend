@@ -68,6 +68,7 @@ import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
 import { SlideOverPanel } from "./SlideOverPanel";
 import { SendEmailActionForm } from "./SendEmailActionForm";
+import { CreateNoteActionForm } from "./CreateNoteActionForm";
 import { TimezoneField } from "./TimezoneField";
 
 function useMembers() {
@@ -96,7 +97,7 @@ function useMembers() {
 
 
 /** Actions whose panel shows their module's own page-sized form. */
-const WIDE_PANEL_ACTIONS = new Set<string>(["SEND_EMAIL"]);
+const WIDE_PANEL_ACTIONS = new Set<string>(["SEND_EMAIL", "CREATE_NOTE"]);
 
 /** The config keys SEND_EMAIL renders through its own recipients block. */
 const EMAIL_RECIPIENT_KEYS = ["toEmail", "cc", "bcc"];
@@ -145,6 +146,10 @@ function ActionConfigForm({
   // Create Contact is the Create Contact modal's own form.
   if (step.action === "CREATE_CONTACT") {
     return <CreateContactActionForm config={config} entityType={entityType} onChange={onChange} />;
+  }
+  // Create Note is the Notes page's own editor card.
+  if (step.action === "CREATE_NOTE") {
+    return <CreateNoteActionForm config={config} entityType={entityType} onChange={onChange} />;
   }
   // Send Email is the Emails compose page, laid out in the panel.
   if (step.action === "SEND_EMAIL") {
