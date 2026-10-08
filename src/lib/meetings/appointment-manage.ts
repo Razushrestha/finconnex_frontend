@@ -1,4 +1,4 @@
-import { ianaTimezoneFromLabel } from "@/lib/booking/timezones";
+import { dateInTimezone, ianaTimezoneFromLabel } from "@/lib/booking/timezones";
 
 export type AppointmentManageRecord = {
   token: string;
@@ -100,10 +100,23 @@ export type GuestClock = {
   dateIso: string;
   startHHmm: string;
   durationMinutes: number;
+  /** The zone dateIso/startHHmm are on: the guest's, when they rescheduled. */
+  timeZone?: string;
   updatedAt: string;
   status: string;
   remarks?: string;
 };
+
+/**
+ * The real moment a guest clock stands for, or null when it carries no zone.
+ * Its date and time are on the guest's clock, so they must be converted
+ * before staff, who may be in another zone, see them.
+ */
+export function guestClockInstant(clock: GuestClock): Date | null {
+  if (!clock.timeZone?.trim()) return null;
+  const instant = dateInTimezone(clock.dateIso, clock.startHHmm, clock.timeZone);
+  return Number.isNaN(instant.getTime()) ? null : instant;
+}
 
 /** A staff reschedule puts a cancelled appointment back on the books at the new time. */
 export function reopenGuestRecord(

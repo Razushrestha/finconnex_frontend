@@ -7,6 +7,7 @@ import {
   appointmentPersonName,
   hostsToConsultants,
   appointmentsFromGuestClocks,
+  guestClockDisplayRange,
   meetingToAppointment,
   resolveConsultantMatch,
   toLocalStart,
@@ -23,7 +24,6 @@ import { listCrmMeetings } from "@/lib/meetings/api";
 import {
   assignGuestClocks,
   guestAppointmentNotes,
-  guestClockRange,
   type GuestClock,
 } from "@/lib/meetings/appointment-manage";
 import { loadWorkspaceConsultants } from "@/lib/users/assignable";
@@ -48,6 +48,7 @@ import { loadCrmContacts } from "@/lib/contacts/api";
 import { fetchLeadList } from "@/lib/leads/api/client";
 import type { CrmLead } from "@/lib/leads/api/types";
 import { getRulesActor } from "@/lib/rules/actor";
+import { loadSettingsValues } from "@/lib/settings/settings-store";
 
 const BOOKING_CODE_STORE = "booking:list-codes:v1";
 
@@ -236,7 +237,7 @@ function rowsWithGuestClocks(rows: DashboardAppointment[], clocks: GuestClock[])
         (clock.meetingId === row.meetingId || clock.meetingId === row.id);
       return sameId ? [] : [row];
     }
-    const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+    const range = guestClockDisplayRange(clock);
     const notes = guestAppointmentNotes(row.notes, clock.remarks);
     return [
       {
@@ -464,7 +465,11 @@ export function useCrmBooking() {
           (actor.id && host.crmUserId === actor.id) ||
           (actor.email && host.email?.toLowerCase() === actor.email.toLowerCase()),
       );
-      setBookingDisplayZone(me?.timezone);
+      // Not a host (or not matched): the time zone set in My preferences.
+      const profileZone = loadSettingsValues("my-preferences/profile").timezone;
+      setBookingDisplayZone(
+        me?.timezone || (typeof profileZone === "string" ? profileZone : null),
+      );
       const people = [
         ...(actor.id || actor.name || actor.email
           ? [

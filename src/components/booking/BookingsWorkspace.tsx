@@ -488,8 +488,10 @@ function HomeView({
         })}
       </div>
 
-      <div className="flex flex-col gap-4 pb-2 xl:flex-row xl:items-start">
-        <section className="min-w-0 flex-1 rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      {/* The appointments card runs to the bottom of the screen and scrolls
+          its rows inside, keeping the column headers and pagination in view. */}
+      <div className="flex min-h-[460px] flex-1 flex-col gap-4 pb-2 xl:flex-row xl:items-start">
+        <section className="flex h-[min(640px,75dvh)] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] xl:h-auto xl:flex-1 xl:self-stretch">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
@@ -533,7 +535,7 @@ function HomeView({
           {error ? (
             <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
           ) : null}
-          <div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="divide-y divide-[#F3F4F6] lg:hidden">
             {loading && pageRows.length === 0 ? (
               <p className="px-4 py-10 text-center text-[13px] text-slate-400">
@@ -563,7 +565,7 @@ function HomeView({
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto lg:block">
+          <div className="hidden lg:block">
             <table className="w-full table-fixed text-left">
               <colgroup>
                 <col className="w-[14%]" />
@@ -575,7 +577,7 @@ function HomeView({
                 <col className="w-[10%]" />
                 <col className="w-[14%]" />
               </colgroup>
-              <thead className="bg-white">
+              <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                   <th className="px-3 py-2 font-semibold">Time</th>
                   <th className="px-2 py-2 font-semibold">Booking ID</th>

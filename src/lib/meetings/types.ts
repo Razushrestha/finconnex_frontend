@@ -61,6 +61,9 @@ export interface Meeting {
   relatedTo?: string;
   type: MeetingType;
   startDateTime: string;
+  /** The CRM's start instant (ISO, with zone); startDateTime is display text. */
+  startAt?: string;
+  endAt?: string;
   endDateTime: string;
   /** Previous schedule kept when rescheduled (activity history). */
   previousStartDateTime?: string;

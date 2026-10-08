@@ -2,6 +2,7 @@
 
 import {
   guestAppointmentNotes,
+  guestClockInstant,
   guestClockRange,
   type GuestClock,
 } from "@/lib/meetings/appointment-manage";
@@ -547,11 +548,26 @@ function mapChannel(type: Meeting["type"]): AppointmentChannel {
 }
 
 /** Rows the booking dashboard can show from the local appointment store when the CRM is down. */
+/**
+ * A guest clock's start and end on the booking screens' clock (the signed-in
+ * host's zone, else this browser's). The guest picked the time on their own
+ * clock; showing those digits as they were put a 9:00 Sydney appointment at
+ * 3:45 for a host in Sydney because the guest was in Kathmandu.
+ */
+export function guestClockDisplayRange(clock: GuestClock): { start: string; end: string } {
+  const instant = guestClockInstant(clock);
+  if (!instant) {
+    return guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+  }
+  const end = new Date(instant.getTime() + Math.max(0, clock.durationMinutes) * 60_000);
+  return { start: toLocalStart(instant.toISOString()), end: toLocalStart(end.toISOString()) };
+}
+
 export function appointmentsFromGuestClocks(clocks: GuestClock[]): DashboardAppointment[] {
   return clocks
     .filter((clock) => clock.status !== "deleted")
     .map((clock) => {
-      const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+      const range = guestClockDisplayRange(clock);
       const cancelled = clock.status === "cancelled";
       return {
         id: clock.meetingId || clock.token || `title:${clock.title.trim().toLowerCase()}`,
@@ -634,8 +650,15 @@ export function meetingToAppointment(
       meeting.bookingHostUserId ||
       "",
     consultantName,
-    start: toLocalStart(meeting.startDateTime),
-    end: meeting.endDateTime ? toLocalStart(meeting.endDateTime) : undefined,
+    // The instant, read on the host's clock; startDateTime is text already
+    // formatted on this browser's clock, which showed a Sydney 9:00 at 3:45
+    // to a host whose browser was in Kathmandu.
+    start: toLocalStart(meeting.startAt ?? meeting.startDateTime),
+    end: meeting.endAt
+      ? toLocalStart(meeting.endAt)
+      : meeting.endDateTime
+        ? toLocalStart(meeting.endDateTime)
+        : undefined,
     eventTypeName:
       appointmentPersonName(meeting.title) &&
       appointmentPersonName(meeting.title) !== guestName

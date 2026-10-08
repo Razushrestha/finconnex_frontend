@@ -130,6 +130,14 @@ export function mapMeetingStatus(raw: string): MeetingStatus {
   return "Scheduled";
 }
 
+/** A CRM timestamp kept as an ISO instant, so screens can show it on any clock. */
+function isoInstant(raw: unknown): string | undefined {
+  const value = pickStr(raw);
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
+}
+
 function formatWhen(raw: unknown): string {
   const value = pickStr(raw);
   if (!value) return "";
@@ -288,6 +296,8 @@ export function normalizeMeeting(
     startDateTime: formatWhen(
       raw.startAt ?? raw.startDateTime ?? raw.scheduledAt ?? raw.startsAt,
     ),
+    startAt: isoInstant(raw.startAt ?? raw.startDateTime ?? raw.scheduledAt ?? raw.startsAt),
+    endAt: isoInstant(raw.endAt ?? raw.endDateTime ?? raw.endsAt ?? raw.scheduledEndAt),
     endDateTime: formatWhen(
       raw.endAt ?? raw.endDateTime ?? raw.endsAt ?? raw.scheduledEndAt,
     ),
