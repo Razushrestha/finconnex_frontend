@@ -423,6 +423,35 @@ function bookingToAppointment(
   };
 }
 
+/**
+ * The zone the booking screens show times in: the signed-in user's own.
+ * Their host record (by user id or email, then by name), else the time zone
+ * set in My preferences, else the zone every host in the workspace shares.
+ * Null leaves this browser's zone.
+ */
+export function bookingDisplayZoneFor(
+  hosts: { name: string; crmUserId?: string; email?: string; timezone?: string }[],
+  actor: { id?: string; email?: string; name?: string },
+  profileZone: unknown = loadSettingsValues("my-preferences/profile").timezone,
+): { zone: string | null; from: string } {
+  const email = actor.email?.trim().toLowerCase() ?? "";
+  const name = actor.name?.trim().toLowerCase() ?? "";
+  const me =
+    hosts.find(
+      (host) =>
+        (!!actor.id && host.crmUserId === actor.id) ||
+        (!!email && host.email?.trim().toLowerCase() === email),
+    ) ??
+    (name ? hosts.find((host) => host.name.trim().toLowerCase() === name) : undefined);
+  if (me?.timezone) return { zone: me.timezone, from: "your host profile" };
+  if (typeof profileZone === "string" && profileZone.trim()) {
+    return { zone: profileZone.trim(), from: "My preferences" };
+  }
+  const zones = [...new Set(hosts.map((host) => host.timezone).filter(Boolean))];
+  if (zones.length === 1) return { zone: zones[0]!, from: "the workspace's hosts" };
+  return { zone: null, from: "no host or preference zone found" };
+}
+
 export function useCrmBooking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -460,16 +489,11 @@ export function useCrmBooking() {
       );
       // The signed-in host's own zone is the clock these screens read times
       // on; set before any booking below is converted.
-      const me = (crmHosts ?? []).find(
-        (host) =>
-          (actor.id && host.crmUserId === actor.id) ||
-          (actor.email && host.email?.toLowerCase() === actor.email.toLowerCase()),
-      );
-      // Not a host (or not matched): the time zone set in My preferences.
-      const profileZone = loadSettingsValues("my-preferences/profile").timezone;
-      setBookingDisplayZone(
-        me?.timezone || (typeof profileZone === "string" ? profileZone : null),
-      );
+      const zone = bookingDisplayZoneFor(crmHosts ?? [], actor);
+      setBookingDisplayZone(zone.zone);
+      if (process.env.NODE_ENV !== "production") {
+        console.info(`[booking] showing times in ${zone.zone ?? "this browser's zone"} (${zone.from})`);
+      }
       const people = [
         ...(actor.id || actor.name || actor.email
           ? [
