@@ -45,13 +45,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Local file-upload fallback when CRM storage is unconfigured
-/data/uploads/
-/data/settings-catalog/
-/data/public-sign/
-/data/email-signatures/
-/data/appointment-manage/
-/data/document-provide/
+# Local runtime data (uploads, settings catalog, sign blobs)
+/data/
 
 # Nested Nest CRM clone — own repo: kachhuwagroup/multi-crm-backend
 /multi-crm-backend-main/
@@ -59,4 +54,27 @@ next-env.d.ts
 # Local API probe scripts (not part of the app)
 /scripts/probe-*.mjs
 /scripts/_pdf_extract.txt
+
+# Scratch specs, extracts, and one-off prototypes
+/.cursor-pdf-preview-leadcard.png
+/.srs_extract.txt
+/.tmp-fin-srs.txt
+/.tmp-sla-pdf/
+/45-Day-CRM-Sprint-Plan.docx
+/45-Day-CRM-Sprint-Plan_final.pdf
+/CRM Workqueue App (Standalone).html
+/Finconnex_CRM_Software_Requirements_Specification.pdf
+/a38ccc93-8ab5-4108-8654-0b0a4086ae1e (2).pdf
+/lead-card-spec-v3 (1) (2).pdf
+/src/lib/work-queue/_client-gap-ref.txt
+
+# Editor and OS
+.idea/
+.vscode/
+*.swp
+*~
+Thumbs.db
+*.log
+.turbo/
+.cache/
 
