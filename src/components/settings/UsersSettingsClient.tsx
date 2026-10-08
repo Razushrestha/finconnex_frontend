@@ -716,10 +716,11 @@ export function UsersSettingsClient() {
         </div>
       </div>
 
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {inviteOpen ? (
         <div
           ref={inviteRef}
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="border-b border-slate-100 p-5"
         >
           <div className="mb-4 flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-violet-600" />
@@ -861,7 +862,6 @@ export function UsersSettingsClient() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <h3 className="text-[14px] font-semibold text-slate-900">
             All Users ({filtered.length})
