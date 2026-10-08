@@ -490,7 +490,7 @@ function HomeView({
 
       {/* The appointments card runs to the bottom of the screen and scrolls
           its rows inside, keeping the column headers and pagination in view. */}
-      <div className="flex min-h-[460px] flex-1 flex-col gap-4 pb-2 xl:flex-row xl:items-start">
+      <div className="flex min-h-[300px] flex-1 flex-col gap-4 xl:flex-row xl:items-start">
         <section className="flex h-[min(640px,75dvh)] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] xl:h-auto xl:flex-1 xl:self-stretch">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
@@ -568,14 +568,13 @@ function HomeView({
           <div className="hidden lg:block">
             <table className="w-full table-fixed text-left">
               <colgroup>
-                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[11%]" />
+                <col className="w-[17%]" />
+                <col className="w-[17%]" />
+                <col className="w-[15%]" />
                 <col className="w-[9%]" />
                 <col className="w-[15%]" />
-                <col className="w-[15%]" />
-                <col className="w-[13%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                <col className="w-[14%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -585,21 +584,20 @@ function HomeView({
                   <th className="px-2 py-2 font-semibold">Users/Resources</th>
                   <th className="px-2 py-2 font-semibold">Customers</th>
                   <th className="px-2 py-2 font-semibold">Payment</th>
-                  <th className="px-2 py-2 font-semibold">Price</th>
                   <th className="px-2 py-2 font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
                       Loading appointments…
                     </td>
                   </tr>
                 ) : null}
                 {!loading && pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-[13px] text-slate-400">
+                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
                       {dateFilter
                   ? "No appointments on this day."
                   : "No appointments from CRM meetings yet."}
@@ -859,15 +857,6 @@ function formatTimeRange(row: DashboardAppointment) {
   return end && end !== start ? `${start} - ${end}` : start;
 }
 
-function listPriceLabel(row: DashboardAppointment) {
-  if (!row.price || row.price <= 0) return null;
-  const known = ["NPR", "INR", "AUD", "USD", "GBP"];
-  const currency = (
-    known.includes(row.currency || "") ? row.currency : "NPR"
-  ) as BookingCurrency;
-  return `${currencyPrefix(currency)}${row.price.toFixed(2)}`;
-}
-
 function consultantLabel(row: DashboardAppointment) {
   return (
     consultantById(row.consultantId)?.name ||
@@ -1040,7 +1029,7 @@ function AppointmentDayGroup({
   return (
     <>
       <tr className="border-b border-[#EEF0F3] bg-white">
-        <td colSpan={8} className="px-3 py-1.5">
+        <td colSpan={7} className="px-3 py-1.5">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
             <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
             {label}
@@ -1203,7 +1192,6 @@ function AppointmentRow({
   onDelete: () => void;
 }) {
   const eventName = row.eventTypeName || row.type;
-  const price = listPriceLabel(row);
 
   return (
     <tr
@@ -1224,7 +1212,7 @@ function AppointmentRow({
       <td className="px-3 py-2 align-middle">
         <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
           <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="truncate">{formatTimeRange(row)}</span>
+          <span className="line-clamp-2 break-words">{formatTimeRange(row)}</span>
         </span>
       </td>
       <td className="truncate px-2 py-2 align-middle text-[11px] font-medium text-slate-800">
@@ -1235,7 +1223,9 @@ function AppointmentRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#7C6AE8] text-[9px] font-bold text-white">
             {eventTypeInitials(eventName)}
           </span>
-          <span className="truncate text-[11px] text-slate-800">{eventName}</span>
+          <span className="line-clamp-2 break-words text-[11px] text-slate-800" title={eventName}>
+            {eventName}
+          </span>
         </span>
       </td>
       <td className="px-2 py-2 align-middle">
@@ -1243,26 +1233,24 @@ function AppointmentRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
             <User className="h-3 w-3" />
           </span>
-          <span className="truncate text-[11px] text-slate-800">{consultantLabel(row)}</span>
+          <span
+            className="line-clamp-2 break-words text-[11px] text-slate-800"
+            title={consultantLabel(row)}
+          >
+            {consultantLabel(row)}
+          </span>
         </span>
       </td>
       <td className="px-2 py-2 align-middle">
         <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
           <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="truncate">{row.guestName}</span>
+          <span className="line-clamp-2 break-words" title={row.guestName}>
+            {row.guestName}
+          </span>
         </span>
       </td>
       <td className="truncate px-2 py-2 align-middle text-[11px] text-slate-700">
         {row.paymentStatus || "—"}
-      </td>
-      <td className="px-2 py-2 align-middle">
-        {price ? (
-          <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
-            {price}
-          </span>
-        ) : (
-          <span className="text-[11px] text-slate-400">—</span>
-        )}
       </td>
       <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
         <BookingStatusMenu
