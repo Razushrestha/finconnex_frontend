@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Check, Copy, ExternalLink, Loader2 } from "lucide-react";
 
 import { CalendarSyncSettingsClient } from "@/components/settings/CalendarSyncSettingsClient";
-import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import { getCrmApiBaseUrl } from "@/lib/activity-timeline/auth";
 import {
   connectEquifax,
@@ -893,16 +892,6 @@ export function CalendarPanel({
   provider: "google" | "outlook";
 }) {
   return <CalendarSyncSettingsClient provider={provider} />;
-}
-
-export function CalendlyPanel({ onChanged }: { onChanged: () => void }) {
-  return (
-    <CalendlyConnectionCard
-      compact
-      showCalendarSync={false}
-      onChanged={onChanged}
-    />
-  );
 }
 
 export function LinkPanel({

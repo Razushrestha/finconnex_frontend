@@ -8,7 +8,7 @@
  * - OAuth2 apps   — /v1/integrations/connections       (generic framework)
  * - Webhooks      — /v1/integrations/webhook-endpoints (inbound URLs)
  *
- * Calendar sync and Calendly keep their own clients in
+ * Calendar sync keeps its own client in
  * lib/booking/calendly-integration-api.
  */
 

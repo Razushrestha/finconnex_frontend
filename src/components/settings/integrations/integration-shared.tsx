@@ -6,10 +6,8 @@ import { ExternalLink } from "lucide-react";
 import { openIntegrationTab } from "@/lib/integrations/open-tab";
 
 import {
-  getCalendlyConnection,
   listCalendarSyncConnections,
   type CalendarSyncConnection,
-  type CalendlyConnection,
 } from "@/lib/booking/calendly-integration-api";
 import {
   getEquifaxConnection,
@@ -30,7 +28,6 @@ import {
 
 import {
   CalendarPanel,
-  CalendlyPanel,
   EquifaxPanel,
   LinkPanel,
   MessagingPanel,
@@ -46,7 +43,6 @@ export type IntegrationStatuses = {
   oauth: IntegrationConnection[];
   webhooks: WebhookEndpoint[];
   calendars: CalendarSyncConnection[];
-  calendly: CalendlyConnection | null;
 };
 
 const EMPTY: IntegrationStatuses = {
@@ -56,7 +52,6 @@ const EMPTY: IntegrationStatuses = {
   oauth: [],
   webhooks: [],
   calendars: [],
-  calendly: null,
 };
 
 function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
@@ -79,9 +74,8 @@ export function useIntegrationStatuses() {
       listIntegrationConnections(),
       listWebhookEndpoints(),
       listCalendarSyncConnections(),
-      getCalendlyConnection(),
     ]).then(
-      ([stripe, equifax, messaging, oauth, webhooks, calendars, calendly]) => {
+      ([stripe, equifax, messaging, oauth, webhooks, calendars]) => {
         if (!alive) return;
         setStatuses({
           stripe: settled(stripe, null),
@@ -90,7 +84,6 @@ export function useIntegrationStatuses() {
           oauth: settled(oauth, []),
           webhooks: settled(webhooks, []),
           calendars: settled(calendars, []),
-          calendly: settled(calendly, null),
         });
         setLoading(false);
       },
@@ -120,8 +113,6 @@ export function isIntegrationConnected(
       return s.calendars.some(
         (c) => c.connected && c.provider.toLowerCase().includes(flow.provider),
       );
-    case "calendly":
-      return !!s.calendly?.connected;
     case "stripe":
       return !!s.stripe?.connected;
     case "equifax":
@@ -199,8 +190,6 @@ function IntegrationSetup({
   switch (flow.kind) {
     case "calendar":
       return <CalendarPanel provider={flow.provider} />;
-    case "calendly":
-      return <CalendlyPanel onChanged={onChanged} />;
     case "stripe":
       return <StripePanel status={statuses.stripe} onChanged={onChanged} />;
     case "equifax":

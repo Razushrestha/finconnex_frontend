@@ -3,7 +3,6 @@
  * one connects. The flow follows what the CRM supports for it:
  *
  * - "calendar"   Google / Outlook calendar sync — the provider's consent screen
- * - "calendly"   Calendly's own connection card
  * - "stripe"     API keys on /payments/stripe/connection
  * - "equifax"    OAuth client credentials on /equifax/connection
  * - "messaging"  SendGrid / Twilio keys on /messaging-credentials
@@ -43,7 +42,6 @@ export type OAuthPreset = {
 
 export type IntegrationFlow =
   | { kind: "calendar"; provider: "google" | "outlook" }
-  | { kind: "calendly" }
   | { kind: "stripe" }
   | { kind: "equifax" }
   | { kind: "messaging"; provider: "SENDGRID" | "TWILIO"; whatsapp?: boolean }
@@ -65,7 +63,7 @@ export type IntegrationDefinition = {
   /**
    * The app's own page where it is set up (dashboard, console, developer
    * portal). "Integrate" opens it in a new tab; consent-screen flows
-   * (calendars, Calendly) fetch their address instead.
+   * (calendars) fetch their address instead.
    */
   integrateUrl?: string;
 };
@@ -130,16 +128,6 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
         developerUrl: "https://marketplace.zoom.us/develop/create",
       },
     },
-  },
-  {
-    id: "calendly",
-    name: "Calendly",
-    category: "Calendar & meetings",
-    blurb: "Bring Calendly bookings and hosts into FinConnex.",
-    icon: "calendly",
-    color: "#006BFF",
-    initials: "CA",
-    flow: { kind: "calendly" },
   },
 
   // Email & messaging

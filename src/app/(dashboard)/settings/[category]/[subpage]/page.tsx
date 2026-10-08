@@ -29,7 +29,6 @@ import { WorkspacesSettingsClient } from "@/components/settings/WorkspacesSettin
 import { IpRestrictionsSettingsClient } from "@/components/settings/IpRestrictionsSettingsClient";
 import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjectsSettingsClient";
 import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
-import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import { CalendarSyncSettingsClient } from "@/components/settings/CalendarSyncSettingsClient";
 import { IntegrationDetailClient } from "@/components/settings/integrations/IntegrationDetailClient";
 import { findIntegration } from "@/lib/integrations/catalog";
@@ -51,6 +50,12 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
   const legacy = SETTINGS_REDIRECTS[`${categorySlug}/${subpageSlug}`];
   if (legacy) {
     redirect(`/settings/${legacy.category}/${legacy.subpage}`);
+  }
+
+  // Calendly was replaced by FinConnex's own booking system; the CRM no
+  // longer has a Calendly connection to show.
+  if (categorySlug === "integrations" && subpageSlug === "calendly") {
+    redirect("/settings/integrations");
   }
 
   // An integration's own page (Settings → Integrations opens these in a new tab).
@@ -124,8 +129,6 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
         moduleHref={item.moduleHref}
         moduleLabel={item.moduleLabel}
       />
-    ) : key === "integrations/calendly" ? (
-      <CalendlyConnectionCard showCalendarSync={false} />
     ) : key === "integrations/google-calendar" ? (
       <CalendarSyncSettingsClient provider="google" />
     ) : key === "integrations/outlook-calendar" ? (
