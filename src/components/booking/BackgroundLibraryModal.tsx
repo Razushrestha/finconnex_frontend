@@ -23,8 +23,9 @@ const SUGGESTED = [
 ];
 
 /**
- * Pick a free background photo by keyword. The photos are public domain
- * (from Openverse); picking one keeps only its web address.
+ * Pick a free background photo by keyword. The photos are StockSnap's (all
+ * CC0, found through Openverse); picking one keeps only its web address and
+ * the photographer's credit.
  */
 export function BackgroundLibraryModal({
   onCancel,
@@ -115,8 +116,19 @@ export function BackgroundLibraryModal({
               Choose a background photo
             </h2>
             <p className="text-[11px] text-slate-500">
-              Free public-domain photos. Only the link is saved; the photo loads
-              from its source.
+
+              Free CC0 photos from StockSnap. Only the link is saved; the photo
+
+              loads from StockSnap, with a small credit on the page.
+
+            </p>
+
+            <p className="mt-0.5 text-[11px] font-medium text-amber-700">
+
+              Check the photo suits commercial use; avoid recognisable people and
+
+              logos.
+
             </p>
           </div>
           <button

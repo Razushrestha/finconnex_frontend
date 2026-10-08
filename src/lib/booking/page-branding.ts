@@ -18,6 +18,10 @@ export type BookingPageBranding = {
   backgroundImageUrl: string | null;
   /** How strongly the background image shows, 0 (hidden) to 100 (full). */
   backgroundOpacity: number;
+  /** Credit for a linked library photo, shown bottom-right of the page. */
+  backgroundCredit: string;
+  /** The photo's own page, which the credit links to. */
+  backgroundCreditUrl: string | null;
   header: {
     title: string;
     titleVisible: boolean;
@@ -66,6 +70,8 @@ export function defaultBookingPageBranding(): BookingPageBranding {
     buttonText: "Book Appointment",
     backgroundImageUrl: null,
     backgroundOpacity: 100,
+    backgroundCredit: "",
+    backgroundCreditUrl: null,
     header: {
       title: "",
       titleVisible: true,
@@ -126,6 +132,15 @@ export function normalizeBookingPageBranding(
   if (typeof current.backgroundImageUrl === "string") {
     next.backgroundImageUrl = current.backgroundImageUrl || null;
   }
+  next.backgroundCredit =
+    typeof current.backgroundCredit === "string"
+      ? current.backgroundCredit.slice(0, 120)
+      : "";
+  next.backgroundCreditUrl =
+    typeof current.backgroundCreditUrl === "string" &&
+    /^https:\/\//i.test(current.backgroundCreditUrl)
+      ? current.backgroundCreditUrl
+      : null;
   if (
     typeof current.backgroundOpacity === "number" &&
     Number.isFinite(current.backgroundOpacity)

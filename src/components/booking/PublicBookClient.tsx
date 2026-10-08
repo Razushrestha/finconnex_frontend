@@ -94,6 +94,7 @@ import {
 } from "@/lib/booking/all-timezones";
 import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 import { cn } from "@/lib/utils";
+import { BackgroundCredit } from "@/components/booking/BackgroundCredit";
 
 type Step = "date" | "details" | "done";
 
@@ -943,12 +944,13 @@ function BookFlow({
 
   return (
     <div
-      className="flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
+      className="relative flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
       style={{
         backgroundColor: "#F3F4F6",
         ...brandingBackgroundStyle(pageBranding),
       }}
     >
+      <BackgroundCredit branding={pageBranding} />
       {pageBranding.header.titleVisible ||
       (pageBranding.header.logoVisible && pageBranding.header.logoUrl) ? (
         <div className="mb-4 flex w-full max-w-[980px] items-center gap-2 px-1">

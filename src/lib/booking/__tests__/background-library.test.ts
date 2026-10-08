@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   backgroundSizedUrl,
   isLinkedImage,
+  libraryImageCredit,
   libraryImagesFrom,
 } from "@/lib/booking/background-library";
 
@@ -34,5 +35,22 @@ describe("free background photos", () => {
     expect(isLinkedImage("https://cdn.stocksnap.io/a.jpg")).toBe(true);
     expect(isLinkedImage("data:image/webp;base64,AAAA")).toBe(false);
     expect(isLinkedImage(null)).toBe(false);
+  });
+
+  it("keeps the photographer and the photo's StockSnap page for the credit", () => {
+    const [image] = libraryImagesFrom({
+      results: [
+        {
+          id: "s",
+          url: "https://cdn.stocksnap.io/img-thumbs/960w/I3QWA2OLLM.jpg",
+          thumbnail: "https://api.openverse.org/v1/images/s/thumb/",
+          creator: "Ian Schneider",
+          foreign_landing_url: "https://stocksnap.io/photo/beach-shore-I3QWA2OLLM",
+        },
+      ],
+    });
+    expect(libraryImageCredit(image)).toBe("Photo: Ian Schneider on StockSnap");
+    expect(image.landingUrl).toBe("https://stocksnap.io/photo/beach-shore-I3QWA2OLLM");
+    expect(libraryImageCredit({ creator: "" })).toBe("Photo: StockSnap");
   });
 });

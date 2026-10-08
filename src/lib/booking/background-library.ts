@@ -1,7 +1,8 @@
 /**
- * Free background photos for booking pages, from Openverse
- * (api.openverse.org): public-domain only (CC0 and the Public Domain Mark),
- * so a page can use one without crediting anyone.
+ * Free background photos for booking pages: StockSnap's photos, searched
+ * through Openverse (api.openverse.org). StockSnap is a curated site whose
+ * every photo is CC0, so commercial use needs no permission; the page still
+ * shows a small credit to the photographer as a courtesy.
  *
  * The browser searches Openverse directly — it allows any origin — and a
  * chosen photo is kept only as its web address. Nothing is downloaded to or
@@ -22,6 +23,10 @@ export type LibraryImage = {
   source: string;
   width: number;
   height: number;
+  /** Photographer's name, when StockSnap gives one. */
+  creator: string;
+  /** The photo's page on StockSnap, which the page credit links to. */
+  landingUrl: string | null;
 };
 
 type OpenverseResult = {
@@ -30,6 +35,8 @@ type OpenverseResult = {
   url?: unknown;
   thumbnail?: unknown;
   source?: unknown;
+  creator?: unknown;
+  foreign_landing_url?: unknown;
   width?: unknown;
   height?: unknown;
 };
@@ -72,6 +79,10 @@ export function libraryImagesFrom(data: unknown): LibraryImage[] {
       thumbnailUrl,
       imageUrl: backgroundSizedUrl(url, width),
       source: str(row.source),
+      creator: str(row.creator).trim(),
+      landingUrl: str(row.foreign_landing_url).startsWith("https://")
+        ? str(row.foreign_landing_url)
+        : null,
       width,
       height: num(row.height),
     });
@@ -88,8 +99,10 @@ export async function searchLibraryImages(
   if (!q) return { images: [], hasMore: false };
   const params = new URLSearchParams({
     q,
-    license: "cc0,pdm",
-    category: "photograph",
+    // StockSnap only: curated, and all CC0. Open-upload sources (Wikimedia,
+    // Flickr) occasionally carry a wrong licence label.
+    license: "cc0",
+    source: "stocksnap",
     aspect_ratio: "wide",
     size: "large",
     mature: "false",
@@ -111,4 +124,9 @@ export async function searchLibraryImages(
 /** True for a photo kept as a web address rather than an uploaded image. */
 export function isLinkedImage(value: string | null | undefined): boolean {
   return !!value && /^https:\/\//i.test(value);
+}
+
+/** The page credit for a library photo, e.g. "Photo: Ian Schneider on StockSnap". */
+export function libraryImageCredit(image: Pick<LibraryImage, "creator">): string {
+  return image.creator ? `Photo: ${image.creator} on StockSnap` : "Photo: StockSnap";
 }
