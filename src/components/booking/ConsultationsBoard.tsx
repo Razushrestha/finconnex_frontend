@@ -661,7 +661,13 @@ export function ConsultationsBoard() {
             current ? { ...current, coverImageUrl: url } : current,
           )
         }
-        onBack={() => goToSetupStep("details")}
+        initialSelected={assignedConsultants}
+        initialPriorities={assignedPriorities}
+        onBack={(consultants, priorities) => {
+          setAssignedConsultants(consultants);
+          setAssignedPriorities(priorities);
+          goToSetupStep("details");
+        }}
         onCreate={(consultants, priorities, userIds) => {
           setAssignedConsultants(consultants);
           setAssignedPriorities(priorities);

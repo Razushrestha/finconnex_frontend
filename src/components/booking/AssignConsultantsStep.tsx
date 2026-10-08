@@ -25,6 +25,8 @@ export function AssignConsultantsStep({
   consultationName,
   coverImageUrl,
   onCoverChange,
+  initialSelected,
+  initialPriorities,
   onBack,
   onCreate,
 }: {
@@ -32,7 +34,14 @@ export function AssignConsultantsStep({
   consultationName: string;
   coverImageUrl?: string;
   onCoverChange?: (url: string) => void;
-  onBack: () => void;
+  /** What was chosen last time this step was shown, so Back and Next keep it. */
+  initialSelected?: string[];
+  initialPriorities?: Record<string, ConsultantPriority>;
+  /** Hands back the current choices so returning here shows them again. */
+  onBack: (
+    consultants: string[],
+    priorities: Record<string, ConsultantPriority>,
+  ) => void;
   onCreate: (
     consultants: string[],
     priorities: Record<string, ConsultantPriority>,
@@ -40,10 +49,12 @@ export function AssignConsultantsStep({
   ) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(
+    () => initialSelected ?? [],
+  );
   const [priorities, setPriorities] = useState<
     Record<string, ConsultantPriority>
-  >({});
+  >(() => ({ ...(initialPriorities ?? {}) }));
   const [error, setError] = useState("");
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
@@ -242,7 +253,11 @@ export function AssignConsultantsStep({
       <div className="mt-4 flex shrink-0 flex-wrap items-center justify-center gap-3 pb-1">
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => {
+            const kept: Record<string, ConsultantPriority> = {};
+            for (const name of selected) kept[name] = priorityOf(name);
+            onBack(selected, kept);
+          }}
           className="h-10 min-w-[96px] rounded-lg border border-[#E5E7EB] bg-white px-6 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
         >
           Back
