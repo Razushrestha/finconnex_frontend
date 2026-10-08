@@ -31,6 +31,8 @@ import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjects
 import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
 import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import { CalendarSyncSettingsClient } from "@/components/settings/CalendarSyncSettingsClient";
+import { IntegrationDetailClient } from "@/components/settings/integrations/IntegrationDetailClient";
+import { findIntegration } from "@/lib/integrations/catalog";
 import { CrmPicklistSettingsClient } from "@/components/settings/CrmPicklistSettingsClient";
 import { CRM_SETTINGS_PICKLISTS } from "@/lib/settings/crm-picklists";
 import { cn } from "@/lib/utils";
@@ -49,6 +51,11 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
   const legacy = SETTINGS_REDIRECTS[`${categorySlug}/${subpageSlug}`];
   if (legacy) {
     redirect(`/settings/${legacy.category}/${legacy.subpage}`);
+  }
+
+  // An integration's own page (Settings → Integrations opens these in a new tab).
+  if (categorySlug === "integrations" && findIntegration(subpageSlug)) {
+    return <IntegrationDetailClient id={subpageSlug} />;
   }
 
   const hit = findSettingsPage(categorySlug, subpageSlug);

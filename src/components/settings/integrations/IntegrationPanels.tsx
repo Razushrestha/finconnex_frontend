@@ -254,9 +254,8 @@ export function StripePanel({
         In the Stripe Dashboard open <b>Developers → API keys</b> and copy both
         keys. Then add a webhook endpoint pointing at the address below (events:{" "}
         <code>payment_intent.succeeded</code> and{" "}
-        <code>payment_intent.payment_failed</code>)
-        and paste its signing secret, so paid invoices are recorded
-        automatically.
+        <code>payment_intent.payment_failed</code>) and paste its signing
+        secret, so paid invoices are recorded automatically.
       </p>
       <CopyBox label="Webhook endpoint for Stripe" value={webhookUrl} />
       <Field label="Label (optional)">
@@ -760,8 +759,8 @@ export function OAuthPanel({
           </p>
         ) : null}
         <p className="text-[12px] text-slate-600">
-          FinConnex keeps this connection&apos;s access token refreshed. Features
-          that work with {integration.name} use this connection.
+          FinConnex keeps this connection&apos;s access token refreshed.
+          Features that work with {integration.name} use this connection.
         </p>
         <SecondaryButton
           danger
