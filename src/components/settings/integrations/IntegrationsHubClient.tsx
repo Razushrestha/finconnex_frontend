@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExternalLink, Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
+import { WorkspacePortal } from "@/components/shared/WorkspacePortal";
 import {
   INTEGRATION_CATEGORIES,
   INTEGRATIONS,
@@ -12,18 +13,21 @@ import { cn } from "@/lib/utils";
 
 import {
   IntegrationLogo,
+  IntegrationPanel,
   isIntegrationConnected,
   useIntegrationStatuses,
 } from "./integration-shared";
 
 /**
  * Settings → Integrations: every third-party connection in one place, as
- * logo tiles. Each tile opens that integration's own page, in a new tab.
+ * logo tiles. A tile opens that integration's setup in a panel inside the
+ * working area; its "Integrate" button opens the app's own page in a new tab.
  */
 export function IntegrationsHubClient() {
-  const { statuses, loading } = useIntegrationStatuses();
+  const { statuses, loading, refresh } = useIntegrationStatuses();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<IntegrationCategory | "All">("All");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -37,6 +41,7 @@ export function IntegrationsHubClient() {
     );
   }, [query, category]);
 
+  const open = INTEGRATIONS.find((item) => item.id === openId) ?? null;
   const connectedCount = INTEGRATIONS.filter((item) =>
     isIntegrationConnected(item, statuses),
   ).length;
@@ -85,28 +90,22 @@ export function IntegrationsHubClient() {
         {visible.map((item) => {
           const connected = isIntegrationConnected(item, statuses);
           return (
-            <a
+            <button
               key={item.id}
-              href={`/settings/integrations/${item.id}`}
-              target="_blank"
-              rel="noopener"
-              title={`Open ${item.name} in a new tab`}
-              className="group relative flex h-44 flex-col items-center justify-center gap-4 rounded-xl border border-slate-200 bg-white px-4 text-center transition-shadow hover:border-slate-300 hover:shadow-md"
+              type="button"
+              onClick={() => setOpenId(item.id)}
+              className="relative flex h-44 flex-col items-center justify-center gap-4 rounded-xl border border-slate-200 bg-white px-4 text-center transition-shadow hover:border-slate-300 hover:shadow-md"
             >
               {connected ? (
                 <span className="absolute top-3 right-3 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                   Connected
                 </span>
               ) : null}
-              <ExternalLink
-                aria-hidden
-                className="absolute bottom-3 right-3 h-3.5 w-3.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100"
-              />
               <IntegrationLogo item={item} />
               <span className="text-[15px] font-semibold text-slate-900">
                 {item.name}
               </span>
-            </a>
+            </button>
           );
         })}
       </div>
@@ -114,6 +113,49 @@ export function IntegrationsHubClient() {
         <p className="py-10 text-center text-[13px] text-slate-400">
           No integrations match “{query}”.
         </p>
+      ) : null}
+
+      {open ? (
+        <WorkspacePortal>
+          <div
+            className="fixed inset-0 z-[90] flex justify-end bg-slate-900/30"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setOpenId(null);
+            }}
+          >
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-label={open.name}
+              className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+            >
+              <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
+                <IntegrationLogo item={open} size={40} />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[16px] font-semibold text-slate-900">
+                    {open.name}
+                  </h2>
+                  <p className="text-[12px] text-slate-500">{open.blurb}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpenId(null)}
+                  aria-label="Close"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <IntegrationPanel
+                  item={open}
+                  statuses={statuses}
+                  onChanged={refresh}
+                />
+              </div>
+            </aside>
+          </div>
+        </WorkspacePortal>
       ) : null}
     </div>
   );

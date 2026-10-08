@@ -62,6 +62,12 @@ export type IntegrationDefinition = {
   color: string;
   initials: string;
   flow: IntegrationFlow;
+  /**
+   * The app's own page where it is set up (dashboard, console, developer
+   * portal). "Integrate" opens it in a new tab; consent-screen flows
+   * (calendars, Calendly) fetch their address instead.
+   */
+  integrateUrl?: string;
 };
 
 const MICROSOFT_TOKEN =
@@ -144,6 +150,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     blurb: "Send workspace email from your own SendGrid account and sender.",
     color: "#1A82E2",
     initials: "SG",
+    integrateUrl: "https://app.sendgrid.com/settings/api_keys",
     flow: { kind: "messaging", provider: "SENDGRID" },
   },
   {
@@ -153,6 +160,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     blurb: "Texts and calls from your own Twilio number.",
     color: "#F22F46",
     initials: "TW",
+    integrateUrl: "https://console.twilio.com/",
     flow: { kind: "messaging", provider: "TWILIO" },
   },
   {
@@ -163,6 +171,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     icon: "whatsapp",
     color: "#25D366",
     initials: "WA",
+    integrateUrl:
+      "https://console.twilio.com/us1/develop/sms/senders/whatsapp-senders",
     flow: { kind: "messaging", provider: "TWILIO", whatsapp: true },
   },
   {
@@ -192,6 +202,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     icon: "stripe",
     color: "#635BFF",
     initials: "ST",
+    integrateUrl: "https://dashboard.stripe.com/apikeys",
     flow: { kind: "stripe" },
   },
   {
@@ -259,6 +270,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     blurb: "Pull credit reports for leads and applicants.",
     color: "#9E1B32",
     initials: "EQ",
+    integrateUrl: "https://developer.equifax.com/",
     flow: { kind: "equifax" },
   },
 
@@ -375,6 +387,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     icon: "zapier",
     color: "#FF4F00",
     initials: "ZA",
+    integrateUrl: "https://zapier.com/app/zaps",
     flow: { kind: "webhook" },
   },
   {
@@ -385,6 +398,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     icon: "make",
     color: "#6D00CC",
     initials: "MK",
+    integrateUrl: "https://www.make.com/en/login",
     flow: { kind: "webhook" },
   },
   {

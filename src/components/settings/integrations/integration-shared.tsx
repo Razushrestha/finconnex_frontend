@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
+
+import { openIntegrationTab } from "@/lib/integrations/open-tab";
 
 import {
   getCalendlyConnection,
@@ -97,6 +100,12 @@ export function useIntegrationStatuses() {
     };
   }, [tick]);
 
+  // An app's setup happens in another tab: re-read on return.
+  useEffect(() => {
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [refresh]);
+
   return { statuses, loading, refresh };
 }
 
@@ -177,7 +186,7 @@ export function IntegrationLogo({
 }
 
 /** The integration's own setup: consent screen, keys, webhook URL or OAuth app. */
-export function IntegrationPanel({
+function IntegrationSetup({
   item,
   statuses,
   onChanged,
@@ -227,4 +236,43 @@ export function IntegrationPanel({
     case "link":
       return <LinkPanel href={flow.href} cta={flow.cta} blurb={item.blurb} />;
   }
+}
+
+/**
+ * The app's own integration page, in a new tab: where its keys are issued or
+ * its OAuth app is registered. The setup below takes what it gives.
+ */
+function IntegrateButton({ name, url }: { name: string; url: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--brand-primary-faint)] p-3">
+      <button
+        type="button"
+        onClick={() => void openIntegrationTab(url)}
+        className="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[var(--brand-primary-strong)]"
+      >
+        Integrate {name}
+        <ExternalLink className="h-4 w-4" />
+      </button>
+      <p className="min-w-0 flex-1 text-[12px] text-slate-600">
+        Opens {name} in a new tab. Come back here to finish connecting.
+      </p>
+    </div>
+  );
+}
+
+export function IntegrationPanel(props: {
+  item: IntegrationDefinition;
+  statuses: IntegrationStatuses;
+  onChanged: () => void;
+}) {
+  const { item } = props;
+  const appUrl =
+    item.integrateUrl ??
+    (item.flow.kind === "oauth" ? item.flow.preset?.developerUrl : undefined);
+  return (
+    <div className="space-y-4">
+      {appUrl ? <IntegrateButton name={item.name} url={appUrl} /> : null}
+      <IntegrationSetup {...props} />
+    </div>
+  );
 }

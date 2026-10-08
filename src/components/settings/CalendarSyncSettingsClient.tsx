@@ -10,6 +10,7 @@ import {
   type CalendarSyncConnection,
 } from "@/lib/booking/calendly-integration-api";
 import { cn } from "@/lib/utils";
+import { openIntegrationTab } from "@/lib/integrations/open-tab";
 
 export function CalendarSyncSettingsClient({
   provider,
@@ -30,13 +31,19 @@ export function CalendarSyncSettingsClient({
     } catch (err) {
       setRows([]);
       setError(
-        err instanceof Error ? err.message : `Could not load ${label} connections.`,
+        err instanceof Error
+          ? err.message
+          : `Could not load ${label} connections.`,
       );
     }
   }, [label, provider]);
 
   useEffect(() => {
     void refresh();
+    // Consent happens in another tab: pick up the new connection on return.
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
   async function run(key: string, fn: () => Promise<void>) {
@@ -61,7 +68,8 @@ export function CalendarSyncSettingsClient({
         <div>
           <p className="text-[16px] font-bold text-slate-900">{label}</p>
           <p className="mt-0.5 text-[12px] text-slate-500">
-            GET /v1/calendar-sync/{provider}/authorize — workspace OWNER or ADMIN.
+            GET /v1/calendar-sync/{provider}/authorize — workspace OWNER or
+            ADMIN.
           </p>
         </div>
         <span
@@ -82,7 +90,9 @@ export function CalendarSyncSettingsClient({
           disabled={Boolean(busy)}
           onClick={() =>
             void run("connect", async () => {
-              window.location.assign(await authorizeCalendarSync(provider));
+              // The consent screen opens in a new tab; this one refreshes
+              // when the user comes back to it.
+              await openIntegrationTab(() => authorizeCalendarSync(provider));
             })
           }
           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white disabled:opacity-60"
@@ -142,7 +152,9 @@ export function CalendarSyncSettingsClient({
         </p>
       )}
 
-      {note ? <p className="mt-2 text-[12px] text-emerald-700">{note}</p> : null}
+      {note ? (
+        <p className="mt-2 text-[12px] text-emerald-700">{note}</p>
+      ) : null}
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
     </div>
   );
