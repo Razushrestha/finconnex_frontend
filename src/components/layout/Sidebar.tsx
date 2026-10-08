@@ -8,6 +8,10 @@ import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { resolveWorkspaceBrand } from "@/lib/settings/brand";
 import {
+  isDisplayableImageSrc,
+  resolveCrmStorageUrl,
+} from "@/lib/storage/api";
+import {
   Package,
   BadgePercent,
   LineChart,
@@ -235,13 +239,37 @@ export function Sidebar({
     [onMobileOpenChange, mobileOpenProp],
   );
 
+  const navScrollRef = React.useRef<HTMLDivElement>(null);
+  const revealLabelRef = React.useRef<string | null>(null);
+
   const toggle = (label: string) => {
+    revealLabelRef.current = label;
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(label) ? next.delete(label) : next.add(label);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
   };
+
+  // Opening a group inserts its children above whatever sits below the
+  // heading. Scroll anchoring then shoves the heading and the first child
+  // out of the top of the nav. Pull the heading back into view.
+  React.useLayoutEffect(() => {
+    const label = revealLabelRef.current;
+    const scroller = navScrollRef.current;
+    if (!label || !scroller) return;
+    revealLabelRef.current = null;
+    const parent = scroller.querySelector<HTMLElement>(
+      `[data-nav-label="${CSS.escape(label)}"] [data-nav-parent]`,
+    );
+    if (!parent) return;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    if (parentRect.top < scrollerRect.top) {
+      scroller.scrollTop -= scrollerRect.top - parentRect.top;
+    }
+  }, [expanded]);
 
   React.useEffect(() => {
     setMobileOpen(false);
@@ -278,9 +306,29 @@ export function Sidebar({
   // Icon-only rail only applies on md+; the mobile drawer always shows labels.
   const hideLabel = collapsed ? "md:hidden" : undefined;
   const iconOnly = collapsed ? "md:justify-center md:px-0" : undefined;
-  const logoSrc = brand.secondaryIsLight
+  const logoKey = brand.secondaryIsLight
     ? brand.logoLightUrl || brand.logoDarkUrl
     : brand.logoDarkUrl || brand.logoLightUrl;
+  const [logoSrc, setLogoSrc] = React.useState("");
+
+  React.useEffect(() => {
+    if (!logoKey) {
+      setLogoSrc("");
+      return;
+    }
+    if (isDisplayableImageSrc(logoKey) || logoKey.startsWith("/")) {
+      setLogoSrc(logoKey);
+      return;
+    }
+    let cancelled = false;
+    setLogoSrc("");
+    void resolveCrmStorageUrl(logoKey).then((url) => {
+      if (!cancelled) setLogoSrc(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [logoKey]);
 
   return (
     <>
@@ -401,7 +449,10 @@ export function Sidebar({
           </span>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar">
+        <div
+          ref={navScrollRef}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar [overflow-anchor:none]"
+        >
           <nav className="flex flex-col gap-0.5">
             {dashboardItems.map((item) => {
               const hasChildren = !!item.children?.length;
@@ -413,10 +464,11 @@ export function Sidebar({
               const Icon = item.icon!;
 
               return (
-                <div key={item.label}>
+                <div key={item.label} data-nav-label={item.label}>
                   {hasChildren ? (
                     <button
                       type="button"
+                      data-nav-parent=""
                       onClick={() => toggle(item.label)}
                       title={collapsed ? item.label : undefined}
                       className={cn(
