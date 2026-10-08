@@ -6,6 +6,7 @@ import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverP
 import { loadWorkspaceConsultants, listAssignableOwnersLocal, type AssignableOwner } from "@/lib/users/assignable";
 import {
   CONSULTANT_PRIORITIES,
+  normalizeConsultantPriority,
   type ConsultantPriority,
 } from "@/lib/booking/types";
 import {
@@ -80,7 +81,7 @@ export function AssignConsultantsStep({
     names.length > 0 && names.every((n) => selected.includes(n));
 
   function priorityOf(name: string): ConsultantPriority {
-    return priorities[name] ?? "Low";
+    return normalizeConsultantPriority(priorities[name], "Low");
   }
 
   function setPriority(name: string, priority: ConsultantPriority) {

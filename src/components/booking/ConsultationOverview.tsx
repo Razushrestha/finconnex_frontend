@@ -98,6 +98,7 @@ import {
   type BookingCurrency,
   type BookingPage,
   type PaymentType,
+  normalizeConsultantPriority,
   type ConsultantPriority,
   type MeetingVia,
 } from "@/lib/booking/types";
@@ -816,7 +817,7 @@ function AssignedUsersEditForm({
     () =>
       people.reduce(
         (acc, name) => {
-          acc[name] = page.consultantPriorities?.[name] ?? "Highest";
+          acc[name] = normalizeConsultantPriority(page.consultantPriorities?.[name]);
           return acc;
         },
         {} as Record<string, ConsultantPriority>,
@@ -871,7 +872,7 @@ function AssignedUsersEditForm({
       setPriorities((current) => {
         const nextPriorities = { ...current };
         for (const name of people) {
-          if (!nextPriorities[name]) nextPriorities[name] = "Highest";
+          if (!nextPriorities[name]) nextPriorities[name] = "High";
         }
         return nextPriorities;
       });
@@ -1058,7 +1059,7 @@ function AssignedUsersEditForm({
             ) : null}
             {priorityBased ? (
               <select
-                value={priorities[row.name] ?? "Highest"}
+                value={normalizeConsultantPriority(priorities[row.name])}
                 onChange={(e) =>
                   setPriorities((current) => ({
                     ...current,
@@ -1606,7 +1607,7 @@ export function ConsultationOverview({
                       ) : null}
                       {page.appointmentDistribution === "Priority-based" ? (
                         <p className="shrink-0 text-[13px] text-slate-600">
-                          {page.consultantPriorities?.[name] ?? "Highest"}
+                          {normalizeConsultantPriority(page.consultantPriorities?.[name])}
                         </p>
                       ) : null}
                     </div>

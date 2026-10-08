@@ -48,7 +48,7 @@ describe("CRM meetings on the booking dashboard", () => {
       startDateTime: "09/10/2026, 3:45 am",
       endDateTime: "09/10/2026, 4:15 am",
     } as unknown as Parameters<typeof meetingToAppointment>[0]);
-    expect(row.start).toBe("2026-10-09T09:00");
-    expect(row.end).toBe("2026-10-09T09:30");
+    expect(row?.start).toBe("2026-10-09T09:00");
+    expect(row?.end).toBe("2026-10-09T09:30");
   });
 });

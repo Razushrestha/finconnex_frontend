@@ -44,6 +44,7 @@ import {
   type AvailabilityRule,
   type BookingQuestion,
   type ConsultationMode,
+  normalizeConsultantPriorities,
   type ConsultantPriority,
   type MeetingMode,
   type MeetingVia,
@@ -215,7 +216,7 @@ export function BookingPageForm({
   );
   const [consultantPriorities, setConsultantPriorities] = useState<
     Record<string, ConsultantPriority>
-  >(initial?.consultantPriorities ?? {});
+  >(normalizeConsultantPriorities(initial?.consultantPriorities));
 
   const [durationMinutes, setDurationMinutes] = useState(
     initial?.durationMinutes ?? defaultDurationMinutes ?? 30,
@@ -292,7 +293,7 @@ export function BookingPageForm({
           ? [live.owner]
           : [],
     );
-    setConsultantPriorities(live.consultantPriorities ?? {});
+    setConsultantPriorities(normalizeConsultantPriorities(live.consultantPriorities));
     setDurationMinutes(live.durationMinutes);
     setBufferMinutes(live.bufferMinutes);
     setMinNoticeHours(live.minNoticeHours ?? 2);
