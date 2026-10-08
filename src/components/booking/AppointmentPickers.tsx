@@ -35,6 +35,7 @@ import {
 } from "@/lib/booking/new-appointment";
 import type { BookingCurrency } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
+import { emailAddressProblem } from "@/lib/emails/address";
 
 /** Accent used across the New Appointment form. */
 export const ACCENT = "#5A4FCF";
@@ -570,7 +571,6 @@ function SideMessage({
 /* Customer                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type NewCustomerInput = { name: string; email: string; phone: string };
 
@@ -792,7 +792,8 @@ function NewCustomerForm({
   async function save() {
     if (busy) return;
     if (!name.trim()) return setError("Enter the client's name.");
-    if (!EMAIL_PATTERN.test(email.trim())) return setError("Enter a valid email address.");
+    const emailProblem = emailAddressProblem(email);
+    if (emailProblem) return setError(emailProblem);
     setBusy(true);
     setError("");
     try {

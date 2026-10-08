@@ -11,6 +11,7 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { splitNameParts } from "@/components/sales/leads/LeadContactPicker";
 import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
+import { emailAddressProblem } from "@/lib/emails/address";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,15 +84,21 @@ export function QuickAddContactForm({
     const last = lastName.trim();
     const mail = email.trim();
     const tel = phone.trim();
+    const emailProblem = mail ? emailAddressProblem(mail) : null;
     const nextErrors = {
       firstName: !first,
       lastName: !last,
-      email: !mail || !EMAIL_RE.test(mail),
+      email: !mail || emailProblem !== null,
       phone: !isValidPhoneInput(tel),
     };
     setFieldErrors(nextErrors);
-    if (nextErrors.firstName || nextErrors.lastName || nextErrors.email) {
+    if (nextErrors.firstName || nextErrors.lastName || !mail) {
       setError("First name, last name and email are required");
+      return;
+    }
+    if (emailProblem) {
+      // e.g. "Did you mean ram@gmail.com?" for ram@gmail.comcomcom
+      setError(emailProblem);
       return;
     }
     if (nextErrors.phone) {
