@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -28,12 +35,15 @@ import {
   Pencil,
   ExternalLink,
 } from "lucide-react";
-import { BodyPortal } from "@/components/shared/BodyPortal";
 import { cn } from "@/lib/utils";
 import { crmRecordHref, useCrmRecordName } from "@/lib/crm/related-record";
 import { toast } from "@/lib/notify/toast";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
-import { publicBookUrl, type BookingCurrency, type BookingPage } from "@/lib/booking/types";
+import {
+  publicBookUrl,
+  type BookingCurrency,
+  type BookingPage,
+} from "@/lib/booking/types";
 import {
   currencyPrefix,
   eventTypeInitials,
@@ -42,7 +52,10 @@ import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewAppointmentModal } from "@/components/booking/NewAppointmentModal";
 import type { ScheduleMeetingSeed } from "@/app/(dashboard)/activities/meetings/create/page";
 import { AppointmentDateField } from "@/components/booking/DateTimeSection";
-import { FINANCE_PRIMARY_BUTTON, FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import {
+  FINANCE_PRIMARY_BUTTON,
+  FINANCE_PRIMARY_BUTTON_SM,
+} from "@/components/finance/buttonStyles";
 import {
   appointmentDateKey,
   appointmentInitials,
@@ -79,12 +92,10 @@ import {
   updateCrmMeeting,
 } from "@/lib/meetings/api";
 import { todayIsoInTimezone } from "@/lib/booking/timezones";
+import { WorkspacePortal } from "@/components/shared/WorkspacePortal";
 
 export type BookingSection =
-  | "home"
-  | "consultations"
-  | "schedules"
-  | "consultants";
+  "home" | "consultations" | "schedules" | "consultants";
 
 const BRAND = "var(--brand-primary)";
 
@@ -99,7 +110,11 @@ function ConsultantFace({
 }) {
   if (photo && /^https?:\/\//i.test(photo)) {
     return (
-      <img src={photo} alt="" className={cn("rounded-full object-cover", className)} />
+      <img
+        src={photo}
+        alt=""
+        className={cn("rounded-full object-cover", className)}
+      />
     );
   }
   return (
@@ -301,7 +316,9 @@ function HomeView({
   const now = useMemo(() => bookingNow(), [appointments]);
   const [consultantFilter, setConsultantFilter] = useState("all");
   const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(bookingNow()));
+  const [selectedDate, setSelectedDate] = useState(() =>
+    dateKeyFromDate(bookingNow()),
+  );
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [month, setMonth] = useState(() => {
     const d = bookingNow();
@@ -354,7 +371,9 @@ function HomeView({
   // Each day's appointments in start order, for the calendar's hover card.
   const appointmentsByDay = useMemo(() => {
     const byDay = new Map<string, DashboardAppointment[]>();
-    for (const a of [...appointments].sort((x, y) => x.start.localeCompare(y.start))) {
+    for (const a of [...appointments].sort((x, y) =>
+      x.start.localeCompare(y.start),
+    )) {
       const key = appointmentDateKey(a.start);
       byDay.set(key, [...(byDay.get(key) ?? []), a]);
     }
@@ -377,7 +396,8 @@ function HomeView({
 
   async function cancelAppointment(row: DashboardAppointment) {
     if (row.status === "Cancelled") return;
-    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    const meetingId =
+      row.meetingId || (row.recordKind === "meeting" ? row.id : "");
     const bookingId = row.recordKind === "booking" ? row.id : "";
     if (bookingId) {
       await tryCrmBooking(() =>
@@ -392,8 +412,14 @@ function HomeView({
   }
 
   async function removeAppointment(row: DashboardAppointment) {
-    if (!window.confirm(`Delete appointment “${row.guestName}”? This also removes it for the client.`)) return;
-    const meetingId = row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    if (
+      !window.confirm(
+        `Delete appointment “${row.guestName}”? This also removes it for the client.`,
+      )
+    )
+      return;
+    const meetingId =
+      row.meetingId || (row.recordKind === "meeting" ? row.id : "");
     const bookingId = row.recordKind === "booking" ? row.id : "";
     hideAppointments([row.id, row.meetingId, bookingId]);
     if (detail?.id === row.id) setDetail(null);
@@ -494,7 +520,10 @@ function HomeView({
         <section className="flex h-[min(640px,75dvh)] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] xl:h-auto xl:flex-1 xl:self-stretch">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-              <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
+              <CalendarDays
+                className="h-4 w-4 shrink-0"
+                style={{ color: BRAND }}
+              />
               {dateFilter
                 ? `Appointments on ${formatApptDate(`${dateFilter}T00:00`)}`
                 : kpiFilter
@@ -536,92 +565,99 @@ function HomeView({
             <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
           ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="divide-y divide-[#F3F4F6] lg:hidden">
-            {loading && pageRows.length === 0 ? (
-              <p className="px-4 py-10 text-center text-[13px] text-slate-400">
-                Loading appointments…
-              </p>
-            ) : null}
-            {!loading && pageRows.length === 0 ? (
-              <p className="px-4 py-10 text-center text-[13px] text-slate-400">
-                {dateFilter
-                  ? "No appointments on this day."
-                  : "No appointments from CRM meetings yet."}
-              </p>
-            ) : null}
-            {pageRows.map((row) => (
-              <AppointmentCard
-                key={row.id}
-                row={row}
-                dimmed={
-                  !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
-                }
-                onView={() => openView(row)}
-                onEdit={() => openEdit(row)}
-                onReschedule={() => openReschedule(row)}
-                onCancel={() => void cancelAppointment(row)}
-                onDelete={() => void removeAppointment(row)}
-              />
-            ))}
-          </div>
+            <div className="divide-y divide-[#F3F4F6] lg:hidden">
+              {loading && pageRows.length === 0 ? (
+                <p className="px-4 py-10 text-center text-[13px] text-slate-400">
+                  Loading appointments…
+                </p>
+              ) : null}
+              {!loading && pageRows.length === 0 ? (
+                <p className="px-4 py-10 text-center text-[13px] text-slate-400">
+                  {dateFilter
+                    ? "No appointments on this day."
+                    : "No appointments from CRM meetings yet."}
+                </p>
+              ) : null}
+              {pageRows.map((row) => (
+                <AppointmentCard
+                  key={row.id}
+                  row={row}
+                  dimmed={
+                    !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
+                  }
+                  onView={() => openView(row)}
+                  onEdit={() => openEdit(row)}
+                  onReschedule={() => openReschedule(row)}
+                  onCancel={() => void cancelAppointment(row)}
+                  onDelete={() => void removeAppointment(row)}
+                />
+              ))}
+            </div>
 
-          <div className="hidden lg:block">
-            <table className="w-full table-fixed text-left">
-              <colgroup>
-                <col className="w-[16%]" />
-                <col className="w-[11%]" />
-                <col className="w-[17%]" />
-                <col className="w-[17%]" />
-                <col className="w-[15%]" />
-                <col className="w-[9%]" />
-                <col className="w-[15%]" />
-              </colgroup>
-              <thead className="sticky top-0 z-10 bg-white">
-                <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  <th className="px-3 py-2 font-semibold">Time &amp; Date</th>
-                  <th className="px-2 py-2 font-semibold">Booking ID</th>
-                  <th className="px-2 py-2 font-semibold">Consultations</th>
-                  <th className="px-2 py-2 font-semibold">Consultants</th>
-                  <th className="px-2 py-2 font-semibold">Clients</th>
-                  <th className="px-2 py-2 font-semibold">Payment</th>
-                  <th className="px-2 py-2 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && pageRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
-                      Loading appointments…
-                    </td>
+            <div className="hidden lg:block">
+              <table className="w-full table-fixed text-left">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <thead className="sticky top-0 z-10 bg-white">
+                  <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                    <th className="px-3 py-2 font-semibold">Time &amp; Date</th>
+                    <th className="px-2 py-2 font-semibold">Booking ID</th>
+                    <th className="px-2 py-2 font-semibold">Consultations</th>
+                    <th className="px-2 py-2 font-semibold">Consultants</th>
+                    <th className="px-2 py-2 font-semibold">Clients</th>
+                    <th className="px-2 py-2 font-semibold">Payment</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
                   </tr>
-                ) : null}
-                {!loading && pageRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
-                      {dateFilter
-                  ? "No appointments on this day."
-                  : "No appointments from CRM meetings yet."}
-                    </td>
-                  </tr>
-                ) : null}
-                {groupAppointmentsByDate(pageRows).map((group) => (
-                  <AppointmentDayGroup
-                    key={group.key}
-                    label={group.label}
-                    rows={group.rows}
-                    dimmedFor={(row) =>
-                      !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
-                    }
-                    onView={openView}
-                    onEdit={openEdit}
-                    onReschedule={openReschedule}
-                    onCancel={(row) => void cancelAppointment(row)}
-                    onDelete={(row) => void removeAppointment(row)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {loading && pageRows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-5 py-12 text-center text-[13px] text-slate-400"
+                      >
+                        Loading appointments…
+                      </td>
+                    </tr>
+                  ) : null}
+                  {!loading && pageRows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-5 py-12 text-center text-[13px] text-slate-400"
+                      >
+                        {dateFilter
+                          ? "No appointments on this day."
+                          : "No appointments from CRM meetings yet."}
+                      </td>
+                    </tr>
+                  ) : null}
+                  {groupAppointmentsByDate(pageRows).map((group) => (
+                    <AppointmentDayGroup
+                      key={group.key}
+                      label={group.label}
+                      rows={group.rows}
+                      dimmedFor={(row) =>
+                        !!kpiFilter &&
+                        !appointmentMatchesKpi(row, kpiFilter, now)
+                      }
+                      onView={openView}
+                      onEdit={openEdit}
+                      onReschedule={openReschedule}
+                      onCancel={(row) => void cancelAppointment(row)}
+                      onDelete={(row) => void removeAppointment(row)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-col gap-2 border-t border-[#E5E7EB] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
@@ -685,14 +721,16 @@ function HomeView({
             <div className="space-y-3">
               {consultants.length === 0 ? (
                 <p className="text-[12px] text-slate-400">
-                  {loading
-                    ? "Loading hosts…"
-                    : "No consultants yet."}
+                  {loading ? "Loading hosts…" : "No consultants yet."}
                 </p>
               ) : null}
               {consultants.slice(0, 4).map((c) => (
                 <div key={c.id} className="flex items-center gap-2.5">
-                  <ConsultantFace name={c.name} photo={c.photo} className="h-9 w-9 text-[11px]" />
+                  <ConsultantFace
+                    name={c.name}
+                    photo={c.photo}
+                    className="h-9 w-9 text-[11px]"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-slate-900">
                       {c.name}
@@ -805,7 +843,9 @@ function scheduleSeed(row: DashboardAppointment): ScheduleMeetingSeed {
     date: valid
       ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
       : undefined,
-    time: valid ? `${pad(start.getHours())}:${pad(start.getMinutes())}` : undefined,
+    time: valid
+      ? `${pad(start.getHours())}:${pad(start.getMinutes())}`
+      : undefined,
     duration: minutes > 0 ? `${minutes} min` : undefined,
     teamMember: row.consultantName || "Calendar Default",
   };
@@ -824,7 +864,8 @@ function appointmentParts(row: DashboardAppointment) {
 }
 
 function groupAppointmentsByDate(rows: DashboardAppointment[]) {
-  const groups: { key: string; label: string; rows: DashboardAppointment[] }[] = [];
+  const groups: { key: string; label: string; rows: DashboardAppointment[] }[] =
+    [];
   for (const row of rows) {
     const key = appointmentDateKey(row.start);
     const last = groups[groups.length - 1];
@@ -846,7 +887,11 @@ function formatClock(iso: string) {
   const date = parseAppointmentStart(iso);
   if (Number.isNaN(date.getTime())) return "";
   return date
-    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
     .replace(" AM", " am")
     .replace(" PM", " pm");
 }
@@ -891,7 +936,8 @@ function BookingStatusMenu({
     if (!open) return;
     function onDoc(event: Event) {
       const target = event.target as Node;
-      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target))
+        return;
       setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
@@ -1125,9 +1171,9 @@ function AppointmentCard({
               <RelatedIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span className="truncate">{appointmentRelatedLabel(row)}</span>
             </p>
-            {(consultant?.name ||
-              row.consultantName ||
-              appointmentConsultantName(row.consultantId)) ? (
+            {consultant?.name ||
+            row.consultantName ||
+            appointmentConsultantName(row.consultantId) ? (
               <p className="flex items-center gap-1.5">
                 <ConsultantFace
                   name={
@@ -1212,7 +1258,9 @@ function AppointmentRow({
       <td className="px-3 py-2 align-middle">
         <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
           <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="line-clamp-2 break-words">{formatTimeRange(row)}</span>
+          <span className="line-clamp-2 break-words">
+            {formatTimeRange(row)}
+          </span>
         </span>
       </td>
       <td className="truncate px-2 py-2 align-middle text-[11px] font-medium text-slate-800">
@@ -1223,7 +1271,10 @@ function AppointmentRow({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#7C6AE8] text-[9px] font-bold text-white">
             {eventTypeInitials(eventName)}
           </span>
-          <span className="line-clamp-2 break-words text-[11px] text-slate-800" title={eventName}>
+          <span
+            className="line-clamp-2 break-words text-[11px] text-slate-800"
+            title={eventName}
+          >
             {eventName}
           </span>
         </span>
@@ -1252,7 +1303,10 @@ function AppointmentRow({
       <td className="truncate px-2 py-2 align-middle text-[11px] text-slate-700">
         {row.paymentStatus || "—"}
       </td>
-      <td className="px-2 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
+      <td
+        className="px-2 py-2 align-middle"
+        onClick={(e) => e.stopPropagation()}
+      >
         <BookingStatusMenu
           status={row.status}
           onEdit={onEdit}
@@ -1294,7 +1348,10 @@ function MiniCalendar({
 
   function showDay(iso: string, target: HTMLElement) {
     const rect = target.getBoundingClientRect();
-    const rows = Math.min(appointmentsByDay.get(iso)?.length ?? 0, DAY_CARD_MAX_ROWS);
+    const rows = Math.min(
+      appointmentsByDay.get(iso)?.length ?? 0,
+      DAY_CARD_MAX_ROWS,
+    );
     const estimatedHeight = 64 + Math.max(rows, 1) * 52;
     const left = Math.min(
       Math.max(rect.left + rect.width / 2 - DAY_CARD_WIDTH / 2, 8),
@@ -1368,7 +1425,9 @@ function MiniCalendar({
               onMouseLeave={() => setHovered(null)}
               onFocus={(e) => showDay(iso, e.currentTarget)}
               onBlur={() => setHovered(null)}
-              aria-describedby={hovered?.iso === iso ? "calendar-day-card" : undefined}
+              aria-describedby={
+                hovered?.iso === iso ? "calendar-day-card" : undefined
+              }
               className="relative flex h-full min-h-9 items-center justify-center"
             >
               <span
@@ -1439,11 +1498,16 @@ function DayBookingsCard({
         </p>
       </div>
       {appointments.length === 0 ? (
-        <p className="py-1 text-[12px] text-slate-400">No bookings on this day.</p>
+        <p className="py-1 text-[12px] text-slate-400">
+          No bookings on this day.
+        </p>
       ) : (
         <ul className="space-y-1.5">
           {shown.map((a) => (
-            <li key={a.id} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+            <li
+              key={a.id}
+              className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2"
+            >
               <span className="w-[58px] shrink-0 pt-px text-[11px] font-semibold tabular-nums text-slate-700">
                 {formatApptTime(a.start)}
               </span>
@@ -1452,7 +1516,9 @@ function DayBookingsCard({
                   {a.guestName}
                 </span>
                 <span className="block truncate text-[11px] text-slate-500">
-                  {a.consultantName || appointmentConsultantName(a.consultantId) || a.type}
+                  {a.consultantName ||
+                    appointmentConsultantName(a.consultantId) ||
+                    a.type}
                 </span>
               </span>
               <span
@@ -1522,7 +1588,10 @@ function AppointmentDrawer({
       return;
     }
     const start = new Date(`${date}T${time}`);
-    if (Number.isNaN(start.getTime()) || start.getTime() < bookingNow().getTime()) {
+    if (
+      Number.isNaN(start.getTime()) ||
+      start.getTime() < bookingNow().getTime()
+    ) {
       setError("Choose today or a future date and time.");
       return;
     }
@@ -1532,7 +1601,12 @@ function AppointmentDrawer({
       previousEnd &&
       !Number.isNaN(previousEnd.getTime()) &&
       !Number.isNaN(previousStart.getTime())
-        ? Math.max(5, Math.round((previousEnd.getTime() - previousStart.getTime()) / 60000))
+        ? Math.max(
+            5,
+            Math.round(
+              (previousEnd.getTime() - previousStart.getTime()) / 60000,
+            ),
+          )
         : 30;
     const end = new Date(start.getTime() + minutes * 60 * 1000);
     setSaving(true);
@@ -1545,7 +1619,9 @@ function AppointmentDrawer({
       };
       if (row.recordKind === "meeting" || row.status === "Cancelled") {
         const meetingId = row.meetingId || row.id;
-        const meeting = await tryCrmMeeting(() => updateCrmMeeting(meetingId, when));
+        const meeting = await tryCrmMeeting(() =>
+          updateCrmMeeting(meetingId, when),
+        );
         if (row.status === "Cancelled") {
           await fetch("/api/appointment/manage/reopen", {
             method: "POST",
@@ -1610,131 +1686,144 @@ function AppointmentDrawer({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]"
-      onClick={onClose}
-    >
+    <WorkspacePortal>
       <div
-        role="dialog"
-        aria-labelledby="appointment-detail-title"
-        className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]"
+        onClick={onClose}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3
-            id="appointment-detail-title"
-            className="text-[15px] font-bold text-slate-900"
-          >
-            {editing ? "Edit appointment" : "Appointment detail"}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-4 overflow-auto px-5 py-5">
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold",
-                row.avatarClass,
-              )}
+        <div
+          role="dialog"
+          aria-labelledby="appointment-detail-title"
+          className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <h3
+              id="appointment-detail-title"
+              className="text-[15px] font-bold text-slate-900"
             >
-              {appointmentInitials(row.guestName)}
-            </span>
-            <div>
-              <p className="text-[16px] font-bold text-slate-900">
-                {row.guestName}
-              </p>
-              <p className="text-[13px] text-slate-500">{row.topic}</p>
-            </div>
-          </div>
-          {editing ? (
-            <div className="space-y-3">
-              <label className="block text-[13px] font-medium text-slate-600">
-                Date
-                <div className="mt-1">
-                  <AppointmentDateField
-                    value={date}
-                    min={minDate}
-                    onChange={setDate}
-                  />
-                </div>
-              </label>
-              <label className="block text-[13px] font-medium text-slate-600">
-                Time
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(event) => setTime(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
-              {error ? (
-                <p className="text-[12px] font-medium text-rose-600">{error}</p>
-              ) : null}
-            </div>
-          ) : (
-            <dl className="space-y-3 text-[13px]">
-              <div className="flex justify-between gap-3 border-b border-slate-50 pb-2">
-                <dt className="text-slate-400">Related to</dt>
-                <dd className="min-w-0 text-right font-semibold text-slate-800">
-                  <RelatedRecordLink kind={row.relatedKind} id={row.relatedId} />
-                </dd>
-              </div>
-              <Row
-                label="Consultant"
-                value={
-                  consultant?.name ||
-                  row.consultantName ||
-                  appointmentConsultantName(row.consultantId)
-                }
-              />
-              <Row label="Role" value={consultant?.role ?? ""} />
-              <Row
-                label="Time & Date"
-                value={`${formatApptTime(row.start)} · ${formatApptDate(row.start)}`}
-              />
-              <Row label="Status" value={row.status} />
-              <Row label="Channel" value={row.channel} />
-            </dl>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
-          {editing ? (
-            <>
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveEdit()}
-                className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            </>
-          ) : (
+              {editing ? "Edit appointment" : "Appointment detail"}
+            </h3>
             <button
               type="button"
-              onClick={onEdit}
-              className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
+              <X className="h-4 w-4" />
             </button>
-          )}
+          </div>
+          <div className="space-y-4 overflow-auto px-5 py-5">
+            <div className="flex items-center gap-3">
+              <span
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold",
+                  row.avatarClass,
+                )}
+              >
+                {appointmentInitials(row.guestName)}
+              </span>
+              <div>
+                <p className="text-[16px] font-bold text-slate-900">
+                  {row.guestName}
+                </p>
+                <p className="text-[13px] text-slate-500">{row.topic}</p>
+              </div>
+            </div>
+            {editing ? (
+              <div className="space-y-3">
+                <label className="block text-[13px] font-medium text-slate-600">
+                  Date
+                  <div className="mt-1">
+                    <AppointmentDateField
+                      value={date}
+                      min={minDate}
+                      onChange={setDate}
+                    />
+                  </div>
+                </label>
+                <label className="block text-[13px] font-medium text-slate-600">
+                  Time
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(event) => setTime(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  />
+                </label>
+                {error ? (
+                  <p className="text-[12px] font-medium text-rose-600">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <dl className="space-y-3 text-[13px]">
+                <div className="flex justify-between gap-3 border-b border-slate-50 pb-2">
+                  <dt className="text-slate-400">Related to</dt>
+                  <dd className="min-w-0 text-right font-semibold text-slate-800">
+                    <RelatedRecordLink
+                      kind={row.relatedKind}
+                      id={row.relatedId}
+                    />
+                  </dd>
+                </div>
+                <Row
+                  label="Consultant"
+                  value={
+                    consultant?.name ||
+                    row.consultantName ||
+                    appointmentConsultantName(row.consultantId)
+                  }
+                />
+                <Row label="Role" value={consultant?.role ?? ""} />
+                <Row
+                  label="Time & Date"
+                  value={`${formatApptTime(row.start)} · ${formatApptDate(row.start)}`}
+                />
+                <Row label="Status" value={row.status} />
+                <Row label="Channel" value={row.channel} />
+              </dl>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
+            {editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void saveEdit()}
+                  className={cn(
+                    FINANCE_PRIMARY_BUTTON_SM,
+                    "h-9 px-4 text-[13px]",
+                  )}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onEdit}
+                className={cn(
+                  FINANCE_PRIMARY_BUTTON_SM,
+                  "h-9 px-4 text-[13px]",
+                )}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </WorkspacePortal>
   );
 }
 
@@ -1750,8 +1839,12 @@ function formatSummaryWhen(row: DashboardAppointment) {
 function formatDurationPhrase(row: DashboardAppointment) {
   const start = parseAppointmentStart(row.start);
   const end = row.end ? parseAppointmentStart(row.end) : null;
-  if (!end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "";
-  const mins = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+  if (!end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
+    return "";
+  const mins = Math.max(
+    0,
+    Math.round((end.getTime() - start.getTime()) / 60000),
+  );
   if (!mins) return "";
   const hours = Math.floor(mins / 60);
   const rest = mins % 60;
@@ -1784,7 +1877,9 @@ function AppointmentSummary({
   onCancel: () => void;
   onDelete: () => void;
 }) {
-  const [tab, setTab] = useState<"appointment" | "customer" | "audit">("appointment");
+  const [tab, setTab] = useState<"appointment" | "customer" | "audit">(
+    "appointment",
+  );
   const tabs = [
     { id: "appointment" as const, label: "Appointment Info" },
     { id: "customer" as const, label: "Client Info" },
@@ -1792,107 +1887,119 @@ function AppointmentSummary({
   ];
 
   return (
-    <div className="fixed inset-0 z-[80] flex justify-end bg-slate-900/35" onClick={onClose}>
+    <WorkspacePortal>
       <div
-        role="dialog"
-        aria-labelledby="appointment-summary-title"
-        className="flex h-full w-full max-w-[560px] flex-col bg-white shadow-[-12px_0_40px_rgba(15,23,42,0.12)]"
-        onClick={(event) => event.stopPropagation()}
+        className="fixed inset-0 z-[80] flex justify-end bg-slate-900/35"
+        onClick={onClose}
       >
-        <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <h3 id="appointment-summary-title" className="text-[15px] font-semibold text-slate-800">
-            Appointment Summary
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">
-          <div className="rounded-lg border border-[#E7E9F2] bg-[#F8F7FC] px-4 py-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-[15px] font-semibold leading-snug text-slate-900">{whenLabel}</p>
-              <BookingStatusMenu
-                status={row.status}
-                tone="blue"
-                onEdit={onEdit}
-                onReschedule={onReschedule}
-                onCancel={onCancel}
-                onDelete={onDelete}
-              />
-            </div>
-            <p className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-500">
-              <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <span className="truncate">
-                {row.guestName}
-                {email ? `, ${email}` : ""}
-              </span>
-            </p>
+        <div
+          role="dialog"
+          aria-labelledby="appointment-summary-title"
+          className="flex h-full w-full max-w-[560px] flex-col bg-white shadow-[-12px_0_40px_rgba(15,23,42,0.12)]"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <h3
+              id="appointment-summary-title"
+              className="text-[15px] font-semibold text-slate-800"
+            >
+              Appointment Summary
+            </h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-
-          <div className="mt-4 overflow-hidden rounded-lg border border-[#E6E8F0]">
-            <div className="flex gap-1 border-b border-[#E6E8F0] px-3">
-              {tabs.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={cn(
-                    "-mb-px border-b-2 px-2.5 py-3 text-[13px] font-medium",
-                    tab === item.id
-                      ? "border-[var(--brand-primary-strong)] text-[var(--brand-primary-strong)]"
-                      : "border-transparent text-slate-500 hover:text-slate-700",
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8">
+            <div className="rounded-lg border border-[#E7E9F2] bg-[#F8F7FC] px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[15px] font-semibold leading-snug text-slate-900">
+                  {whenLabel}
+                </p>
+                <BookingStatusMenu
+                  status={row.status}
+                  tone="blue"
+                  onEdit={onEdit}
+                  onReschedule={onReschedule}
+                  onCancel={onCancel}
+                  onDelete={onDelete}
+                />
+              </div>
+              <p className="mt-2 flex items-center gap-1.5 text-[13px] text-slate-500">
+                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">
+                  {row.guestName}
+                  {email ? `, ${email}` : ""}
+                </span>
+              </p>
             </div>
 
-            {tab === "appointment" ? (
-              <div>
-                <SummaryRow label="Consultation">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#7C6BF2] text-[9px] font-bold text-white">
-                      {eventTypeInitials(eventName)}
-                    </span>
-                    <span className="truncate">{eventName}</span>
-                  </span>
-                </SummaryRow>
-                <SummaryRow label="Consultant">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                      <User className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="truncate">{consultantLabel(row)}</span>
-                  </span>
-                </SummaryRow>
-                <SummaryRow label="Time & Date">
-                  <span className="inline-flex items-center gap-2">
-                    <Clock className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span>
-                      {timeLabel} · {formatApptDate(row.start)}
-                    </span>
-                  </span>
-                </SummaryRow>
-                <SummaryRow label="Booked IP Address">—</SummaryRow>
-                <SummaryRow label="Booked Source">In App</SummaryRow>
+            <div className="mt-4 overflow-hidden rounded-lg border border-[#E6E8F0]">
+              <div className="flex gap-1 border-b border-[#E6E8F0] px-3">
+                {tabs.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    className={cn(
+                      "-mb-px border-b-2 px-2.5 py-3 text-[13px] font-medium",
+                      tab === item.id
+                        ? "border-[var(--brand-primary-strong)] text-[var(--brand-primary-strong)]"
+                        : "border-transparent text-slate-500 hover:text-slate-700",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
-            ) : null}
 
-            {tab === "customer" ? (
-              <CustomerInfoTab row={row} email={email} />
-            ) : null}
+              {tab === "appointment" ? (
+                <div>
+                  <SummaryRow label="Consultation">
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#7C6BF2] text-[9px] font-bold text-white">
+                        {eventTypeInitials(eventName)}
+                      </span>
+                      <span className="truncate">{eventName}</span>
+                    </span>
+                  </SummaryRow>
+                  <SummaryRow label="Consultant">
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                        <User className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate">{consultantLabel(row)}</span>
+                    </span>
+                  </SummaryRow>
+                  <SummaryRow label="Time & Date">
+                    <span className="inline-flex items-center gap-2">
+                      <Clock className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span>
+                        {timeLabel} · {formatApptDate(row.start)}
+                      </span>
+                    </span>
+                  </SummaryRow>
+                  <SummaryRow label="Booked IP Address">—</SummaryRow>
+                  <SummaryRow label="Booked Source">In App</SummaryRow>
+                </div>
+              ) : null}
 
-            {tab === "audit" ? <AuditInfoTab row={row} email={email} /> : null}
+              {tab === "customer" ? (
+                <CustomerInfoTab row={row} email={email} />
+              ) : null}
+
+              {tab === "audit" ? (
+                <AuditInfoTab row={row} email={email} />
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </WorkspacePortal>
   );
 }
 
@@ -1903,7 +2010,9 @@ function CustomerInfoTab({
   row: DashboardAppointment;
   email: string;
 }) {
-  const [section, setSection] = useState<"booking" | "questions" | "payment">("booking");
+  const [section, setSection] = useState<"booking" | "questions" | "payment">(
+    "booking",
+  );
   const paid = row.paymentStatus === "Paid";
   const sections = [
     { id: "booking" as const, label: "Booking Info" },
@@ -1921,13 +2030,19 @@ function CustomerInfoTab({
             <span className="block truncate text-[14px] font-semibold text-slate-800">
               {row.guestName}
             </span>
-            <span className="block truncate text-[12px] text-slate-400">{email || "—"}</span>
+            <span className="block truncate text-[12px] text-slate-400">
+              {email || "—"}
+            </span>
           </span>
         </div>
         <span
           className={cn(
             "inline-flex shrink-0 items-center gap-1 text-[13px] font-medium",
-            paid ? "text-red-500" : row.paymentStatus === "Due" ? "text-amber-600" : "text-slate-400",
+            paid
+              ? "text-red-500"
+              : row.paymentStatus === "Due"
+                ? "text-amber-600"
+                : "text-slate-400",
           )}
         >
           <CreditCard className="h-3.5 w-3.5" />
@@ -1954,7 +2069,9 @@ function CustomerInfoTab({
       {section === "booking" ? (
         <div>
           <SummaryRow label="Booking ID">{row.bookingCode || "—"}</SummaryRow>
-          <SummaryRow label="Booked On">{formatBookedOn(row.bookedOn)}</SummaryRow>
+          <SummaryRow label="Booked On">
+            {formatBookedOn(row.bookedOn)}
+          </SummaryRow>
           <SummaryRow label="Contact Number">{row.phone || "—"}</SummaryRow>
           <SummaryRow label="Notes">
             <span className="whitespace-pre-line">{row.notes || "—"}</span>
@@ -1964,9 +2081,7 @@ function CustomerInfoTab({
       {section === "questions" ? (
         <p className="px-4 py-6 text-[13px] text-slate-400">No answers yet.</p>
       ) : null}
-      {section === "payment" ? (
-        <PaymentBreakdown row={row} />
-      ) : null}
+      {section === "payment" ? <PaymentBreakdown row={row} /> : null}
     </div>
   );
 }
@@ -1979,12 +2094,18 @@ function PaymentBreakdown({ row }: { row: DashboardAppointment }) {
   return (
     <div>
       <SummaryRow label="Status">
-        <span className={status === "Paid" ? "font-medium text-red-500" : undefined}>
+        <span
+          className={status === "Paid" ? "font-medium text-red-500" : undefined}
+        >
           {status}
         </span>
       </SummaryRow>
-      <SummaryRow label="Total">{formatPaymentAmount(total, row.currency)}</SummaryRow>
-      <SummaryRow label="Paid">{formatPaymentAmount(paidAmount, row.currency)}</SummaryRow>
+      <SummaryRow label="Total">
+        {formatPaymentAmount(total, row.currency)}
+      </SummaryRow>
+      <SummaryRow label="Paid">
+        {formatPaymentAmount(paidAmount, row.currency)}
+      </SummaryRow>
       <SummaryRow label="To Be Paid">
         <span className="font-medium text-red-500">
           {formatPaymentAmount(outstanding, row.currency, outstanding === 0)}
@@ -1994,22 +2115,39 @@ function PaymentBreakdown({ row }: { row: DashboardAppointment }) {
   );
 }
 
-function formatPaymentAmount(amount: number, currency?: string, plainZero = false) {
+function formatPaymentAmount(
+  amount: number,
+  currency?: string,
+  plainZero = false,
+) {
   const known = ["NPR", "INR", "AUD", "USD", "GBP"];
-  const code = (known.includes(currency || "") ? currency : "NPR") as BookingCurrency;
+  const code = (
+    known.includes(currency || "") ? currency : "NPR"
+  ) as BookingCurrency;
   const prefix = currencyPrefix(code);
   const value = Number.isFinite(amount) ? Math.max(0, amount) : 0;
   if (plainZero || value === 0) return `${prefix} 0`;
   return `${prefix} ${value.toFixed(2)}`;
 }
 
-function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string }) {
+function AuditInfoTab({
+  row,
+  email,
+}: {
+  row: DashboardAppointment;
+  email: string;
+}) {
   const when = row.bookedOn ? parseAppointmentStart(row.bookedOn) : null;
   const valid = !!when && !Number.isNaN(when.getTime());
   const actor = row.createdBy || consultantLabel(row);
   const events = [
     ...(email
-      ? [{ id: "email" as const, text: "Email notification to Client sent for appointment" }]
+      ? [
+          {
+            id: "email" as const,
+            text: "Email notification to Client sent for appointment",
+          },
+        ]
       : []),
     { id: "created" as const, text: "Appointment created by" },
   ];
@@ -2035,7 +2173,9 @@ function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string
 
         {events.map((event, index) => (
           <div key={event.id} className="contents">
-            <div className="pt-5 text-right text-[12px] leading-7 text-slate-400">{timeLabel}</div>
+            <div className="pt-5 text-right text-[12px] leading-7 text-slate-400">
+              {timeLabel}
+            </div>
             <div className="relative">
               <span
                 className={cn(
@@ -2069,8 +2209,29 @@ function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string
   );
 }
 
-const AUDIT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const AUDIT_WEEKDAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const AUDIT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const AUDIT_WEEKDAYS = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+];
 
 function formatBookedOn(value?: string) {
   if (!value) return "—";
@@ -2079,7 +2240,11 @@ function formatBookedOn(value?: string) {
   const day = String(date.getDate()).padStart(2, "0");
   const month = date.toLocaleDateString("en-GB", { month: "short" });
   const time = date
-    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
     .replace(" AM", " am")
     .replace(" PM", " pm");
   return `${day} ${month} ${date.getFullYear()} ${time}`;
@@ -2092,7 +2257,11 @@ function formatAuditDate(date: Date) {
 
 function formatAuditTime(date: Date) {
   return date
-    .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+    .toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
     .replace(" AM", " am")
     .replace(" PM", " pm")
     .toLowerCase();
@@ -2172,62 +2341,67 @@ function PagesPanel({
         storageKey="bookings-pages-list"
         className="min-w-0 overflow-x-auto"
       >
-      <table className="w-full min-w-[640px] text-left text-[13px]">
-        <thead>
-          <tr className="border-b border-slate-100 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
-            <th className="px-5 py-3">Page</th>
-            <th className="px-3 py-3">Type</th>
-            <th className="px-3 py-3">Owner</th>
-            <th className="px-3 py-3">Duration</th>
-            <th className="px-3 py-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pages.map((p) => (
-            <tr
-              key={p.id}
-              onClick={() => onOpenPage(p.id)}
-              className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-[var(--brand-primary-soft)]"
-            >
-              <td className="px-5 py-3">
-                <p className="font-semibold text-slate-900">{p.title}</p>
-                <a
-                  href={publicBookUrl(p.slug)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-[11px] hover:underline"
-                  style={{ color: BRAND }}
-                >
-                  /book/{p.slug}
-                </a>
-              </td>
-              <td className="px-3 py-3 text-slate-600">{p.eventType}</td>
-              <td className="px-3 py-3 text-slate-600">{p.owner}</td>
-              <td className="px-3 py-3 text-slate-600">{p.durationMinutes} min</td>
-              <td className="px-3 py-3">
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    p.status === "Live"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-slate-100 text-slate-600",
-                  )}
-                >
-                  {p.status}
-                </span>
-              </td>
+        <table className="w-full min-w-[640px] text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-slate-100 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+              <th className="px-5 py-3">Page</th>
+              <th className="px-3 py-3">Type</th>
+              <th className="px-3 py-3">Owner</th>
+              <th className="px-3 py-3">Duration</th>
+              <th className="px-3 py-3">Status</th>
             </tr>
-          ))}
-          {pages.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
-                {loading
-                  ? "Loading consultation pages…"
-                  : "No consultation pages yet."}
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pages.map((p) => (
+              <tr
+                key={p.id}
+                onClick={() => onOpenPage(p.id)}
+                className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-[var(--brand-primary-soft)]"
+              >
+                <td className="px-5 py-3">
+                  <p className="font-semibold text-slate-900">{p.title}</p>
+                  <a
+                    href={publicBookUrl(p.slug)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[11px] hover:underline"
+                    style={{ color: BRAND }}
+                  >
+                    /book/{p.slug}
+                  </a>
+                </td>
+                <td className="px-3 py-3 text-slate-600">{p.eventType}</td>
+                <td className="px-3 py-3 text-slate-600">{p.owner}</td>
+                <td className="px-3 py-3 text-slate-600">
+                  {p.durationMinutes} min
+                </td>
+                <td className="px-3 py-3">
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                      p.status === "Live"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-slate-100 text-slate-600",
+                    )}
+                  >
+                    {p.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {pages.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-5 py-12 text-center text-slate-400"
+                >
+                  {loading
+                    ? "Loading consultation pages…"
+                    : "No consultation pages yet."}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </ResizableColumns>
     </section>
   );
@@ -2264,10 +2438,14 @@ function meetingsByConsultant(
     const start = parseAppointmentStart(row.start).getTime();
     const end = row.end ? parseAppointmentStart(row.end).getTime() : start;
     if (Number.isNaN(start)) continue;
-    (Math.max(start, end || start) < now ? bucket.completed : bucket.upcoming).push(row);
+    (Math.max(start, end || start) < now
+      ? bucket.completed
+      : bucket.upcoming
+    ).push(row);
   }
   for (const bucket of byId.values()) {
-    const at = (row: DashboardAppointment) => parseAppointmentStart(row.start).getTime();
+    const at = (row: DashboardAppointment) =>
+      parseAppointmentStart(row.start).getTime();
     bucket.upcoming.sort((a, b) => at(a) - at(b));
     bucket.completed.sort((a, b) => at(b) - at(a));
   }
@@ -2319,12 +2497,22 @@ function ConsultantsPanel({
               className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[var(--brand-primary)]/30 hover:bg-[#FBF9FE] focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/25 focus-visible:outline-none"
             >
               <div className="flex items-center gap-3">
-                <ConsultantFace name={c.name} photo={c.photo} className="h-12 w-12 shrink-0 text-[13px]" />
+                <ConsultantFace
+                  name={c.name}
+                  photo={c.photo}
+                  className="h-12 w-12 shrink-0 text-[13px]"
+                />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900">{c.name}</p>
-                  <p className="truncate text-[12px] text-slate-500">{c.role}</p>
+                  <p className="truncate font-semibold text-slate-900">
+                    {c.name}
+                  </p>
+                  <p className="truncate text-[12px] text-slate-500">
+                    {c.role}
+                  </p>
                   <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-semibold">
-                    <span className="text-emerald-600">{counts.completed.length} completed</span>
+                    <span className="text-emerald-600">
+                      {counts.completed.length} completed
+                    </span>
                     <span className="text-[var(--brand-primary,var(--brand-primary))]">
                       {counts.upcoming.length} upcoming
                     </span>
@@ -2364,7 +2552,7 @@ function ConsultantMeetingsModal({
   }, [onClose]);
 
   return (
-    <BodyPortal>
+    <WorkspacePortal>
       <div
         className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
         onClick={onClose}
@@ -2383,11 +2571,16 @@ function ConsultantMeetingsModal({
               className="h-10 w-10 shrink-0 text-[12px]"
             />
             <div className="min-w-0 flex-1">
-              <h2 id="consultant-meetings-title" className="truncate text-[16px] font-bold text-slate-900">
+              <h2
+                id="consultant-meetings-title"
+                className="truncate text-[16px] font-bold text-slate-900"
+              >
                 {consultant.name}
               </h2>
               <p className="text-[12px] font-semibold">
-                <span className="text-emerald-600">{meetings.completed.length} completed</span>
+                <span className="text-emerald-600">
+                  {meetings.completed.length} completed
+                </span>
                 <span className="text-slate-300"> · </span>
                 <span className="text-[var(--brand-primary,var(--brand-primary))]">
                   {meetings.upcoming.length} upcoming
@@ -2419,7 +2612,7 @@ function ConsultantMeetingsModal({
           </div>
         </div>
       </div>
-    </BodyPortal>
+    </WorkspacePortal>
   );
 }
 
@@ -2436,18 +2629,32 @@ function MeetingList({
 }) {
   return (
     <section>
-      <h3 className={cn("mb-2 text-[12px] font-bold tracking-wide uppercase", tone)}>
+      <h3
+        className={cn(
+          "mb-2 text-[12px] font-bold tracking-wide uppercase",
+          tone,
+        )}
+      >
         {title} <span className="text-slate-400">({rows.length})</span>
       </h3>
       {rows.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-3 py-3 text-[12px] text-slate-500">{empty}</p>
+        <p className="rounded-lg bg-slate-50 px-3 py-3 text-[12px] text-slate-500">
+          {empty}
+        </p>
       ) : (
         <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
           {rows.map((row) => (
-            <li key={row.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5">
+            <li
+              key={row.id}
+              className="flex flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5"
+            >
               <div className="w-[118px] shrink-0">
-                <p className="text-[12px] font-semibold text-slate-800">{formatGroupDate(row.start)}</p>
-                <p className="text-[11px] text-slate-500">{formatTimeRange(row)}</p>
+                <p className="text-[12px] font-semibold text-slate-800">
+                  {formatGroupDate(row.start)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {formatTimeRange(row)}
+                </p>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold text-slate-900">
@@ -2459,7 +2666,10 @@ function MeetingList({
               </div>
               {row.relatedId ? (
                 <div className="shrink-0 text-[12px]">
-                  <RelatedRecordLink kind={row.relatedKind} id={row.relatedId} />
+                  <RelatedRecordLink
+                    kind={row.relatedKind}
+                    id={row.relatedId}
+                  />
                 </div>
               ) : null}
             </li>

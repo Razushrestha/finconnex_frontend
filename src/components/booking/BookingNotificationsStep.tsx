@@ -25,6 +25,7 @@ import {
   type NotifyChannel,
 } from "@/lib/booking/notify-prefs";
 import { sendNotifyTest } from "@/lib/booking/notify";
+import { WorkspacePortal } from "@/components/shared/WorkspacePortal";
 
 export type { NotificationRow, NotifyChannel };
 export { DEFAULT_NOTIFICATIONS };
@@ -74,7 +75,10 @@ export function BookingNotificationsStep({
     setRows((prev) =>
       prev.map((r) =>
         r.id === id
-          ? { ...r, channels: { ...r.channels, [channel]: !r.channels[channel] } }
+          ? {
+              ...r,
+              channels: { ...r.channels, [channel]: !r.channels[channel] },
+            }
           : r,
       ),
     );
@@ -84,7 +88,9 @@ export function BookingNotificationsStep({
     <div className="mx-auto w-full max-w-[920px] pb-8">
       <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
         <div className="border-b border-[#E5E7EB] px-5 py-5 sm:px-7">
-          <h1 className="text-[18px] font-bold text-slate-900">Notifications</h1>
+          <h1 className="text-[18px] font-bold text-slate-900">
+            Notifications
+          </h1>
         </div>
 
         <div className="divide-y divide-[#F3F4F6]">
@@ -280,7 +286,10 @@ function TestSend({
       {note ? (
         <p
           role="status"
-          className={cn("mt-2 text-[12px]", failed ? "text-rose-600" : "text-emerald-700")}
+          className={cn(
+            "mt-2 text-[12px]",
+            failed ? "text-rose-600" : "text-emerald-700",
+          )}
         >
           {note}
         </p>
@@ -373,229 +382,259 @@ export function NotificationEditModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
-      // Closing needs the press and the release on the backdrop: dragging to
-      // select text and letting go outside the window must not throw away edits.
-      onMouseDown={(event) => {
-        pressedOnBackdrop.current = event.target === event.currentTarget;
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget && pressedOnBackdrop.current) onClose();
-        pressedOnBackdrop.current = false;
-      }}
-    >
+    <WorkspacePortal>
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="flex max-h-[92vh] w-full max-w-[800px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
+        // Closing needs the press and the release on the backdrop: dragging to
+        // select text and letting go outside the window must not throw away edits.
+        onMouseDown={(event) => {
+          pressedOnBackdrop.current = event.target === event.currentTarget;
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget && pressedOnBackdrop.current)
+            onClose();
+          pressedOnBackdrop.current = false;
+        }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-4">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-[16px] font-semibold text-slate-900">
-              Edit {row.title}
-            </h2>
-            <p className="mt-0.5 text-[12.5px] leading-5 text-slate-500">{row.info}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
-
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div className="flex items-end justify-between gap-3 border-b border-[#E5E7EB]">
-            <div className="flex gap-5">
-              {tabs.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setTab(c)}
-                  className={cn(
-                    "-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors",
-                    tab === c
-                      ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
-                      : "border-transparent text-slate-500 hover:text-slate-800",
-                  )}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-            <label className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-slate-600">
-              Enabled
-              <button
-                type="button"
-                role="switch"
-                aria-checked={enabled}
-                onClick={() =>
-                  setDraft((d) => ({
-                    ...d,
-                    channels: { ...d.channels, [tab]: !d.channels[tab] },
-                  }))
-                }
-                className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 focus-visible:ring-offset-2",
-                  enabled ? "bg-[var(--brand-primary)]" : "bg-slate-300",
-                )}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          className="flex max-h-[92vh] w-full max-w-[800px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-4">
+            <div className="min-w-0">
+              <h2
+                id={titleId}
+                className="text-[16px] font-semibold text-slate-900"
               >
-                <span
-                  className={cn(
-                    "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                    enabled && "translate-x-5",
-                  )}
-                />
-              </button>
-            </label>
+                Edit {row.title}
+              </h2>
+              <p className="mt-0.5 text-[12.5px] leading-5 text-slate-500">
+                {row.info}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
           </div>
 
-          {tab === "Email" ? (
-            <div className="space-y-5">
-              <div>
-                <label htmlFor={subjectId} className={LABEL}>
-                  Subject<Required />
-                </label>
-                <div className="relative mt-1.5">
-                  <input
-                    id={subjectId}
-                    ref={subjectRef}
-                    value={draft.emailSubject}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, emailSubject: e.target.value }))
-                    }
-                    className={cn(INPUT, "pr-[150px]")}
-                  />
-                  <div className="absolute top-1/2 right-1.5 -translate-y-1/2">
-                    <NotifyVariableMenu
-                      onInsert={(token) => insertToken("emailSubject", token)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  <label htmlFor={bodyId} className={LABEL}>
-                    Email body<Required />
-                  </label>
-                  <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto sm:flex-nowrap">
-                    <span className="text-[12px] text-slate-500">
-                      Select Date Format For Mail:
-                    </span>
-                    <ListboxSelect
-                      compact
-                      label="Select date format for mail"
-                      value={dateFormat}
-                      options={dateOptions}
-                      onChange={(value) => setDraft((d) => ({ ...d, dateFormat: value }))}
-                      className="w-full sm:w-[230px]"
-                    />
-                  </div>
-                </div>
-                <MessageBox
-                  id={bodyId}
-                  textareaRef={bodyRef}
-                  value={draft.emailBody}
-                  rows={9}
-                  onChange={(emailBody) => setDraft((d) => ({ ...d, emailBody }))}
-                  onReset={() =>
-                    setDraft((d) => ({ ...d, emailBody: defaults?.emailBody ?? d.emailBody }))
-                  }
-                  tools={
-                    <NotifyVariableMenu
-                      onInsert={(token) => insertToken("emailBody", token)}
-                    />
-                  }
-                  hint="Dates in the message follow the format above."
-                />
-              </div>
-            </div>
-          ) : tab === "SMS" ? (
-            <div className="space-y-5">
-              <div>
-                <label htmlFor={smsId} className={LABEL}>
-                  SMS message<Required />
-                </label>
-                <div className="mt-1.5">
-                  <MessageBox
-                    id={smsId}
-                    value={draft.smsBody}
-                    rows={5}
-                    onChange={(smsBody) => setDraft((d) => ({ ...d, smsBody }))}
-                    onReset={() =>
-                      setDraft((d) => ({ ...d, smsBody: defaults?.smsBody ?? d.smsBody }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <TestSend
-                id={testPhoneId}
-                label="Test SMS (enter phone number with country code)"
-                value={testPhone}
-                onChange={setTestPhone}
-                buttonLabel="Send test SMS"
-                busy={testing}
-                onSend={() => void runTest("SMS")}
-                note={testNote}
-                failed={testFailed}
-              />
-            </div>
-          ) : (
-            <div className="rounded-lg bg-slate-50 px-4 py-4 text-[13px] leading-6 text-slate-600">
-              <p>
-                {tab === "In-app"
-                  ? "In-app alerts go to the assigned consultant’s FinConnex notification inbox."
-                  : "WhatsApp uses the same message as SMS and sends to the guest phone."}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={testing}
-                  onClick={() => void runTest(tab === "WhatsApp" ? "WhatsApp" : "In-app")}
-                  className={SECONDARY_BUTTON}
-                >
-                  {tab === "WhatsApp" ? "Send test WhatsApp" : "Send test in-app"}
-                </button>
-                {testNote ? (
-                  <p
-                    role="status"
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            <div className="flex items-end justify-between gap-3 border-b border-[#E5E7EB]">
+              <div className="flex gap-5">
+                {tabs.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setTab(c)}
                     className={cn(
-                      "text-[12px]",
-                      testFailed ? "text-rose-600" : "text-emerald-700",
+                      "-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors",
+                      tab === c
+                        ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+                        : "border-transparent text-slate-500 hover:text-slate-800",
                     )}
                   >
-                    {testNote}
-                  </p>
-                ) : null}
+                    {c}
+                  </button>
+                ))}
               </div>
+              <label className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-slate-600">
+                Enabled
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  onClick={() =>
+                    setDraft((d) => ({
+                      ...d,
+                      channels: { ...d.channels, [tab]: !d.channels[tab] },
+                    }))
+                  }
+                  className={cn(
+                    "relative h-6 w-11 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 focus-visible:ring-offset-2",
+                    enabled ? "bg-[var(--brand-primary)]" : "bg-slate-300",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                      enabled && "translate-x-5",
+                    )}
+                  />
+                </button>
+              </label>
             </div>
-          )}
-        </div>
 
-        <div className="flex items-center gap-2 border-t border-[#E5E7EB] px-6 py-4">
-          <button
-            type="button"
-            onClick={() => onSave(draft)}
-            className="h-10 rounded-lg px-6 text-[13px] font-semibold text-white transition hover:brightness-110"
-            style={{ backgroundColor: BRAND }}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-10 rounded-lg border border-[#E5E7EB] bg-white px-5 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            Cancel
-          </button>
+            {tab === "Email" ? (
+              <div className="space-y-5">
+                <div>
+                  <label htmlFor={subjectId} className={LABEL}>
+                    Subject
+                    <Required />
+                  </label>
+                  <div className="relative mt-1.5">
+                    <input
+                      id={subjectId}
+                      ref={subjectRef}
+                      value={draft.emailSubject}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          emailSubject: e.target.value,
+                        }))
+                      }
+                      className={cn(INPUT, "pr-[150px]")}
+                    />
+                    <div className="absolute top-1/2 right-1.5 -translate-y-1/2">
+                      <NotifyVariableMenu
+                        onInsert={(token) => insertToken("emailSubject", token)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <label htmlFor={bodyId} className={LABEL}>
+                      Email body
+                      <Required />
+                    </label>
+                    <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto sm:flex-nowrap">
+                      <span className="text-[12px] text-slate-500">
+                        Select Date Format For Mail:
+                      </span>
+                      <ListboxSelect
+                        compact
+                        label="Select date format for mail"
+                        value={dateFormat}
+                        options={dateOptions}
+                        onChange={(value) =>
+                          setDraft((d) => ({ ...d, dateFormat: value }))
+                        }
+                        className="w-full sm:w-[230px]"
+                      />
+                    </div>
+                  </div>
+                  <MessageBox
+                    id={bodyId}
+                    textareaRef={bodyRef}
+                    value={draft.emailBody}
+                    rows={9}
+                    onChange={(emailBody) =>
+                      setDraft((d) => ({ ...d, emailBody }))
+                    }
+                    onReset={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        emailBody: defaults?.emailBody ?? d.emailBody,
+                      }))
+                    }
+                    tools={
+                      <NotifyVariableMenu
+                        onInsert={(token) => insertToken("emailBody", token)}
+                      />
+                    }
+                    hint="Dates in the message follow the format above."
+                  />
+                </div>
+              </div>
+            ) : tab === "SMS" ? (
+              <div className="space-y-5">
+                <div>
+                  <label htmlFor={smsId} className={LABEL}>
+                    SMS message
+                    <Required />
+                  </label>
+                  <div className="mt-1.5">
+                    <MessageBox
+                      id={smsId}
+                      value={draft.smsBody}
+                      rows={5}
+                      onChange={(smsBody) =>
+                        setDraft((d) => ({ ...d, smsBody }))
+                      }
+                      onReset={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          smsBody: defaults?.smsBody ?? d.smsBody,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <TestSend
+                  id={testPhoneId}
+                  label="Test SMS (enter phone number with country code)"
+                  value={testPhone}
+                  onChange={setTestPhone}
+                  buttonLabel="Send test SMS"
+                  busy={testing}
+                  onSend={() => void runTest("SMS")}
+                  note={testNote}
+                  failed={testFailed}
+                />
+              </div>
+            ) : (
+              <div className="rounded-lg bg-slate-50 px-4 py-4 text-[13px] leading-6 text-slate-600">
+                <p>
+                  {tab === "In-app"
+                    ? "In-app alerts go to the assigned consultant’s FinConnex notification inbox."
+                    : "WhatsApp uses the same message as SMS and sends to the guest phone."}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={testing}
+                    onClick={() =>
+                      void runTest(tab === "WhatsApp" ? "WhatsApp" : "In-app")
+                    }
+                    className={SECONDARY_BUTTON}
+                  >
+                    {tab === "WhatsApp"
+                      ? "Send test WhatsApp"
+                      : "Send test in-app"}
+                  </button>
+                  {testNote ? (
+                    <p
+                      role="status"
+                      className={cn(
+                        "text-[12px]",
+                        testFailed ? "text-rose-600" : "text-emerald-700",
+                      )}
+                    >
+                      {testNote}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 border-t border-[#E5E7EB] px-6 py-4">
+            <button
+              type="button"
+              onClick={() => onSave(draft)}
+              className="h-10 rounded-lg px-6 text-[13px] font-semibold text-white transition hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 rounded-lg border border-[#E5E7EB] bg-white px-5 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </WorkspacePortal>
   );
 }

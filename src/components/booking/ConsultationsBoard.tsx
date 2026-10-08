@@ -63,7 +63,7 @@ import { BookingPageDesigner } from "@/components/booking/BookingPageDesigner";
 import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
-import { BodyPortal } from "@/components/shared/BodyPortal";
+import { WorkspacePortal } from "@/components/shared/WorkspacePortal";
 import { currentZoneName } from "@/lib/booking/all-timezones";
 import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
@@ -107,7 +107,9 @@ type SectionFilter = (typeof SECTION_FILTERS)[number];
 
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
   const remote = await tryCrmBooking(() => listCrmEventTypePages());
-  const local = listBookingPages().filter((page) => page.eventType === "Consultation");
+  const local = listBookingPages().filter(
+    (page) => page.eventType === "Consultation",
+  );
   if (remote == null) return local;
   const merged = mergeCrmEventTypePages(local, remote).filter(
     (page) => page.eventType === "Consultation",
@@ -181,18 +183,15 @@ export function ConsultationsBoard() {
   const [notifyValues, setNotifyValues] = useState<NotificationRow[] | null>(
     null,
   );
-  const [notifyReminders, setNotifyReminders] = useState<
-    BookingPage["notifyReminders"]
-  >(undefined);
+  const [notifyReminders, setNotifyReminders] =
+    useState<BookingPage["notifyReminders"]>(undefined);
   const [emailNotifyConfig, setEmailNotifyConfig] = useState<
     EmailNotifyConfig | undefined
   >(undefined);
-  const [whatsappNotifyConfig, setWhatsappNotifyConfig] = useState<
-    BookingPage["whatsappNotifyConfig"]
-  >(undefined);
-  const [calendarInvite, setCalendarInvite] = useState<
-    BookingPage["calendarInvite"]
-  >(undefined);
+  const [whatsappNotifyConfig, setWhatsappNotifyConfig] =
+    useState<BookingPage["whatsappNotifyConfig"]>(undefined);
+  const [calendarInvite, setCalendarInvite] =
+    useState<BookingPage["calendarInvite"]>(undefined);
   const [settingsStep, setSettingsStep] = useState(false);
   const [pageStep, setPageStep] = useState(false);
   const draftPageId = useRef(`wizard-page-${Date.now()}`).current;
@@ -410,7 +409,8 @@ export function ConsultationsBoard() {
           : Object.values(assignedUserIds).filter(Boolean),
         bufferBeforeMinutes: page.bufferMinutes,
         // Only sent when set, so the default create request is unchanged.
-        bufferAfterMinutes: page.schedulingRules?.postBufferMinutes || undefined,
+        bufferAfterMinutes:
+          page.schedulingRules?.postBufferMinutes || undefined,
         minimumNoticeMinutes: Math.round((page.minNoticeHours ?? 2) * 60),
         maxDaysInFuture: page.maxAdvanceDays,
       }),
@@ -451,7 +451,10 @@ export function ConsultationsBoard() {
   useEffect(() => {
     if (!sectionOpen) return;
     function onDoc(e: MouseEvent) {
-      if (sectionRef.current && !sectionRef.current.contains(e.target as Node)) {
+      if (
+        sectionRef.current &&
+        !sectionRef.current.contains(e.target as Node)
+      ) {
         setSectionOpen(false);
       }
     }
@@ -508,7 +511,9 @@ export function ConsultationsBoard() {
           </button>
           <button
             type="button"
-            onClick={() => void finishConsultation(formValues, additionalValues ?? undefined)}
+            onClick={() =>
+              void finishConsultation(formValues, additionalValues ?? undefined)
+            }
             className="h-10 min-w-[96px] rounded-lg bg-[var(--brand-primary)] px-6 text-[13px] font-semibold text-white hover:brightness-110"
           >
             Finish setup
@@ -830,7 +835,8 @@ export function ConsultationsBoard() {
       ) : filtered.length === 0 ? (
         <div className="space-y-3">
           <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
-            No consultation pages yet. Create one to start sharing booking links.
+            No consultation pages yet. Create one to start sharing booking
+            links.
           </p>
         </div>
       ) : view === "grid" ? (
@@ -920,7 +926,9 @@ function ChooseCalendarTypeModal({
   onSelect: (choice: CalendarTypeChoice) => void;
 }) {
   const [more, setMore] = useState(false);
-  const types = more ? [...CALENDAR_TYPES, ...MORE_CALENDAR_TYPES] : CALENDAR_TYPES;
+  const types = more
+    ? [...CALENDAR_TYPES, ...MORE_CALENDAR_TYPES]
+    : CALENDAR_TYPES;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -931,7 +939,7 @@ function ChooseCalendarTypeModal({
   }, [onClose]);
 
   return (
-    <BodyPortal>
+    <WorkspacePortal>
       <div
         className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
         onClick={onClose}
@@ -987,14 +995,17 @@ function ChooseCalendarTypeModal({
               className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
             >
               <ChevronRight
-                className={cn("h-4 w-4 transition-transform", more && "rotate-90")}
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  more && "rotate-90",
+                )}
               />
               {more ? "Show fewer types" : "Explore more types"}
             </button>
           </div>
         </div>
       </div>
-    </BodyPortal>
+    </WorkspacePortal>
   );
 }
 
@@ -1042,10 +1053,7 @@ function ConsultationCard({
       <div className="mt-8 flex items-center justify-between gap-3">
         <PeopleSlot people={people} />
         <div onClick={(e) => e.stopPropagation()}>
-          <ShareButton
-            slug={page.slug}
-            title={page.title}
-          />
+          <ShareButton slug={page.slug} title={page.title} />
         </div>
       </div>
     </article>
@@ -1093,10 +1101,7 @@ function ConsultationRow({
         onClick={(e) => e.stopPropagation()}
       >
         <PeopleSlot people={people} />
-        <ShareButton
-          slug={page.slug}
-          title={page.title}
-        />
+        <ShareButton slug={page.slug} title={page.title} />
         <CardMenu page={page} onOpen={onOpen} onRefresh={onRefresh} />
       </div>
     </div>
@@ -1272,13 +1277,7 @@ function BrandMark({ page }: { page: BookingPage }) {
   );
 }
 
-function ShareButton({
-  slug,
-  title,
-}: {
-  slug: string;
-  title: string;
-}) {
+function ShareButton({ slug, title }: { slug: string; title: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -1290,7 +1289,10 @@ function ShareButton({
           setOpen(true);
         }}
         className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold hover:bg-[var(--brand-primary-soft)]"
-        style={{ borderColor: `color-mix(in srgb, ${BRAND} 33%, transparent)`, color: BRAND }}
+        style={{
+          borderColor: `color-mix(in srgb, ${BRAND} 33%, transparent)`,
+          color: BRAND,
+        }}
       >
         <Share2 className="h-3.5 w-3.5" />
         Share
