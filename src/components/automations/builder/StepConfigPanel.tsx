@@ -67,6 +67,7 @@ import { EmailTemplateField } from "./EmailTemplateField";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
 import { SlideOverPanel } from "./SlideOverPanel";
+import { SendEmailActionForm } from "./SendEmailActionForm";
 import { TimezoneField } from "./TimezoneField";
 
 function useMembers() {
@@ -93,6 +94,9 @@ function useMembers() {
   return { members, status };
 }
 
+
+/** Actions whose panel shows their module's own page-sized form. */
+const WIDE_PANEL_ACTIONS = new Set<string>(["SEND_EMAIL"]);
 
 /** The config keys SEND_EMAIL renders through its own recipients block. */
 const EMAIL_RECIPIENT_KEYS = ["toEmail", "cc", "bcc"];
@@ -141,6 +145,10 @@ function ActionConfigForm({
   // Create Contact is the Create Contact modal's own form.
   if (step.action === "CREATE_CONTACT") {
     return <CreateContactActionForm config={config} entityType={entityType} onChange={onChange} />;
+  }
+  // Send Email is the Emails compose page, laid out in the panel.
+  if (step.action === "SEND_EMAIL") {
+    return <SendEmailActionForm config={config} entityType={entityType} onChange={onChange} />;
   }
   // Create Lead is the Create Lead modal's own form.
   if (step.action === "CREATE_LEAD") {
@@ -538,6 +546,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
 
   return (
     <SlideOverPanel
+      // Module-page forms need room for their own layout (the email editor's
+      // toolbar, the record forms' two columns).
+      className={draft.type === "ACTION" && WIDE_PANEL_ACTIONS.has(draft.action) ? "max-w-3xl" : undefined}
       title={meta?.label ?? "Configure Step"}
       subtitle={meta && "category" in meta ? meta.category : undefined}
       onClose={onClose}
