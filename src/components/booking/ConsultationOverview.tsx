@@ -126,20 +126,20 @@ function consultationInitials(title: string) {
 const SECTIONS = [
   {
     id: "details",
-    title: "Event Type Details",
+    title: "Consultation Details",
     hint: "Set the duration, payment type, and meeting mode.",
     icon: ClipboardList,
   },
   {
     id: "consultants",
-    title: "Assigned Users",
-    hint: "View Users who offer this event type.",
+    title: "Assigned Consultants",
+    hint: "View consultants who offer this consultation.",
     icon: Users,
   },
   {
     id: "availability",
     title: "Availability and Limits",
-    hint: "Set the date and time for this Event Type.",
+    hint: "Set the date and time for this Consultation.",
     icon: Clock,
   },
   {
@@ -157,7 +157,7 @@ const SECTIONS = [
   {
     id: "form",
     title: "Booking Form",
-    hint: "Collect Customer information during booking.",
+    hint: "Collect Client information during booking.",
     icon: FileCheck,
   },
   {
@@ -503,7 +503,7 @@ export function EventTypeEditForm({
     const durationMinutes = Math.max(5, hours * 60 + minutes);
     const paidAmount = Number(priceDraft);
     if (!isFree && (!Number.isFinite(paidAmount) || paidAmount <= 0)) {
-      setError("Enter a price for paid event types");
+      setError("Enter a price for paid consultations");
       return;
     }
     const meetingPlace =
@@ -1518,7 +1518,7 @@ export function ConsultationOverview({
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-x-12 gap-y-6 sm:grid-cols-2">
-                <Field label="Event Type Name">{page.title}</Field>
+                <Field label="Consultation Name">{page.title}</Field>
                 <Field label="Duration">
                   {formatDuration(page.durationMinutes || 30)}
                 </Field>

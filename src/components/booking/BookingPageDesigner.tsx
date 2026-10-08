@@ -312,14 +312,14 @@ function BasicThemePreview({
   const steps = [
     {
       id: "service" as const,
-      label: "Event Type",
+      label: "Consultation",
       icon: Clock,
       summary:
         stage !== "service" ? `${page.title} · ${formatDurationHours(page.durationMinutes)}` : null,
     },
     {
       id: "schedule" as const,
-      label: "Date, Time & User",
+      label: "Date, Time & Consultant",
       icon: CalendarClock,
       summary:
         stage === "details" ? `${String(day).padStart(2, "0")} Oct 2026 ${slot} · ${host}` : null,
@@ -739,7 +739,7 @@ function ClassicThemePreview({
               >
                 <CalendarClock className="h-4 w-4" />
               </span>
-              Date, Time & User
+              Date, Time & Consultant
             </p>
             <p className="text-[12px] text-slate-500">Your appointment will be booked with {host}</p>
           </div>

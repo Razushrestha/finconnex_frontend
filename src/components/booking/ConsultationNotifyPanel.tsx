@@ -89,19 +89,19 @@ function headingFor(panel: NotifyPanelId) {
 
 const CALENDAR_VARS = [
   { token: "%servicename%", label: "Service Name" },
-  { token: "%customername%", label: "Customer Name" },
+  { token: "%customername%", label: "Client Name" },
   { token: "%serviceid%", label: "Booking ID" },
   { token: "%staffname%", label: "Staff Name" },
   { token: "%scheduledate%", label: "Schedule Date" },
   { token: "%scheduletime%", label: "Schedule Time" },
   { token: "%duration%", label: "Duration" },
   { token: "%location%", label: "Location" },
-  { token: "%customeremail%", label: "Customer Email" },
+  { token: "%customeremail%", label: "Client Email" },
 ];
 
 const DEFAULT_CAL_TITLE = "%servicename% with %customername%";
 const DEFAULT_CAL_DESC = [
-  "Customer Info",
+  "Client Info",
   "Name  %customername%",
   "Booking ID  %serviceid%",
   "",
@@ -457,7 +457,7 @@ export function ConsultationNotifyPanel({
     [page.notifyPrefs],
   );
   const channel = channelForPanel(panel);
-  const who = audience === "customer" ? "Customer" : "User";
+  const who = audience === "customer" ? "Client" : "Consultant";
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -543,7 +543,7 @@ export function ConsultationNotifyPanel({
                     : "border-transparent text-slate-500",
                 )}
               >
-                {item === "customer" ? "To Customer" : "To User"}
+                {item === "customer" ? "To Client" : "To Consultant"}
               </button>
             ))}
           </div>

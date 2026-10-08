@@ -69,7 +69,7 @@ describe("EmailConfigFields", () => {
       cc: "super_admin",
     });
     expect(trigger(html, "Send from")).toContain("Allocated staff member&#x27;s email address");
-    expect(trigger(html, "Reply To")).toContain("Customer&#x27;s Email address");
+    expect(trigger(html, "Reply To")).toContain("Client&#x27;s Email address");
     expect(trigger(html, "Copy (Cc)")).toContain(
       "Super admin&#x27;s email address (contact@nepatronix.org)",
     );

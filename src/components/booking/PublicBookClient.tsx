@@ -690,7 +690,7 @@ function BookFlow({
   const basicSteps = [
     {
       id: "service",
-      label: "Event Type",
+      label: "Consultation",
       icon: Briefcase,
       active: step === "date" && basicStage === "service",
       reachable: true,
@@ -710,7 +710,7 @@ function BookFlow({
     },
     {
       id: "schedule",
-      label: "Date, Time & User",
+      label: "Date, Time & Consultant",
       icon: Calendar,
       active: step === "date" && basicStage === "schedule",
       reachable: basicStage === "schedule" || step === "details",
@@ -983,7 +983,7 @@ function BookFlow({
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--booking-brand)] text-[var(--booking-brand)]">
                     <Calendar className="h-5 w-5" />
                   </span>
-                  <h2 className="text-[17px] text-slate-800">Date, Time & User</h2>
+                  <h2 className="text-[17px] text-slate-800">Date, Time & Consultant</h2>
                 </div>
                 <p className="text-[14px] text-slate-600">
                   Your appointment will be booked with {hostNames.join(", ") || "our team"}

@@ -156,7 +156,7 @@ export function CalendlyConnectionCard({
                 void run("sync", async () => {
                   await syncCalendlyCatalog();
                   await registerCalendlyWebhook().catch(() => undefined);
-                  setNote("Calendly hosts and event types synced.");
+                  setNote("Calendly hosts and consultations synced.");
                 })
               }
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"

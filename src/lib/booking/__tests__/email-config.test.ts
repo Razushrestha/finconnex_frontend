@@ -31,7 +31,7 @@ describe("Email Configurations options", () => {
     expect(labels(replyToOptions("user", "a@b.co"))).toEqual([
       "Super admin's email address (a@b.co)",
       "Allocated staff member's email address",
-      "Customer's Email address",
+      "Client's Email address",
       "Select Reply To",
     ]);
     expect(labels(replyToOptions("customer", "a@b.co"))).toEqual([

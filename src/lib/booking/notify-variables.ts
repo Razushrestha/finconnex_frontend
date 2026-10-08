@@ -37,7 +37,7 @@ export const NOTIFY_VARIABLE_GROUPS: NotifyVariableGroup[] = [
   {
     title: "Service",
     items: [
-      { label: "Event Type Name", token: "{{appointment.title}}" },
+      { label: "Consultation Name", token: "{{appointment.title}}" },
       { label: "Service Booking URL", token: "{{service.booking_url}}" },
       { label: "Service Description", token: "{{service.description}}" },
     ],
@@ -50,13 +50,13 @@ export const NOTIFY_VARIABLE_GROUPS: NotifyVariableGroup[] = [
     ],
   },
   {
-    title: "Customer",
+    title: "Client",
     items: [
-      { label: "Customer Name", token: "{{contact.name}}" },
-      { label: "Customer Email", token: "{{contact.email}}" },
-      { label: "Customer Contact Number", token: "{{contact.phone}}" },
-      { label: "Customer First Name", token: "{{contact.first_name}}" },
-      { label: "Customer Last Name", token: "{{contact.last_name}}" },
+      { label: "Client Name", token: "{{contact.name}}" },
+      { label: "Client Email", token: "{{contact.email}}" },
+      { label: "Client Contact Number", token: "{{contact.phone}}" },
+      { label: "Client First Name", token: "{{contact.first_name}}" },
+      { label: "Client Last Name", token: "{{contact.last_name}}" },
     ],
   },
   {

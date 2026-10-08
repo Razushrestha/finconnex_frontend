@@ -676,7 +676,7 @@ export function BookingPageForm({
                     body={
                       isConsultation
                         ? "URL, consultation type, and schedule."
-                        : "Title, URL, event type, and duration."
+                        : "Title, URL, consultation, and duration."
                     }
                   />
 

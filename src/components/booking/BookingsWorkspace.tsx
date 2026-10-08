@@ -578,11 +578,11 @@ function HomeView({
               </colgroup>
               <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  <th className="px-3 py-2 font-semibold">Time</th>
+                  <th className="px-3 py-2 font-semibold">Time &amp; Date</th>
                   <th className="px-2 py-2 font-semibold">Booking ID</th>
-                  <th className="px-2 py-2 font-semibold">Event Type</th>
-                  <th className="px-2 py-2 font-semibold">Users/Resources</th>
-                  <th className="px-2 py-2 font-semibold">Customers</th>
+                  <th className="px-2 py-2 font-semibold">Consultations</th>
+                  <th className="px-2 py-2 font-semibold">Consultants</th>
+                  <th className="px-2 py-2 font-semibold">Clients</th>
                   <th className="px-2 py-2 font-semibold">Payment</th>
                   <th className="px-2 py-2 font-semibold">Status</th>
                 </tr>
@@ -1694,8 +1694,10 @@ function AppointmentDrawer({
                 }
               />
               <Row label="Role" value={consultant?.role ?? ""} />
-              <Row label="Date" value={formatApptDate(row.start)} />
-              <Row label="Time" value={formatApptTime(row.start)} />
+              <Row
+                label="Time & Date"
+                value={`${formatApptTime(row.start)} · ${formatApptDate(row.start)}`}
+              />
               <Row label="Status" value={row.status} />
               <Row label="Channel" value={row.channel} />
             </dl>
@@ -1785,7 +1787,7 @@ function AppointmentSummary({
   const [tab, setTab] = useState<"appointment" | "customer" | "audit">("appointment");
   const tabs = [
     { id: "appointment" as const, label: "Appointment Info" },
-    { id: "customer" as const, label: "Customer Info" },
+    { id: "customer" as const, label: "Client Info" },
     { id: "audit" as const, label: "Audit Info" },
   ];
 
@@ -1853,7 +1855,7 @@ function AppointmentSummary({
 
             {tab === "appointment" ? (
               <div>
-                <SummaryRow label="Event Type">
+                <SummaryRow label="Consultation">
                   <span className="inline-flex min-w-0 items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#7C6BF2] text-[9px] font-bold text-white">
                       {eventTypeInitials(eventName)}
@@ -1861,7 +1863,7 @@ function AppointmentSummary({
                     <span className="truncate">{eventName}</span>
                   </span>
                 </SummaryRow>
-                <SummaryRow label="User">
+                <SummaryRow label="Consultant">
                   <span className="inline-flex min-w-0 items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                       <User className="h-3.5 w-3.5" />
@@ -1869,10 +1871,12 @@ function AppointmentSummary({
                     <span className="truncate">{consultantLabel(row)}</span>
                   </span>
                 </SummaryRow>
-                <SummaryRow label="Time">
+                <SummaryRow label="Time & Date">
                   <span className="inline-flex items-center gap-2">
                     <Clock className="h-4 w-4 shrink-0 text-slate-400" />
-                    <span>{timeLabel}</span>
+                    <span>
+                      {timeLabel} · {formatApptDate(row.start)}
+                    </span>
                   </span>
                 </SummaryRow>
                 <SummaryRow label="Booked IP Address">—</SummaryRow>
@@ -2005,7 +2009,7 @@ function AuditInfoTab({ row, email }: { row: DashboardAppointment; email: string
   const actor = row.createdBy || consultantLabel(row);
   const events = [
     ...(email
-      ? [{ id: "email" as const, text: "Email notification to Customer sent for appointment" }]
+      ? [{ id: "email" as const, text: "Email notification to Client sent for appointment" }]
       : []),
     { id: "created" as const, text: "Appointment created by" },
   ];

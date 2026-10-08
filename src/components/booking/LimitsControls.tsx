@@ -348,7 +348,7 @@ export function ListboxSelect({
 const SLOT_LIMIT_WIDTH = "w-full max-w-[280px]";
 
 /**
- * "Slots per Event Type" / "Slots per Customer" control.
+ * "Slots per Consultation" / "Slots per Client" control.
  *
  * Closed on "No limit" it is a single dropdown. Picking "Per day" turns it into
  * one joined control: a number box on the left, a divider, and the dropdown

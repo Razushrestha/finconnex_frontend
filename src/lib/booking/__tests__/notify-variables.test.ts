@@ -46,16 +46,16 @@ describe("Insert Variable list", () => {
         ],
       ],
       ["Workspace", ["Workspace Booking URL"]],
-      ["Service", ["Event Type Name", "Service Booking URL", "Service Description"]],
+      ["Service", ["Consultation Name", "Service Booking URL", "Service Description"]],
       ["Buffer Time", ["Pre-buffer", "Post-buffer"]],
       [
-        "Customer",
+        "Client",
         [
-          "Customer Name",
-          "Customer Email",
-          "Customer Contact Number",
-          "Customer First Name",
-          "Customer Last Name",
+          "Client Name",
+          "Client Email",
+          "Client Contact Number",
+          "Client First Name",
+          "Client Last Name",
         ],
       ],
       [

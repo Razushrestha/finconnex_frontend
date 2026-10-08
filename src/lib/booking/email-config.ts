@@ -54,7 +54,7 @@ export function superAdminLabel(email: string) {
 }
 
 const STAFF_LABEL = "Allocated staff member's email address";
-const CUSTOMER_LABEL = "Customer's Email address";
+const CUSTOMER_LABEL = "Client's Email address";
 
 export function sendFromOptions(superAdminEmail = ""): EmailOption[] {
   return [
