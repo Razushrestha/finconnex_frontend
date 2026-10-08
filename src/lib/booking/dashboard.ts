@@ -9,6 +9,13 @@ import {
 import type { Meeting } from "@/lib/meetings/types";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Scheduled" | "Cancelled";
+/** Where the appointment is in its lifecycle — the stages guests are notified about. */
+export type AppointmentStage =
+  | "Booked"
+  | "Rescheduled"
+  | "Cancelled"
+  | "Completed"
+  | "No Show";
 export type AppointmentType = "Consultation" | "Strategy Call" | "Review";
 export type AppointmentChannel = "In Person" | "Phone Call" | "Video Call";
 export type RelatedKind = "Lead" | "Contact" | "Deal" | "Company";
@@ -50,6 +57,8 @@ export interface DashboardAppointment {
   createdBy?: string;
   type: AppointmentType;
   status: AppointmentStatus;
+  /** Lifecycle stage; unset means Booked (or Cancelled, per status). */
+  stage?: AppointmentStage;
   channel: AppointmentChannel;
   /** True when the booking record itself named a location. Event-type defaults must not replace it. */
   channelFromBooking?: boolean;
@@ -232,6 +241,11 @@ function addDays(date: Date, days: number) {
 
 function inRange(date: Date, start: Date, end: Date) {
   return date >= start && date < end;
+}
+
+export function appointmentStage(row: DashboardAppointment): AppointmentStage {
+  if (row.status === "Cancelled") return "Cancelled";
+  return row.stage ?? "Booked";
 }
 
 export function appointmentMatchesKpi(
@@ -506,8 +520,8 @@ function parseRelated(raw?: string): { kind: RelatedKind; id: string } {
   return { kind: "Contact", id: value || "—" };
 }
 
-function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus | null {
-  if (status === "Completed") return null;
+function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus {
+  if (status === "Completed") return "Confirmed";
   if (status === "Cancelled") return "Cancelled";
   if (status === "In Progress") return "Confirmed";
   if (status === "Rescheduled") return "Pending";
@@ -596,7 +610,12 @@ export function meetingToAppointment(
   consultants: { id: string; name: string; email?: string }[] = [],
 ): DashboardAppointment | null {
   const status = mapMeetingStatus(meeting.status);
-  if (!status) return null;
+  const stage: AppointmentStage | undefined =
+    meeting.status === "Completed"
+      ? "Completed"
+      : meeting.status === "Rescheduled"
+        ? "Rescheduled"
+        : undefined;
   const hostAttendee = meeting.attendees.find((row) => row.role === "Host");
   const host = resolveConsultantMatch(
     [
@@ -666,6 +685,7 @@ export function meetingToAppointment(
         : undefined,
     type: "Consultation",
     status,
+    stage,
     channel: mapChannel(meeting.type),
     avatarClass: AVATARS[(guest?.name || meeting.title).length % AVATARS.length],
     notes: meeting.notes || meeting.agenda,

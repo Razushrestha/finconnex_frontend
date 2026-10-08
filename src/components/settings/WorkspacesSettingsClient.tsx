@@ -23,6 +23,7 @@ import {
   type CrmWorkspaceRecord,
 } from "@/lib/workspaces/types";
 import { cn } from "@/lib/utils";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 function formatWhen(iso: string) {
   const date = new Date(iso);
@@ -133,7 +134,16 @@ export function WorkspacesSettingsClient() {
   }
 
   async function onDelete(row: CrmWorkspaceRecord) {
-    if (!window.confirm(`Soft-delete workspace “${row.name}”?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Soft-delete workspace?",
+        message: `Soft-delete workspace “${row.name}”?`,
+        confirmText: "Soft-delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await deleteCrmWorkspace(row.id);
@@ -148,7 +158,14 @@ export function WorkspacesSettingsClient() {
   }
 
   async function onLeave() {
-    if (!window.confirm("Leave this workspace? Records may need reassignment.")) {
+    if (
+      !(await confirmDialog({
+        title: "Leave this workspace?",
+        message: "Records may need reassignment.",
+        confirmText: "Leave",
+        tone: "danger",
+      }))
+    ) {
       return;
     }
     setLeaving(true);

@@ -58,6 +58,7 @@ import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportM
 import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
@@ -240,9 +241,12 @@ export default function ContactsPage() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} contact${count === 1 ? "" : "s"}? This moves them to the recycle bin.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} contact${count === 1 ? "" : "s"}?`,
+        message: "This moves them to the recycle bin.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }

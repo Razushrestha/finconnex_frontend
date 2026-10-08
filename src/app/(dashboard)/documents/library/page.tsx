@@ -56,6 +56,7 @@ import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
 import { defaultActorName } from "@/lib/rules/actor";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog, promptDialog } from "@/lib/notify/dialog";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
@@ -238,8 +239,13 @@ function DocumentLibraryPageInner() {
     setMenuId(null);
   }
 
-  function renameDoc(doc: LibraryDocument) {
-    const name = window.prompt("Rename file", doc.fileName);
+  async function renameDoc(doc: LibraryDocument) {
+    const name = await promptDialog({
+      title: "Rename file",
+      label: "File name",
+      defaultValue: doc.fileName,
+      confirmText: "Rename",
+    });
     if (!name?.trim()) return;
     const next = { ...doc, fileName: name.trim() };
     upsertLibraryDocument(next);
@@ -338,8 +344,17 @@ function DocumentLibraryPageInner() {
     setMenuId(null);
   }
 
-  function deleteDoc(doc: LibraryDocument) {
-    if (!window.confirm(`Delete ${doc.fileName}?`)) return;
+  async function deleteDoc(doc: LibraryDocument) {
+    if (
+      !(await confirmDialog({
+        title: "Delete document?",
+        message: `${doc.fileName} will be moved to the Recycle Bin.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     const gate = softDeleteRecord({
       action: "documents.library.delete",
       module: "documents.library",
@@ -367,10 +382,17 @@ function DocumentLibraryPageInner() {
     );
   }
 
-  function deleteChecked() {
+  async function deleteChecked() {
     const rows = filtered.filter((doc) => checkedIds.includes(doc.id));
     if (rows.length === 0) return;
-    if (!window.confirm(`Delete ${rows.length} document${rows.length === 1 ? "" : "s"}?`)) {
+    if (
+      !(await confirmDialog({
+        title: `Delete ${rows.length} document${rows.length === 1 ? "" : "s"}?`,
+        message: `The selected file${rows.length === 1 ? "" : "s"} will be moved to the Recycle Bin.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
       return;
     }
     const crmIds = rows.map((doc) => doc.id).filter(isCrmDocumentId);

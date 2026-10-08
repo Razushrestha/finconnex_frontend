@@ -18,6 +18,7 @@ import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import type { WorkspaceMember } from "@/lib/workspace-members/types";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 type Draft = {
   name: string;
@@ -243,7 +244,16 @@ export function AssignmentRulesSettingsClient() {
   }
 
   async function remove(rule: LeadAssignmentRule) {
-    if (!window.confirm(`Delete rule "${rule.name}"?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete rule?",
+        message: `Delete rule "${rule.name}"?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await deleteLeadAssignmentRule(rule.id);

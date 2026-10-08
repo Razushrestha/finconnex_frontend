@@ -23,6 +23,7 @@ import {
 } from "@/lib/messages/api";
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog, promptDialog } from "@/lib/notify/dialog";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { SortableColumnHeader } from "@/components/common/SortableColumnHeader";
 import {
@@ -145,9 +146,19 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
 
   async function onAttach() {
     if (!detail) return;
-    const storageKey = window.prompt("Workspace storage key");
+    const storageKey = await promptDialog({
+      title: "Attach from workspace",
+      label: "Workspace storage key",
+      confirmText: "Next",
+    });
     if (!storageKey?.trim()) return;
-    const fileName = window.prompt("File name", "attachment.pdf") ?? "attachment.pdf";
+    const fileName =
+      (await promptDialog({
+        title: "Attachment file name",
+        label: "File name",
+        defaultValue: "attachment.pdf",
+        confirmText: "Attach",
+      })) ?? "attachment.pdf";
     setBusy(true);
     const attached = await tryCrmMessage(() =>
       attachCrmMessageObject(detail.id, {
@@ -395,10 +406,17 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
                 disabled={busy}
                 className={cn(actionBtn, "text-rose-600")}
                 onClick={() => {
-                  if (!window.confirm(`Delete ${detail.subject || "this message"}?`)) {
-                    return;
-                  }
                   void (async () => {
+                    if (
+                      !(await confirmDialog({
+                        title: "Delete message?",
+                        message: `Delete ${detail.subject || "this message"}?`,
+                        confirmText: "Delete",
+                        tone: "danger",
+                      }))
+                    ) {
+                      return;
+                    }
                     setBusy(true);
                     await tryCrmMessage(() => deleteCrmMessage(detail.id));
                     deleteMessage(detail.id);

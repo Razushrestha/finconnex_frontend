@@ -57,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { softDeleteRecord } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function EstimateDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -441,8 +442,16 @@ export function EstimateDetailClient({ id }: { id: string }) {
             {!locked ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (!window.confirm(`Delete ${row.estimateId}?`)) return;
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog({
+                      title: "Delete estimate?",
+                      message: `Delete ${row.estimateId}?`,
+                      confirmText: "Delete",
+                      tone: "danger",
+                    }))
+                  )
+                    return;
                   const gate = softDeleteRecord({
                     action: "finance.estimates.delete",
                     module: "finance.estimates",

@@ -38,6 +38,7 @@ import {
   type EmailRouting,
 } from "@/lib/booking/email-config";
 import { cn } from "@/lib/utils";
+import { promptDialog } from "@/lib/notify/dialog";
 
 const SELECT_CLASS =
   "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/40";
@@ -236,10 +237,34 @@ function CalendarInvitesEditor({
     save({ eventDescription: next });
   }
 
-  function runFormat(command: string) {
+  async function runFormat(command: string) {
     descRef.current?.focus();
     if (command === "createLink") {
-      const href = window.prompt("Link URL")?.trim();
+      // The dialog takes focus, so keep the editor's selection to link it.
+      const selection = window.getSelection();
+      const saved =
+        selection && selection.rangeCount > 0
+          ? selection.getRangeAt(0).cloneRange()
+          : null;
+      const range =
+        saved && descRef.current?.contains(saved.commonAncestorContainer)
+          ? saved
+          : null;
+      const href = (
+        await promptDialog({
+          title: "Insert link",
+          label: "Link URL",
+          placeholder: "https://",
+          inputType: "url",
+          confirmText: "Insert link",
+        })
+      )?.trim();
+      descRef.current?.focus();
+      if (range) {
+        const current = window.getSelection();
+        current?.removeAllRanges();
+        current?.addRange(range);
+      }
       if (!href) return;
       document.execCommand("createLink", false, href);
     } else {
@@ -337,7 +362,7 @@ function CalendarInvitesEditor({
                   aria-label={item.cmd}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    runFormat(item.cmd);
+                    void runFormat(item.cmd);
                   }}
                   className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100"
                 >
@@ -351,7 +376,7 @@ function CalendarInvitesEditor({
             ref={descRef}
             contentEditable
             suppressContentEditableWarning
-            className="min-h-[180px] whitespace-pre-wrap px-3 py-3 text-[13px] leading-6 text-slate-800 outline-none"
+            className="min-h-[320px] whitespace-pre-wrap px-3 py-3 text-[13px] leading-6 text-slate-800 outline-none"
             onInput={() => {
               const next = (descRef.current?.innerText ?? "").slice(0, 1200);
               setDescription(next);

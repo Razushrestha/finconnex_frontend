@@ -660,6 +660,41 @@ export const ENDPOINT_CATALOG = [
     module: "booking",
   },
   {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/complete",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/drafts",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/drafts",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/drafts/:draftId",
+    module: "booking",
+  },
+  {
+    method: "PUT",
+    path: "/workspaces/:workspaceId/booking/drafts/:draftId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/drafts/:draftId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/complete",
+    module: "booking",
+  },
+  {
     method: "PATCH",
     path: "/workspaces/:workspaceId/booking/bookings/:bookingId/crm-link",
     module: "booking",

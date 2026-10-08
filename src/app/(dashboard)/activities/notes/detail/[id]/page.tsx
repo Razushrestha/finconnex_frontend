@@ -15,6 +15,7 @@ import {
 } from "@/lib/notes/api";
 import { NoteDetailsView } from "@/components/activities/notes/detail/NoteDetailsView";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -114,8 +115,17 @@ export default function NoteDetailPage({ params }: PageProps) {
             : undefined
         }
         onDelete={() => {
-          if (!window.confirm(`Delete ${note.title || "this note"}?`)) return;
           void (async () => {
+            if (
+              !(await confirmDialog({
+                title: "Delete note?",
+                message: `${note.title || "This note"} will be deleted.`,
+                confirmText: "Delete",
+                tone: "danger",
+              }))
+            ) {
+              return;
+            }
             setBusy(true);
             if (live) await tryCrmNote(() => deleteCrmNote(note.id));
             deleteNote(note.id);

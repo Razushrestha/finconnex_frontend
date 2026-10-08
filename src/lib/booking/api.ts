@@ -1612,6 +1612,70 @@ export function markCrmBookingNoShow(bookingId: string): Promise<unknown> {
   return bookingCall(`/bookings/${bookingId}/no-show`, jsonInit("POST", {}));
 }
 
+export function clearCrmBookingNoShow(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/no-show`, { method: "DELETE" });
+}
+
+export function completeCrmBooking(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/complete`, jsonInit("POST", {}));
+}
+
+/** Puts a completed booking back to confirmed. */
+export function reopenCrmBooking(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/complete`, { method: "DELETE" });
+}
+
+/** A consultation still being set up, saved on the server as the wizard goes. */
+export type ConsultationDraftRecord = {
+  id: string;
+  name: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function toConsultationDraft(row: unknown): ConsultationDraftRecord | null {
+  const rec = asRecord(row);
+  if (!rec) return null;
+  const id = pickStr(rec.id);
+  if (!id) return null;
+  return {
+    id,
+    name: pickStr(rec.name),
+    data: asRecord(rec.data) ?? {},
+    createdAt: pickStr(rec.createdAt, rec.created_at),
+    updatedAt: pickStr(rec.updatedAt, rec.updated_at),
+  };
+}
+
+/** The signed-in user's consultation drafts, most recently edited first. */
+export async function listConsultationDrafts(): Promise<ConsultationDraftRecord[]> {
+  const data = await bookingCall("/drafts", silentRequest());
+  return extractRecords(data)
+    .map(toConsultationDraft)
+    .filter((row): row is ConsultationDraftRecord => !!row);
+}
+
+/** Creates the draft when `id` is empty, otherwise saves over it. */
+export async function saveConsultationDraft(
+  id: string | null,
+  name: string,
+  draft: Record<string, unknown>,
+): Promise<ConsultationDraftRecord | null> {
+  const body = { name, data: draft };
+  // Autosaved as the user types: the wizard shows its own save status, so
+  // no toast for each save.
+  const data = id
+    ? await bookingCall(`/drafts/${id}`, jsonInit("PUT", body, true))
+    : await bookingCall("/drafts", jsonInit("POST", body, true));
+  return toConsultationDraft(data);
+}
+
+export async function deleteConsultationDraft(id: string): Promise<void> {
+  // The board shows its own "Draft discarded" message.
+  await bookingCall(`/drafts/${id}`, silentRequest({ method: "DELETE" }));
+}
+
 export function getCrmBookingSummary(): Promise<Record<string, unknown>> {
   return bookingCall("/bookings/summary").then(
     (data) => asRecord(data) ?? {},

@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { softDeleteRecord } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function QuotationDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -517,8 +518,16 @@ export function QuotationDetailClient({ id }: { id: string }) {
             {!locked ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (!window.confirm(`Delete ${row.quotationId}?`)) return;
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog({
+                      title: "Delete quotation?",
+                      message: `Delete ${row.quotationId}?`,
+                      confirmText: "Delete",
+                      tone: "danger",
+                    }))
+                  )
+                    return;
                   const gate = softDeleteRecord({
                     action: "finance.quotations.delete",
                     module: "finance.quotations",

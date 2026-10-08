@@ -32,6 +32,7 @@ import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 const STATUS_STYLE: Record<WhatsAppCampaignStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -366,8 +367,16 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
                   />
                 ) : null}
                 <ActionBtn
-                  onClick={() => {
-                    if (!window.confirm("Delete campaign?")) return;
+                  onClick={async () => {
+                    if (
+                      !(await confirmDialog({
+                        title: "Delete campaign?",
+                        message: `Delete ${campaign.campaignId}?`,
+                        confirmText: "Delete",
+                        tone: "danger",
+                      }))
+                    )
+                      return;
                     const gate = softDeleteRecord({
                       action: "marketing.whatsapp.delete",
                       module: "marketing.whatsapp",

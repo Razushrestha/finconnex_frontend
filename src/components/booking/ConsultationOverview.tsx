@@ -69,6 +69,7 @@ import {
   updateCrmEventType,
 } from "@/lib/booking/api";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { toCrmQuestions } from "@/lib/booking/crm-questions";
 import {
   OfflineLocationFields,
@@ -80,7 +81,9 @@ import {
 import { SELECT_BG, SELECT_CLASS } from "@/components/booking/select-styles";
 import {
   defaultOfficeAddress,
-  selectableOnlinePlatforms,
+  isOnlineLocationKind,
+  type MeetingLocationKind,
+  type OnlineMeetingPlatform,
 } from "@/lib/booking/meeting-platforms";
 import {
   APPOINTMENT_DISTRIBUTIONS,
@@ -109,6 +112,7 @@ import {
 } from "@/lib/users/assignable";
 import { cn } from "@/lib/utils";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import { useMeetingPlatforms } from "@/lib/booking/conference-providers";
 
 const BRAND = "var(--brand-primary)";
 
@@ -489,7 +493,19 @@ export function EventTypeEditForm({
   const [description, setDescription] = useState(page.description || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const platforms = useMemo(() => ["None", ...selectableOnlinePlatforms(), "Phone"], []);
+  // Only integrated video platforms (CRM-reported). A platform this
+  // consultation already uses stays listed, marked, so it isn't silently lost.
+  const meetingPlatforms = useMeetingPlatforms();
+  const platformNotConnected =
+    !meetingPlatforms.loading &&
+    isOnlineLocationKind(platform as MeetingLocationKind) &&
+    !meetingPlatforms.platforms.includes(platform as OnlineMeetingPlatform);
+  const platforms = [
+    "None",
+    ...meetingPlatforms.platforms,
+    ...(platformNotConnected ? [platform] : []),
+    "Phone",
+  ];
   const minuteChoices = MINUTE_OPTIONS.includes(minutes)
     ? MINUTE_OPTIONS
     : [...MINUTE_OPTIONS, minutes].sort((a, b) => a - b);
@@ -498,6 +514,12 @@ export function EventTypeEditForm({
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Event type name is required");
+      return;
+    }
+    if (platformNotConnected) {
+      setError(
+        `${platform} is not integrated. Connect it in Settings → Integrations or choose another platform.`,
+      );
       return;
     }
     const durationMinutes = Math.max(5, hours * 60 + minutes);
@@ -756,11 +778,27 @@ export function EventTypeEditForm({
               >
                 {platforms.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {platformNotConnected && item === platform
+                      ? `${item} (not connected)`
+                      : item}
                   </option>
                 ))}
               </select>
             )}
+            {!meetingPlatforms.loading &&
+            meetingPlatforms.platforms.length === 0 ? (
+              <p role="alert" className="text-[12px] font-medium text-rose-600">
+                No meeting platform integrated.{" "}
+                <a
+                  href="/settings/integrations"
+                  target="_blank"
+                  rel="noopener"
+                  className="underline"
+                >
+                  Connect one
+                </a>
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -1310,17 +1348,29 @@ export function ConsultationOverview({
                 <HeaderMenuRow
                   icon={FolderInput}
                   label="Move"
-                  onClick={() => {
-                    const next =
-                      page.status === "Live"
-                        ? window.confirm("Move this consultation to Draft?")
-                          ? "Draft"
-                          : null
-                        : window.confirm("Move this consultation to Active?")
-                          ? "Live"
-                          : null;
-                    if (!next) return;
+                  onClick={async () => {
                     setMenuOpen(false);
+                    let next: "Draft" | "Live" | null = null;
+                    if (page.status === "Live") {
+                      if (
+                        await confirmDialog({
+                          title: "Move to Draft?",
+                          message: "Move this consultation to Draft?",
+                          confirmText: "Move to Draft",
+                        })
+                      ) {
+                        next = "Draft";
+                      }
+                    } else if (
+                      await confirmDialog({
+                        title: "Make active?",
+                        message: "Move this consultation to Active?",
+                        confirmText: "Make active",
+                      })
+                    ) {
+                      next = "Live";
+                    }
+                    if (!next) return;
                     onSaved({ ...page, status: next });
                   }}
                 />
@@ -1329,11 +1379,19 @@ export function ConsultationOverview({
                   label="Delete"
                   danger
                   onClick={() => {
-                    if (!window.confirm(`Delete “${page.title}”?`)) return;
+                    setMenuOpen(false);
                     void (async () => {
+                      if (
+                        !(await confirmDialog({
+                          title: "Delete consultation?",
+                          message: `Delete “${page.title}”?`,
+                          confirmText: "Delete",
+                          tone: "danger",
+                        }))
+                      )
+                        return;
                       try {
                         await removeConsultationPage(page);
-                        setMenuOpen(false);
                         onRefresh?.();
                         onClose();
                       } catch (err) {

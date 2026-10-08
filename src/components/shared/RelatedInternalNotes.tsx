@@ -25,6 +25,7 @@ import {
 } from "@/lib/notes/store";
 import type { Note } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 function parseNoteDate(raw: string): number {
   const s = raw.trim();
@@ -241,7 +242,16 @@ export function RelatedInternalNotes({
   }
 
   async function remove(note: Note) {
-    if (!window.confirm("Delete this note? This cannot be undone.")) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete this note?",
+        message: "This cannot be undone.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     if (isCrmNoteId(note.id)) {
       await tryCrmNote(() => deleteCrmNote(note.id));
     }

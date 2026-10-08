@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Upload } from "lucide-react";
+import { UseCurrentLocationButton } from "@/components/shared/UseCurrentLocationButton";
 import {
   getSettingsSchema,
   type SettingsField,
@@ -487,6 +488,9 @@ function FieldRenderer({
           placeholder={field.placeholder}
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
         />
+        {field.geolocate ? (
+          <UseCurrentLocationButton onAddress={(address) => onChange(address)} />
+        ) : null}
       </label>
     );
   }

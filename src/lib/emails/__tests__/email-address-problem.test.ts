@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emailAddressProblem } from "@/lib/emails/address";
+import { emailAddressProblem, emailAddressSuggestion } from "@/lib/emails/address";
 
 describe("emailAddressProblem", () => {
   it("accepts real addresses", () => {
@@ -29,5 +29,18 @@ describe("emailAddressProblem", () => {
     for (const bad of ["", "ram", "ram@", "@gmail.com", "ram@@gmail.com", "ram@gmail", "ram@-x.com", "ra m@gmail.com", "ram..x@gmail.com", "ram@gmail..com"]) {
       expect(emailAddressProblem(bad), bad).not.toBeNull();
     }
+  });
+});
+
+describe("emailAddressSuggestion", () => {
+  it("returns the corrected address for a near-miss provider", () => {
+    expect(emailAddressSuggestion(" raju@gmail.comm ")).toBe("raju@gmail.com");
+    expect(emailAddressSuggestion("Raju.K@Gmail.comcom")).toBe("Raju.K@gmail.com");
+  });
+
+  it("returns null when there is nothing to suggest", () => {
+    expect(emailAddressSuggestion("raju@gmail.com")).toBeNull();
+    expect(emailAddressSuggestion("raju@example.org")).toBeNull();
+    expect(emailAddressSuggestion("not-an-email")).toBeNull();
   });
 });

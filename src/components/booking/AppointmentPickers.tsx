@@ -36,6 +36,7 @@ import {
 import type { BookingCurrency } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
 import { emailAddressProblem } from "@/lib/emails/address";
+import { EmailProblemText } from "@/components/shared/EmailProblemText";
 
 /** Accent used across the New Appointment form. */
 export const ACCENT = "#5A4FCF";
@@ -839,7 +840,17 @@ function NewCustomerForm({
         aria-label="Client phone"
         className={input}
       />
-      {error ? <p className="text-[12px] font-medium text-rose-600">{error}</p> : null}
+      {error ? (
+        <EmailProblemText
+          message={error}
+          email={email}
+          onUseSuggestion={(address) => {
+            setEmail(address);
+            setError("");
+          }}
+          className="text-[12px] font-medium text-rose-600"
+        />
+      ) : null}
       <div className="flex gap-2 pt-0.5">
         <button
           type="submit"

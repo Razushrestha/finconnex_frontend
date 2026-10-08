@@ -89,7 +89,11 @@ export function smokeCalendarWiring() {
     fail("endpoint catalog missing calendar conflicts");
   }
 
-  const page = readSrc("src/app/(dashboard)/activities/calendar/page.tsx");
+  // The page is a shell around ActivitiesCalendarView, which owns the data.
+  const page = [
+    readSrc("src/app/(dashboard)/activities/calendar/page.tsx"),
+    readSrc("src/components/activities/calendar/ActivitiesCalendarView.tsx"),
+  ].join("\n");
   if (!page.includes("useCrmCalendar")) {
     fail("calendar page does not call useCrmCalendar");
   }

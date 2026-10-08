@@ -480,7 +480,7 @@ export async function confirmPublicBooking(input: {
     allocateConferencingLink(page, `${page.slug}-${reference}`);
 
   let leadId = existing?.leadId;
-  let contactId = existing?.contactId;
+  const contactId = existing?.contactId;
   let meetingId = existing?.meetingId;
   let createdLead = existing?.createdLead ?? false;
 

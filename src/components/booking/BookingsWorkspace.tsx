@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -34,10 +35,21 @@ import {
   IdCard,
   Pencil,
   ExternalLink,
+  MoreVertical,
+  Trash2,
+  RefreshCw,
+  XCircle,
+  UserX,
+  ListFilter,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { crmRecordHref, useCrmRecordName } from "@/lib/crm/related-record";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   publicBookUrl,
@@ -62,6 +74,7 @@ import {
   appointmentMatchesKpi,
   appointmentPersonName,
   appointmentRelatedLabel,
+  appointmentStage,
   bookingKpiStats,
   consultantById,
   appointmentConsultantName,
@@ -70,6 +83,7 @@ import {
   formatApptTime,
   parseAppointmentStart,
   type AppointmentChannel,
+  type AppointmentStage,
   type AppointmentStatus,
   type BookingKpiKey,
   type DashboardAppointment,
@@ -82,11 +96,16 @@ import {
 import { hideAppointments, useCrmBooking } from "@/lib/booking/use-crm-booking";
 import {
   cancelCrmBooking,
+  clearCrmBookingNoShow,
+  completeCrmBooking,
+  markCrmBookingNoShow,
   readRescheduledBooking,
+  reopenCrmBooking,
   tryCrmBooking,
 } from "@/lib/booking/api";
 import {
   cancelCrmMeeting,
+  completeCrmMeeting,
   deleteCrmMeeting,
   tryCrmMeeting,
   updateCrmMeeting,
@@ -207,6 +226,76 @@ const STATS: {
   },
 ];
 
+const STAGE_FILTERS: {
+  stage: AppointmentStage;
+  icon: typeof Clock;
+}[] = [
+  { stage: "Booked", icon: Clock },
+  { stage: "Rescheduled", icon: RefreshCw },
+  { stage: "Cancelled", icon: XCircle },
+  { stage: "Completed", icon: CheckCircle2 },
+  { stage: "No Show", icon: UserX },
+];
+
+const TABLE_FONT_SIZES = [10, 11, 12, 13, 14, 16];
+const TABLE_FONT_DEFAULT = 11;
+const TABLE_FONT_KEY = "booking.appointments.fontSize";
+
+// The table's text size, remembered per browser. Kept in memory too so the
+// buttons still work when storage is blocked.
+let tableFontMemory: number | null = null;
+const tableFontListeners = new Set<() => void>();
+
+function readTableFontSize() {
+  if (tableFontMemory != null) return tableFontMemory;
+  try {
+    const saved = Number(window.localStorage.getItem(TABLE_FONT_KEY));
+    if (TABLE_FONT_SIZES.includes(saved)) return saved;
+  } catch {
+    // Storage blocked: fall through to the default.
+  }
+  return TABLE_FONT_DEFAULT;
+}
+
+function writeTableFontSize(size: number) {
+  tableFontMemory = size;
+  try {
+    window.localStorage.setItem(TABLE_FONT_KEY, String(size));
+  } catch {
+    // Storage blocked: the size still applies for this visit.
+  }
+  tableFontListeners.forEach((listener) => listener());
+}
+
+function subscribeTableFontSize(listener: () => void) {
+  tableFontListeners.add(listener);
+  return () => {
+    tableFontListeners.delete(listener);
+  };
+}
+
+function useTableFontSize() {
+  const size = useSyncExternalStore(
+    subscribeTableFontSize,
+    readTableFontSize,
+    () => TABLE_FONT_DEFAULT,
+  );
+  function step(direction: 1 | -1) {
+    const index = TABLE_FONT_SIZES.indexOf(size);
+    const next = Math.min(
+      TABLE_FONT_SIZES.length - 1,
+      Math.max(0, (index < 0 ? 1 : index) + direction),
+    );
+    writeTableFontSize(TABLE_FONT_SIZES[next]);
+  }
+  return [size, step] as const;
+}
+
+/** Completed appointments stay out of the list, KPIs and calendar unless filtered for. */
+function isActiveAppointment(row: DashboardAppointment) {
+  return appointmentStage(row) !== "Completed";
+}
+
 const KPI_TITLES: Record<BookingKpiKey, string> = {
   upcoming: "Upcoming Appointments",
   confirmed: "Confirmed Appointments",
@@ -225,6 +314,10 @@ export function BookingsWorkspace({
   const searchParams = useSearchParams();
   const crm = useCrmBooking();
   const [bookOpen, setBookOpen] = useState(false);
+  const activeAppointments = useMemo(
+    () => crm.appointments.filter(isActiveAppointment),
+    [crm.appointments],
+  );
 
   useEffect(() => {
     if (searchParams.get("book") === "1") setBookOpen(true);
@@ -267,7 +360,7 @@ export function BookingsWorkspace({
           {section === "consultants" ? (
             <ConsultantsPanel
               consultants={crm.consultants}
-              appointments={crm.appointments}
+              appointments={activeAppointments}
               loading={crm.loading}
               error={crm.error}
             />
@@ -314,7 +407,18 @@ function HomeView({
   onRefresh: () => void;
 }) {
   const now = useMemo(() => bookingNow(), [appointments]);
+  const activeAppointments = useMemo(
+    () => appointments.filter(isActiveAppointment),
+    [appointments],
+  );
   const [consultantFilter, setConsultantFilter] = useState("all");
+  // "nearest": upcoming soonest-first, then past most-recent-first. The
+  // Time & Date header switches to a plain earliest/latest-first order.
+  const [timeSort, setTimeSort] = useState<"nearest" | "asc" | "desc">(
+    "nearest",
+  );
+  const [stageFilter, setStageFilter] = useState<AppointmentStage | null>(null);
+  const [tableFontSize, stepTableFont] = useTableFontSize();
   const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
   const [selectedDate, setSelectedDate] = useState(() =>
     dateKeyFromDate(bookingNow()),
@@ -327,19 +431,22 @@ function HomeView({
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
   const [editing, setEditing] = useState(false);
-  const [reschedule, setReschedule] = useState<{
-    row: DashboardAppointment;
-    title: "Edit" | "Reschedule";
-  } | null>(null);
+  const [editRow, setEditRow] = useState<DashboardAppointment | null>(null);
+  const [rescheduleRow, setRescheduleRow] =
+    useState<DashboardAppointment | null>(null);
   const [pageSize, setPageSize] = useState(10);
 
   const kpi = useMemo(
-    () => bookingKpiStats(appointments, now),
-    [appointments, now],
+    () => bookingKpiStats(activeAppointments, now),
+    [activeAppointments, now],
   );
 
   const rows = useMemo(() => {
-    let data = [...appointments];
+    let data =
+      stageFilter === "Completed" ? [...appointments] : [...activeAppointments];
+    if (stageFilter) {
+      data = data.filter((a) => appointmentStage(a) === stageFilter);
+    }
     if (consultantFilter !== "all") {
       data = data.filter((a) => a.consultantId === consultantFilter);
     }
@@ -349,21 +456,40 @@ function HomeView({
     if (kpiFilter) {
       data = data.filter((a) => appointmentMatchesKpi(a, kpiFilter, now));
     }
-    const today = dateKeyFromDate(now);
+    // Nearest to today first: upcoming soonest-first, then past
+    // appointments most-recent-first. Compared as times, not as text, so
+    // starts written in different formats still order correctly.
+    const nowMs = now.getTime();
+    const at = (row: DashboardAppointment) => {
+      const ms = parseAppointmentStart(row.start).getTime();
+      return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+    };
     data.sort((a, b) => {
       if (kpiFilter) {
         const am = appointmentMatchesKpi(a, kpiFilter, now) ? 0 : 1;
         const bm = appointmentMatchesKpi(b, kpiFilter, now) ? 0 : 1;
         if (am !== bm) return am - bm;
-      } else {
-        const aUpcoming = a.start.slice(0, 10) >= today ? 0 : 1;
-        const bUpcoming = b.start.slice(0, 10) >= today ? 0 : 1;
-        if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
       }
-      return a.start.localeCompare(b.start);
+      const aStart = at(a);
+      const bStart = at(b);
+      if (timeSort === "asc") return aStart - bStart;
+      if (timeSort === "desc") return bStart - aStart;
+      const aPast = appointmentIsPast(a, nowMs) ? 1 : 0;
+      const bPast = appointmentIsPast(b, nowMs) ? 1 : 0;
+      if (aPast !== bPast) return aPast - bPast;
+      return aPast ? bStart - aStart : aStart - bStart;
     });
     return data;
-  }, [appointments, consultantFilter, dateFilter, kpiFilter, now]);
+  }, [
+    appointments,
+    activeAppointments,
+    stageFilter,
+    consultantFilter,
+    dateFilter,
+    kpiFilter,
+    now,
+    timeSort,
+  ]);
 
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const shownFrom = rows.length ? (page - 1) * pageSize + 1 : 0;
@@ -371,14 +497,14 @@ function HomeView({
   // Each day's appointments in start order, for the calendar's hover card.
   const appointmentsByDay = useMemo(() => {
     const byDay = new Map<string, DashboardAppointment[]>();
-    for (const a of [...appointments].sort((x, y) =>
+    for (const a of [...activeAppointments].sort((x, y) =>
       x.start.localeCompare(y.start),
     )) {
       const key = appointmentDateKey(a.start);
       byDay.set(key, [...(byDay.get(key) ?? []), a]);
     }
     return byDay;
-  }, [appointments]);
+  }, [activeAppointments]);
   const todayKey = dateKeyFromDate(now);
 
   function openView(row: DashboardAppointment) {
@@ -387,11 +513,11 @@ function HomeView({
   }
 
   function openEdit(row: DashboardAppointment) {
-    setReschedule({ row, title: "Edit" });
+    setEditRow(row);
   }
 
   function openReschedule(row: DashboardAppointment) {
-    setReschedule({ row, title: "Reschedule" });
+    setRescheduleRow(row);
   }
 
   async function cancelAppointment(row: DashboardAppointment) {
@@ -411,11 +537,48 @@ function HomeView({
     onRefresh();
   }
 
+  async function changeStage(row: DashboardAppointment, stage: SettableStage) {
+    const current = appointmentStage(row);
+    if (stage === current) return;
+    if (stage === "Cancelled") return cancelAppointment(row);
+    const bookingId = row.recordKind === "booking" ? row.id : "";
+    const meetingId =
+      row.meetingId || (row.recordKind === "meeting" ? row.id : "");
+    try {
+      if (bookingId) {
+        // Back to booked first, so Completed and No Show never stack.
+        if (current === "No Show") await clearCrmBookingNoShow(bookingId);
+        if (current === "Completed") await reopenCrmBooking(bookingId);
+        if (stage === "Completed") await completeCrmBooking(bookingId);
+        if (stage === "No Show") await markCrmBookingNoShow(bookingId);
+      } else if (stage === "Completed" && meetingId) {
+        await completeCrmMeeting(meetingId);
+      } else {
+        return;
+      }
+      toast.success(
+        stage === "Booked"
+          ? "Appointment set back to booked"
+          : `Appointment marked ${stage === "No Show" ? "a no-show" : "completed"}`,
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not update this appointment",
+      );
+    }
+    onRefresh();
+  }
+
   async function removeAppointment(row: DashboardAppointment) {
     if (
-      !window.confirm(
-        `Delete appointment “${row.guestName}”? This also removes it for the client.`,
-      )
+      !(await confirmDialog({
+        title: "Delete appointment?",
+        message: `Delete appointment “${row.guestName}”? This also removes it for the client.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     )
       return;
     const meetingId =
@@ -519,18 +682,33 @@ function HomeView({
       <div className="flex min-h-[300px] flex-1 flex-col gap-4 xl:flex-row xl:items-start">
         <section className="flex h-[min(640px,75dvh)] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] xl:h-auto xl:flex-1 xl:self-stretch">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
-            <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-              <CalendarDays
-                className="h-4 w-4 shrink-0"
-                style={{ color: BRAND }}
-              />
-              {dateFilter
-                ? `Appointments on ${formatApptDate(`${dateFilter}T00:00`)}`
-                : kpiFilter
-                  ? KPI_TITLES[kpiFilter]
-                  : "Upcoming Appointments"}
-            </h2>
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
+                <CalendarDays
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: BRAND }}
+                />
+                {dateFilter
+                  ? `Appointments on ${formatApptDate(`${dateFilter}T00:00`)}`
+                  : kpiFilter
+                    ? KPI_TITLES[kpiFilter]
+                    : stageFilter
+                      ? `${stageFilter} Appointments`
+                      : "Upcoming Appointments"}
+              </h2>
+            </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <StageFilterMenu
+                value={stageFilter}
+                onChange={(stage) => {
+                  setStageFilter(stage);
+                  setPage(1);
+                }}
+              />
+              <TableFontSizeControl
+                size={tableFontSize}
+                onStep={stepTableFont}
+              />
               <select
                 value={consultantFilter}
                 onChange={(e) => {
@@ -588,7 +766,7 @@ function HomeView({
                   onView={() => openView(row)}
                   onEdit={() => openEdit(row)}
                   onReschedule={() => openReschedule(row)}
-                  onCancel={() => void cancelAppointment(row)}
+                  onStage={(stage) => void changeStage(row, stage)}
                   onDelete={() => void removeAppointment(row)}
                 />
               ))}
@@ -597,26 +775,74 @@ function HomeView({
             <div className="hidden lg:block">
               <table className="w-full table-fixed text-left">
                 <colgroup>
-                  <col className="w-[16%]" />
-                  <col className="w-[11%]" />
                   <col className="w-[17%]" />
-                  <col className="w-[17%]" />
-                  <col className="w-[15%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[15%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[132px]" />
+                  <col className="w-[76px]" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-[#EEF0F3] text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                    <th className="px-3 py-2 font-semibold">Time &amp; Date</th>
-                    <th className="px-2 py-2 font-semibold">Booking ID</th>
-                    <th className="px-2 py-2 font-semibold">Consultations</th>
-                    <th className="px-2 py-2 font-semibold">Consultants</th>
-                    <th className="px-2 py-2 font-semibold">Clients</th>
-                    <th className="px-2 py-2 font-semibold">Payment</th>
-                    <th className="px-2 py-2 font-semibold">Status</th>
+                    <th
+                      className="px-3 py-2.5 align-middle font-semibold"
+                      aria-sort={
+                        timeSort === "asc"
+                          ? "ascending"
+                          : timeSort === "desc"
+                            ? "descending"
+                            : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimeSort((current) =>
+                            current === "asc" ? "desc" : "asc",
+                          );
+                          setPage(1);
+                        }}
+                        title={
+                          timeSort === "asc"
+                            ? "Earliest first. Click for latest first."
+                            : timeSort === "desc"
+                              ? "Latest first. Click for earliest first."
+                              : "Nearest first. Click to sort earliest first."
+                        }
+                        className="inline-flex items-center gap-1 uppercase hover:text-slate-600"
+                      >
+                        Time &amp; Date
+                        {timeSort === "asc" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : timeSort === "desc" ? (
+                          <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-60" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="px-3 py-2.5 align-middle font-semibold">
+                      Booking ID
+                    </th>
+                    <th className="px-3 py-2.5 align-middle font-semibold">
+                      Consultations
+                    </th>
+                    <th className="px-3 py-2.5 align-middle font-semibold">
+                      Consultants
+                    </th>
+                    <th className="px-3 py-2.5 align-middle font-semibold">
+                      Clients
+                    </th>
+                    <th className="px-3 py-2.5 align-middle font-semibold">
+                      Status
+                    </th>
+                    <th className="px-3 py-2.5 text-center align-middle font-semibold">
+                      Options
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody style={{ fontSize: tableFontSize }}>
                   {loading && pageRows.length === 0 ? (
                     <tr>
                       <td
@@ -639,7 +865,7 @@ function HomeView({
                       </td>
                     </tr>
                   ) : null}
-                  {groupAppointmentsByDate(pageRows).map((group) => (
+                  {groupAppointmentsByDate(pageRows, now).map((group) => (
                     <AppointmentDayGroup
                       key={group.key}
                       label={group.label}
@@ -651,7 +877,7 @@ function HomeView({
                       onView={openView}
                       onEdit={openEdit}
                       onReschedule={openReschedule}
-                      onCancel={(row) => void cancelAppointment(row)}
+                      onStage={(row, stage) => void changeStage(row, stage)}
                       onDelete={(row) => void removeAppointment(row)}
                     />
                   ))}
@@ -703,7 +929,9 @@ function HomeView({
           </div>
         </section>
 
-        <div className="flex w-full shrink-0 flex-col gap-4 xl:w-[300px]">
+        {/* Stretches with the appointments card, so the calendar below
+            Top Consultants ends level with the table. */}
+        <div className="flex w-full shrink-0 flex-col gap-4 xl:w-[300px] xl:self-stretch">
           <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">
@@ -780,16 +1008,16 @@ function HomeView({
             const row = detail;
             setDetail(null);
             setEditing(false);
-            if (row) setReschedule({ row, title: "Reschedule" });
+            if (row) setRescheduleRow(row);
           }}
           onEditMeeting={() => {
             const row = detail;
             setDetail(null);
             setEditing(false);
-            if (row) setReschedule({ row, title: "Edit" });
+            if (row) setEditRow(row);
           }}
-          onCancel={() => {
-            if (detail) void cancelAppointment(detail);
+          onStage={(stage) => {
+            if (detail) void changeStage(detail, stage);
           }}
           onDelete={() => {
             if (detail) void removeAppointment(detail);
@@ -802,15 +1030,26 @@ function HomeView({
         />
       ) : null}
       <NewAppointmentModal
-        open={reschedule != null}
-        title={reschedule?.title ?? "Schedule Meeting"}
-        initial={reschedule ? scheduleSeed(reschedule.row) : undefined}
-        onClose={() => setReschedule(null)}
+        open={editRow != null}
+        title="Edit"
+        initial={editRow ? scheduleSeed(editRow) : undefined}
+        onClose={() => setEditRow(null)}
         onCreated={() => {
-          setReschedule(null);
+          setEditRow(null);
           onRefresh();
         }}
       />
+      {rescheduleRow ? (
+        <RescheduleDialog
+          key={rescheduleRow.id}
+          row={rescheduleRow}
+          onClose={() => setRescheduleRow(null)}
+          onSaved={() => {
+            setRescheduleRow(null);
+            onRefresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -863,14 +1102,28 @@ function appointmentParts(row: DashboardAppointment) {
   };
 }
 
-function groupAppointmentsByDate(rows: DashboardAppointment[]) {
+/** Over: its end (or its start, when it has no end) is before `nowMs`. */
+function appointmentIsPast(row: DashboardAppointment, nowMs: number) {
+  const end = parseAppointmentStart(row.end || row.start).getTime();
+  return !Number.isNaN(end) && end < nowMs;
+}
+
+function groupAppointmentsByDate(rows: DashboardAppointment[], now?: Date) {
   const groups: { key: string; label: string; rows: DashboardAppointment[] }[] =
     [];
+  const nowMs = now?.getTime();
   for (const row of rows) {
-    const key = appointmentDateKey(row.start);
+    const past = nowMs !== undefined && appointmentIsPast(row, nowMs);
+    // Past and upcoming rows of the same day stay in separate groups.
+    const key = `${appointmentDateKey(row.start)}${past ? ":past" : ""}`;
     const last = groups[groups.length - 1];
     if (last?.key === key) last.rows.push(row);
-    else groups.push({ key, label: formatGroupDate(row.start), rows: [row] });
+    else
+      groups.push({
+        key,
+        label: `${formatGroupDate(row.start)}${past ? " · Past" : ""}`,
+        rows: [row],
+      });
   }
   return groups;
 }
@@ -911,22 +1164,9 @@ function consultantLabel(row: DashboardAppointment) {
   );
 }
 
-function BookingStatusMenu({
-  status,
-  onEdit,
-  onReschedule,
-  onCancel,
-  onDelete,
-  tone = "neutral",
-}: {
-  status?: AppointmentStatus;
-  onEdit: () => void;
-  onReschedule: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
-  tone?: "neutral" | "blue";
-}) {
-  const cancelled = status === "Cancelled";
+// A dropdown portalled to <body>, under its trigger (right-aligned unless
+// align is "start"), that closes on any outside mousedown.
+function useAnchoredMenu(width: number, align: "start" | "end" = "end") {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLDivElement>(null);
@@ -947,13 +1187,77 @@ function BookingStatusMenu({
   function toggle(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
-    const width = 168;
     setPos({
       top: rect.bottom + 6,
-      left: Math.max(8, rect.right - width),
+      left:
+        align === "start"
+          ? Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
+          : Math.max(8, rect.right - width),
     });
     setOpen((value) => !value);
   }
+
+  return { open, setOpen, pos, ref, menuRef, toggle };
+}
+
+/** Stages set from the status menu; Rescheduled comes from picking a new time. */
+type SettableStage = Exclude<AppointmentStage, "Rescheduled">;
+
+const STAGE_DOT: Record<AppointmentStage, string> = {
+  Booked: "bg-[var(--brand-primary)]",
+  Rescheduled: "bg-blue-500",
+  Cancelled: "bg-red-500",
+  Completed: "bg-emerald-500",
+  "No Show": "bg-amber-500",
+};
+
+const STAGE_BUTTON: Record<AppointmentStage, string> = {
+  Booked: "border-[#E5E7EB] text-slate-700 hover:bg-slate-50",
+  Rescheduled: "border-blue-200 text-blue-600 hover:bg-blue-50",
+  Cancelled: "border-red-200 text-red-600 hover:bg-red-50",
+  Completed: "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
+  "No Show": "border-amber-200 text-amber-700 hover:bg-amber-50",
+};
+
+/** Why the row cannot move to this stage, or null when it can. */
+function stageBlockedReason(
+  row: DashboardAppointment,
+  stage: AppointmentStage,
+): string | null {
+  const current = appointmentStage(row);
+  const booking = row.recordKind === "booking";
+  if (stage === "Rescheduled") return null;
+  if (current === "Cancelled" && stage !== "Cancelled") {
+    return "Reschedule to reopen a cancelled appointment.";
+  }
+  if (current === "Completed" && !booking && stage !== "Completed") {
+    return "A completed meeting cannot be changed.";
+  }
+  if (stage === "No Show" && !booking) {
+    return "Only booked appointments can be marked a no-show.";
+  }
+  return null;
+}
+
+function BookingStatusMenu({
+  row,
+  onEdit,
+  onReschedule,
+  onStage,
+  onDelete,
+}: {
+  row: DashboardAppointment;
+  /** Omit Edit/Delete when a row actions menu sits beside this one. */
+  onEdit?: () => void;
+  onReschedule: () => void;
+  onStage: (stage: SettableStage) => void;
+  onDelete?: () => void;
+}) {
+  const current = appointmentStage(row);
+  const { open, setOpen, pos, ref, menuRef, toggle } = useAnchoredMenu(176);
+  // Rescheduled is still booked: Booked reads as current for it too.
+  const isCurrent = (stage: AppointmentStage) =>
+    stage === current || (stage === "Booked" && current === "Rescheduled");
 
   return (
     <div className="relative" ref={ref}>
@@ -961,21 +1265,17 @@ function BookingStatusMenu({
         type="button"
         onClick={toggle}
         className={cn(
-          "inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-[11px] font-medium shadow-sm",
-          cancelled
-            ? "border-red-200 text-red-600 hover:bg-red-50"
-            : tone === "blue"
-              ? "border-blue-200 text-blue-600 hover:bg-blue-50"
-              : "border-[#E5E7EB] text-slate-700 hover:bg-slate-50",
+          "inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-[11px] font-medium whitespace-nowrap shadow-sm",
+          STAGE_BUTTON[current],
         )}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        {cancelled ? "Cancelled" : "Upcoming"}
+        {current}
         {open ? (
-          <ChevronUp className="h-3 w-3 text-slate-400" />
+          <ChevronUp className="h-3 w-3 opacity-60" />
         ) : (
-          <ChevronDown className="h-3 w-3 text-slate-400" />
+          <ChevronDown className="h-3 w-3 opacity-60" />
         )}
       </button>
       {open
@@ -983,7 +1283,118 @@ function BookingStatusMenu({
             <div
               ref={menuRef}
               role="menu"
-              className="fixed z-[80] w-[168px] overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
+              className="fixed z-[80] w-[176px] overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              {onEdit ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onEdit();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+                >
+                  <Pencil className="h-3 w-3 shrink-0 text-slate-400" />
+                  Edit
+                </button>
+              ) : null}
+              {STAGE_FILTERS.map(({ stage }) => {
+                const blocked = stageBlockedReason(row, stage);
+                const selected = stage !== "Rescheduled" && isCurrent(stage);
+                return (
+                  <button
+                    key={stage}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    disabled={!!blocked}
+                    title={blocked ?? undefined}
+                    onClick={() => {
+                      setOpen(false);
+                      if (stage === "Rescheduled") onReschedule();
+                      else if (!selected) onStage(stage);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px]",
+                      selected
+                        ? "bg-slate-50 font-medium text-slate-900"
+                        : "text-slate-700 hover:bg-slate-50",
+                      "disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 shrink-0 rounded-full",
+                        STAGE_DOT[stage],
+                        blocked && "opacity-30",
+                      )}
+                    />
+                    <span className="flex-1">
+                      {stage === "Rescheduled" ? "Reschedule…" : stage}
+                    </span>
+                    {selected ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" />
+                    ) : null}
+                  </button>
+                );
+              })}
+              {onDelete ? (
+                <>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onDelete();
+                    }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3 w-3 shrink-0" />
+                    Delete
+                  </button>
+                </>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+function AppointmentActionsMenu({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { open, setOpen, pos, ref, menuRef, toggle } = useAnchoredMenu(140);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={toggle}
+        className={cn(
+          "flex h-[26px] w-[26px] items-center justify-center rounded-md border bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700",
+          open ? "border-slate-300" : "border-[#E5E7EB]",
+        )}
+        aria-label="Appointment actions"
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <MoreVertical className="h-3.5 w-3.5" />
+      </button>
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[80] w-[140px] overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
               style={{ top: pos.top, left: pos.left }}
             >
               <button
@@ -995,43 +1406,8 @@ function BookingStatusMenu({
                 }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--brand-primary-strong)]" />
+                <Pencil className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 Edit
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
-                  onReschedule();
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                Reschedule
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                aria-pressed={cancelled}
-                onClick={() => {
-                  setOpen(false);
-                  if (!cancelled) onCancel();
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px]",
-                  cancelled
-                    ? "bg-red-50 font-medium text-red-600"
-                    : "text-slate-600 hover:bg-slate-50",
-                )}
-              >
-                <span
-                  className={cn(
-                    "h-2 w-2 shrink-0 rounded-full",
-                    cancelled ? "bg-red-500" : "bg-slate-300",
-                  )}
-                />
-                Cancelled
               </button>
               <button
                 type="button"
@@ -1042,13 +1418,150 @@ function BookingStatusMenu({
                 }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-600 hover:bg-red-50"
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
                 Delete
               </button>
             </div>,
             document.body,
           )
         : null}
+    </div>
+  );
+}
+
+function StageFilterMenu({
+  value,
+  onChange,
+}: {
+  value: AppointmentStage | null;
+  onChange: (stage: AppointmentStage | null) => void;
+}) {
+  const { open, setOpen, pos, ref, menuRef, toggle } = useAnchoredMenu(
+    180,
+    "start",
+  );
+  const active = STAGE_FILTERS.find((item) => item.stage === value);
+  const ActiveIcon = active?.icon ?? ListFilter;
+
+  function pick(stage: AppointmentStage | null) {
+    setOpen(false);
+    onChange(stage);
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={toggle}
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium",
+          value
+            ? "border-[var(--brand-primary)]/40 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
+            : "border-[#E5E7EB] bg-white text-slate-700 hover:bg-slate-50",
+        )}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <ActiveIcon className="h-3.5 w-3.5 shrink-0" />
+        {value ?? "All Statuses"}
+        {open ? (
+          <ChevronUp className="h-3 w-3 opacity-60" />
+        ) : (
+          <ChevronDown className="h-3 w-3 opacity-60" />
+        )}
+      </button>
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[80] w-[180px] overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={value === null}
+                onClick={() => pick(null)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
+                  value === null
+                    ? "font-medium text-[var(--brand-primary)]"
+                    : "text-slate-700",
+                )}
+              >
+                <ListFilter className="h-3.5 w-3.5 shrink-0" />
+                All Statuses
+              </button>
+              {STAGE_FILTERS.map(({ stage, icon: Icon }) => (
+                <button
+                  key={stage}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={value === stage}
+                  onClick={() => pick(stage)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
+                    value === stage
+                      ? "bg-[var(--brand-primary-soft)] font-medium text-[var(--brand-primary)]"
+                      : "text-slate-700",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      value === stage
+                        ? "text-[var(--brand-primary)]"
+                        : "text-slate-400",
+                    )}
+                  />
+                  {stage}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+function TableFontSizeControl({
+  size,
+  onStep,
+}: {
+  size: number;
+  onStep: (direction: 1 | -1) => void;
+}) {
+  const min = size <= TABLE_FONT_SIZES[0];
+  const max = size >= TABLE_FONT_SIZES[TABLE_FONT_SIZES.length - 1];
+  return (
+    <div
+      role="group"
+      aria-label="Table text size"
+      className="hidden h-8 items-center overflow-hidden rounded-lg border border-[#E5E7EB] bg-white lg:inline-flex"
+    >
+      <button
+        type="button"
+        onClick={() => onStep(-1)}
+        disabled={min}
+        title="Smaller text"
+        aria-label="Smaller text"
+        className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <span className="h-4 w-px bg-[#E5E7EB]" aria-hidden />
+      <button
+        type="button"
+        onClick={() => onStep(1)}
+        disabled={max}
+        title="Larger text"
+        aria-label="Larger text"
+        className="flex h-full w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
@@ -1060,7 +1573,7 @@ function AppointmentDayGroup({
   onView,
   onEdit,
   onReschedule,
-  onCancel,
+  onStage,
   onDelete,
 }: {
   label: string;
@@ -1069,15 +1582,15 @@ function AppointmentDayGroup({
   onView: (row: DashboardAppointment) => void;
   onEdit: (row: DashboardAppointment) => void;
   onReschedule: (row: DashboardAppointment) => void;
-  onCancel: (row: DashboardAppointment) => void;
+  onStage: (row: DashboardAppointment, stage: SettableStage) => void;
   onDelete: (row: DashboardAppointment) => void;
 }) {
   return (
     <>
       <tr className="border-b border-[#EEF0F3] bg-white">
         <td colSpan={7} className="px-3 py-1.5">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-            <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+          <span className="inline-flex items-center gap-1.5 text-[1em] font-medium text-slate-500">
+            <CalendarDays className="h-[1.27em] w-[1.27em] shrink-0 text-slate-400" />
             {label}
           </span>
         </td>
@@ -1090,7 +1603,7 @@ function AppointmentDayGroup({
           onView={() => onView(row)}
           onEdit={() => onEdit(row)}
           onReschedule={() => onReschedule(row)}
-          onCancel={() => onCancel(row)}
+          onStage={(stage) => onStage(row, stage)}
           onDelete={() => onDelete(row)}
         />
       ))}
@@ -1104,7 +1617,7 @@ function AppointmentCard({
   onView,
   onEdit,
   onReschedule,
-  onCancel,
+  onStage,
   onDelete,
 }: {
   row: DashboardAppointment;
@@ -1112,7 +1625,7 @@ function AppointmentCard({
   onView: () => void;
   onEdit: () => void;
   onReschedule: () => void;
-  onCancel: () => void;
+  onStage: (stage: SettableStage) => void;
   onDelete: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -1153,17 +1666,16 @@ function AppointmentCard({
               <p className="truncate text-[11px] text-slate-500">{row.topic}</p>
             </div>
             <div
-              className="shrink-0"
+              className="flex shrink-0 items-center gap-1.5"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
               <BookingStatusMenu
-                status={row.status}
-                onEdit={onEdit}
+                row={row}
                 onReschedule={onReschedule}
-                onCancel={onCancel}
-                onDelete={onDelete}
+                onStage={onStage}
               />
+              <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
             </div>
           </div>
           <div className="mt-2.5 grid grid-cols-1 gap-1.5 text-[12px] text-slate-600 min-[480px]:grid-cols-2">
@@ -1226,7 +1738,7 @@ function AppointmentRow({
   onView,
   onEdit,
   onReschedule,
-  onCancel,
+  onStage,
   onDelete,
 }: {
   row: DashboardAppointment;
@@ -1234,7 +1746,7 @@ function AppointmentRow({
   onView: () => void;
   onEdit: () => void;
   onReschedule: () => void;
-  onCancel: () => void;
+  onStage: (stage: SettableStage) => void;
   onDelete: () => void;
 }) {
   const eventName = row.eventTypeName || row.type;
@@ -1256,64 +1768,71 @@ function AppointmentRow({
       )}
     >
       <td className="px-3 py-2 align-middle">
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <span className="flex min-w-0 items-center gap-1.5 text-[1em] text-slate-700">
+          <Clock className="h-[1.27em] w-[1.27em] shrink-0 text-slate-400" />
           <span className="line-clamp-2 break-words">
             {formatTimeRange(row)}
           </span>
         </span>
       </td>
-      <td className="truncate px-2 py-2 align-middle text-[11px] font-medium text-slate-800">
+      <td className="truncate px-3 py-2 align-middle text-[1em] font-medium text-slate-800">
         {row.bookingCode || "—"}
       </td>
-      <td className="px-2 py-2 align-middle">
+      <td className="px-3 py-2 align-middle">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#7C6AE8] text-[9px] font-bold text-white">
+          <span className="flex h-[1.8em] w-[1.8em] shrink-0 items-center justify-center rounded bg-[#7C6AE8] text-[0.82em] font-bold text-white">
             {eventTypeInitials(eventName)}
           </span>
           <span
-            className="line-clamp-2 break-words text-[11px] text-slate-800"
+            className="line-clamp-2 break-words text-[1em] text-slate-800"
             title={eventName}
           >
             {eventName}
           </span>
         </span>
       </td>
-      <td className="px-2 py-2 align-middle">
+      <td className="px-3 py-2 align-middle">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-            <User className="h-3 w-3" />
+          <span className="flex h-[1.8em] w-[1.8em] shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+            <User className="h-[1.1em] w-[1.1em]" />
           </span>
           <span
-            className="line-clamp-2 break-words text-[11px] text-slate-800"
+            className="line-clamp-2 break-words text-[1em] text-slate-800"
             title={consultantLabel(row)}
           >
             {consultantLabel(row)}
           </span>
         </span>
       </td>
-      <td className="px-2 py-2 align-middle">
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-700">
-          <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      <td className="px-3 py-2 align-middle">
+        <span className="flex min-w-0 items-center gap-1.5 text-[1em] text-slate-700">
+          <span className="flex h-[1.8em] w-[1.8em] shrink-0 items-center justify-center text-slate-400">
+            <User className="h-[1.27em] w-[1.27em]" />
+          </span>
           <span className="line-clamp-2 break-words" title={row.guestName}>
             {row.guestName}
           </span>
         </span>
       </td>
-      <td className="truncate px-2 py-2 align-middle text-[11px] text-slate-700">
-        {row.paymentStatus || "—"}
-      </td>
       <td
-        className="px-2 py-2 align-middle"
+        className="px-3 py-2 align-middle"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         <BookingStatusMenu
-          status={row.status}
-          onEdit={onEdit}
+          row={row}
           onReschedule={onReschedule}
-          onCancel={onCancel}
-          onDelete={onDelete}
+          onStage={onStage}
         />
+      </td>
+      <td
+        className="px-3 py-2 align-middle"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-center">
+          <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
+        </div>
       </td>
     </tr>
   );
@@ -1409,7 +1928,7 @@ function MiniCalendar({
           </div>
         ))}
       </div>
-      <div className="grid auto-rows-fr grid-cols-7 text-center">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-7 text-center">
         {cells.map((day, i) => {
           if (!day) return <div key={`e-${i}`} className="min-h-9" />;
           const iso = `${year}-${String(mo + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -1549,7 +2068,7 @@ function AppointmentDrawer({
   onEdit,
   onEditMeeting,
   onReschedule,
-  onCancel,
+  onStage,
   onDelete,
   onSaved,
 }: {
@@ -1559,7 +2078,7 @@ function AppointmentDrawer({
   onEdit: () => void;
   onEditMeeting: () => void;
   onReschedule: () => void;
-  onCancel: () => void;
+  onStage: (stage: SettableStage) => void;
   onDelete: () => void;
   onSaved: () => void;
 }) {
@@ -1579,85 +2098,16 @@ function AppointmentDrawer({
   }, [row.id, row.start]);
 
   async function saveEdit() {
-    if (!date || !time) {
-      setError("Date & time is required");
-      return;
-    }
-    if (date < minDate) {
-      setError("Choose today or a future date and time.");
-      return;
-    }
-    const start = new Date(`${date}T${time}`);
-    if (
-      Number.isNaN(start.getTime()) ||
-      start.getTime() < bookingNow().getTime()
-    ) {
-      setError("Choose today or a future date and time.");
-      return;
-    }
-    const previousStart = parseAppointmentStart(row.start);
-    const previousEnd = row.end ? parseAppointmentStart(row.end) : null;
-    const minutes =
-      previousEnd &&
-      !Number.isNaN(previousEnd.getTime()) &&
-      !Number.isNaN(previousStart.getTime())
-        ? Math.max(
-            5,
-            Math.round(
-              (previousEnd.getTime() - previousStart.getTime()) / 60000,
-            ),
-          )
-        : 30;
-    const end = new Date(start.getTime() + minutes * 60 * 1000);
     setSaving(true);
     setError("");
-    try {
-      const when = {
-        // Typed on the host's clock; sent as the real instant.
-        startDateTime: instantFromBookingWallClock(start).toISOString(),
-        endDateTime: instantFromBookingWallClock(end).toISOString(),
-      };
-      if (row.recordKind === "meeting" || row.status === "Cancelled") {
-        const meetingId = row.meetingId || row.id;
-        const meeting = await tryCrmMeeting(() =>
-          updateCrmMeeting(meetingId, when),
-        );
-        if (row.status === "Cancelled") {
-          await fetch("/api/appointment/manage/reopen", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              meetingId,
-              guestName: row.guestName,
-              title: row.eventTypeName || row.topic,
-              dateIso: date,
-              startHHmm: time,
-              durationMinutes: minutes,
-            }),
-          }).catch(() => undefined);
-        } else if (!meeting) {
-          setError("Could not save this appointment.");
-          setSaving(false);
-          return;
-        }
-      } else {
-        const fresh = await readRescheduledBooking(row.id, when.startDateTime);
-        if (!fresh) {
-          setError("Could not save this appointment.");
-          setSaving(false);
-          return;
-        }
-        if (fresh.meetingId) {
-          await tryCrmMeeting(() => updateCrmMeeting(fresh.meetingId!, when));
-        }
-      }
-      toast.success("Appointment updated");
-      onSaved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+    const problem = await rescheduleAppointment(row, date, time);
+    if (problem) {
+      setError(problem);
       setSaving(false);
+      return;
     }
+    toast.success("Appointment updated");
+    onSaved();
   }
 
   const email = row.topic.includes("@") ? row.topic : "";
@@ -1679,7 +2129,7 @@ function AppointmentDrawer({
         onClose={onClose}
         onEdit={onEditMeeting}
         onReschedule={onReschedule}
-        onCancel={onCancel}
+        onStage={onStage}
         onDelete={onDelete}
       />
     );
@@ -1827,6 +2277,360 @@ function AppointmentDrawer({
   );
 }
 
+/** The appointment's length in minutes, 30 when it has no end. */
+function appointmentMinutes(row: DashboardAppointment) {
+  const start = parseAppointmentStart(row.start);
+  const end = row.end ? parseAppointmentStart(row.end) : null;
+  if (!end || Number.isNaN(end.getTime()) || Number.isNaN(start.getTime())) {
+    return 30;
+  }
+  return Math.max(5, Math.round((end.getTime() - start.getTime()) / 60000));
+}
+
+/**
+ * Moves the appointment to date + time (on the host's clock), keeping its
+ * length. Resolves to an error message, or null once saved.
+ */
+async function rescheduleAppointment(
+  row: DashboardAppointment,
+  date: string,
+  time: string,
+): Promise<string | null> {
+  if (!date || !time) return "Date & time is required";
+  const minDate = todayIsoInTimezone(bookingDisplayZone() ?? undefined);
+  const start = new Date(`${date}T${time}`);
+  if (
+    date < minDate ||
+    Number.isNaN(start.getTime()) ||
+    start.getTime() < bookingNow().getTime()
+  ) {
+    return "Choose today or a future date and time.";
+  }
+  const minutes = appointmentMinutes(row);
+  const end = new Date(start.getTime() + minutes * 60 * 1000);
+  try {
+    const when = {
+      // Typed on the host's clock; sent as the real instant.
+      startDateTime: instantFromBookingWallClock(start).toISOString(),
+      endDateTime: instantFromBookingWallClock(end).toISOString(),
+    };
+    if (row.recordKind === "meeting" || row.status === "Cancelled") {
+      const meetingId = row.meetingId || row.id;
+      const meeting = await tryCrmMeeting(() =>
+        updateCrmMeeting(meetingId, when),
+      );
+      if (row.status === "Cancelled") {
+        await fetch("/api/appointment/manage/reopen", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meetingId,
+            guestName: row.guestName,
+            title: row.eventTypeName || row.topic,
+            dateIso: date,
+            startHHmm: time,
+            durationMinutes: minutes,
+          }),
+        }).catch(() => undefined);
+      } else if (!meeting) {
+        return "Could not save this appointment.";
+      }
+    } else {
+      const fresh = await readRescheduledBooking(row.id, when.startDateTime);
+      if (!fresh) return "Could not save this appointment.";
+      if (fresh.meetingId) {
+        await tryCrmMeeting(() => updateCrmMeeting(fresh.meetingId!, when));
+      }
+    }
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : "Could not save";
+  }
+}
+
+const RESCHEDULE_SLOTS = Array.from({ length: 96 }, (_, i) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(i / 4))}:${pad((i % 4) * 15)}`;
+});
+
+function slotLabel(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+}
+
+function RescheduleDialog({
+  row,
+  onClose,
+  onSaved,
+}: {
+  row: DashboardAppointment;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const minDate = todayIsoInTimezone(bookingDisplayZone() ?? undefined);
+  const initial = appointmentParts(row);
+  const [date, setDate] = useState(
+    initial.date < minDate ? minDate : initial.date,
+  );
+  const [time, setTime] = useState(initial.time);
+  const [month, setMonth] = useState(() => {
+    const [y, m] = (initial.date < minDate ? minDate : initial.date)
+      .split("-")
+      .map(Number);
+    return new Date(y, m - 1, 1);
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const slotsRef = useRef<HTMLDivElement>(null);
+  const minutes = appointmentMinutes(row);
+  const now = bookingNow();
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Open the slot list at the chosen time rather than midnight.
+  useEffect(() => {
+    const list = slotsRef.current;
+    const chosen = list?.querySelector<HTMLElement>("[data-chosen='true']");
+    if (list && chosen) {
+      list.scrollTop =
+        chosen.offsetTop - list.clientHeight / 2 + chosen.clientHeight / 2;
+    }
+  }, []);
+
+  function slotPast(slot: string) {
+    return new Date(`${date}T${slot}`).getTime() < now.getTime();
+  }
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    const problem = await rescheduleAppointment(row, date, time);
+    if (problem) {
+      setError(problem);
+      setSaving(false);
+      return;
+    }
+    toast.success("Appointment rescheduled");
+    onSaved();
+  }
+
+  const year = month.getFullYear();
+  const mo = month.getMonth();
+  const firstDow = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const cells: (string | null)[] = [
+    ...Array.from({ length: firstDow }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) =>
+      dateKeyFromDate(new Date(year, mo, i + 1)),
+    ),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const canGoBack = dateKeyFromDate(new Date(year, mo, 0)) >= minDate;
+  const endClock = (() => {
+    const start = new Date(`${date}T${time}`);
+    if (Number.isNaN(start.getTime())) return "";
+    const end = new Date(start.getTime() + minutes * 60000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return slotLabel(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
+  })();
+  const chosenLabel = new Date(`${date}T00:00`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <WorkspacePortal>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-[1px]"
+        onClick={onClose}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reschedule-title"
+          className="flex max-h-full w-full max-w-[520px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div className="min-w-0">
+              <h3
+                id="reschedule-title"
+                className="text-[15px] font-bold text-slate-900"
+              >
+                Reschedule
+              </h3>
+              <p className="mt-0.5 truncate text-[12px] text-slate-500">
+                {row.eventTypeName || row.topic} with {row.guestName} ·
+                currently {formatSummaryWhen(row)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 py-4 sm:flex-row">
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[13px] font-bold text-slate-900">
+                  {month.toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={!canGoBack}
+                    onClick={() => setMonth(new Date(year, mo - 1, 1))}
+                    aria-label="Previous month"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMonth(new Date(year, mo + 1, 1))}
+                    aria-label="Next month"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-7 gap-0.5 text-center">
+                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+                  <span
+                    key={d}
+                    className="py-1 text-[10px] font-semibold text-slate-400 uppercase"
+                  >
+                    {d}
+                  </span>
+                ))}
+                {cells.map((iso, index) =>
+                  iso ? (
+                    <button
+                      key={iso}
+                      type="button"
+                      disabled={iso < minDate}
+                      onClick={() => {
+                        setDate(iso);
+                        setError("");
+                      }}
+                      aria-pressed={iso === date}
+                      className={cn(
+                        "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[12px] tabular-nums",
+                        iso === date
+                          ? "bg-[var(--brand-primary)] font-semibold text-white"
+                          : iso === minDate
+                            ? "font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
+                            : "text-slate-700 hover:bg-slate-100",
+                        "disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent",
+                      )}
+                    >
+                      {Number(iso.slice(8))}
+                    </button>
+                  ) : (
+                    <span key={`blank-${index}`} />
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div className="flex w-full flex-col sm:w-[150px]">
+              <p className="mb-2 flex h-7 items-center text-[13px] font-bold text-slate-900">
+                <Clock className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
+                Time
+              </p>
+              <div
+                ref={slotsRef}
+                className="relative max-h-[248px] min-h-[160px] space-y-1 overflow-y-auto pr-1"
+              >
+                {RESCHEDULE_SLOTS.map((slot) => {
+                  const past = slotPast(slot);
+                  const chosen = slot === time;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      data-chosen={chosen}
+                      disabled={past}
+                      onClick={() => {
+                        setTime(slot);
+                        setError("");
+                      }}
+                      className={cn(
+                        "flex h-8 w-full items-center justify-center rounded-md border text-[12px] font-medium tabular-nums",
+                        chosen
+                          ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white"
+                          : "border-[#E5E7EB] text-slate-700 hover:border-[var(--brand-primary)]/50 hover:bg-[var(--brand-primary-soft)]",
+                        "disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent",
+                      )}
+                    >
+                      {slotLabel(slot)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[12px] text-slate-500">
+                New time:{" "}
+                <span className="font-semibold text-slate-800">
+                  {chosenLabel} · {slotLabel(time)}
+                  {endClock ? ` – ${endClock}` : ""}
+                </span>
+              </p>
+              {error ? (
+                <p className="mt-0.5 text-[12px] font-medium text-rose-600">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void save()}
+                className={cn(
+                  FINANCE_PRIMARY_BUTTON_SM,
+                  "h-9 px-4 text-[13px]",
+                )}
+              >
+                {saving ? "Saving…" : "Reschedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </WorkspacePortal>
+  );
+}
+
 function formatSummaryWhen(row: DashboardAppointment) {
   const start = parseAppointmentStart(row.start);
   if (Number.isNaN(start.getTime())) return formatTimeRange(row);
@@ -1863,7 +2667,7 @@ function AppointmentSummary({
   onClose,
   onEdit,
   onReschedule,
-  onCancel,
+  onStage,
   onDelete,
 }: {
   row: DashboardAppointment;
@@ -1874,7 +2678,7 @@ function AppointmentSummary({
   onClose: () => void;
   onEdit: () => void;
   onReschedule: () => void;
-  onCancel: () => void;
+  onStage: (stage: SettableStage) => void;
   onDelete: () => void;
 }) {
   const [tab, setTab] = useState<"appointment" | "customer" | "audit">(
@@ -1921,11 +2725,10 @@ function AppointmentSummary({
                   {whenLabel}
                 </p>
                 <BookingStatusMenu
-                  status={row.status}
-                  tone="blue"
+                  row={row}
                   onEdit={onEdit}
                   onReschedule={onReschedule}
-                  onCancel={onCancel}
+                  onStage={onStage}
                   onDelete={onDelete}
                 />
               </div>

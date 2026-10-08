@@ -1,4 +1,7 @@
-import { loadSettingsValues } from "@/lib/settings/settings-store";
+import {
+  loadSettingsValues,
+  type SettingsValues,
+} from "@/lib/settings/settings-store";
 
 export const ONLINE_MEETING_PLATFORMS = [
   "Google Meet",
@@ -101,11 +104,25 @@ export function isOnlineLocationKind(kind: MeetingLocationKind) {
 const FALLBACK_OFFICE_ADDRESS =
   "Level 12, 100 Pitt Street, Sydney NSW 2000";
 
+const COMPANY_PROFILE_KEY = "organization/company-profile";
+
+/**
+ * The office address from Settings → Company Profile, or "" when none is set.
+ * The CRM workspace catalog wins over this browser's copy, so another device's
+ * save shows up here too.
+ */
+export function savedOfficeAddress(
+  catalog?: Record<string, SettingsValues> | null,
+): string {
+  const fromCrm = catalog?.[COMPANY_PROFILE_KEY]?.address;
+  if (typeof fromCrm === "string" && fromCrm.trim()) return fromCrm.trim();
+  if (typeof window === "undefined") return "";
+  const saved = loadSettingsValues(COMPANY_PROFILE_KEY).address;
+  return typeof saved === "string" ? saved.trim() : "";
+}
+
 export function defaultOfficeAddress() {
-  if (typeof window === "undefined") return FALLBACK_OFFICE_ADDRESS;
-  const saved = loadSettingsValues("organization/company-profile").address;
-  if (typeof saved === "string" && saved.trim()) return saved.trim();
-  return FALLBACK_OFFICE_ADDRESS;
+  return savedOfficeAddress() || FALLBACK_OFFICE_ADDRESS;
 }
 
 export function apiLocationTypeFromPlatform(

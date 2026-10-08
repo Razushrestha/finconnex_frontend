@@ -26,6 +26,7 @@ import {
 } from "@/lib/leads/api";
 import { asHttpUrl, mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { leadSendHref } from "@/lib/leads/convert-actions";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import type { LeadMoreAction } from "@/components/sales/leads/LeadMoreMenu";
@@ -166,8 +167,17 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
       return;
     }
     if (action === "delete") {
-      if (!window.confirm(`Delete ${card.name}? This cannot be undone.`)) return;
       void (async () => {
+        if (
+          !(await confirmDialog({
+            title: "Delete lead?",
+            message: `Delete ${card.name}? This cannot be undone.`,
+            confirmText: "Delete",
+            tone: "danger",
+          }))
+        ) {
+          return;
+        }
         // A CRM lead has to be deleted in the CRM first. Removing only the
         // local card let the next board refresh bring the lead straight back.
         if (isUuid(card.id)) {

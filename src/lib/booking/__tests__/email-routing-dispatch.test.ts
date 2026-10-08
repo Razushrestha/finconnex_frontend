@@ -106,17 +106,18 @@ describe("Email Configurations reach the outgoing mail (dashboard route)", () =>
     expect(team.replyTo).toBe("ada@example.com");
   });
 
-  it("changes nothing for a page that was never configured", async () => {
+  it("only defaults the customer's Reply To for a page that was never configured", async () => {
     await dispatchBookingNotifications({
       event: "confirmed",
       page: pageWith(undefined),
       booking,
     });
     expect(sendEmailDemoLive).toHaveBeenCalledTimes(2);
+    // Unset customer Reply To means "reply to the staff member" (email-config).
+    expect(sentTo("ada@example.com").replyTo).toBe("sam@finconnex.com");
+    expect(sentTo("sam@finconnex.com").replyTo).toBeUndefined();
     for (const email of ["ada@example.com", "sam@finconnex.com"]) {
-      const sent = sentTo(email);
-      expect(sent.cc).toEqual([]);
-      expect(sent.replyTo).toBeUndefined();
+      expect(sentTo(email).cc).toEqual([]);
     }
   });
 
@@ -193,16 +194,16 @@ describe("Email Configurations reach the outgoing mail (public booking page)", (
     expect("cc" in invited).toBe(false);
   });
 
-  it("leaves the request unchanged when nothing is configured", async () => {
+  it("adds only the default customer Reply To when nothing is configured", async () => {
     await dispatchBookingNotifications({
       event: "confirmed",
       page: pageWith(undefined),
       booking,
     });
+    expect(bodyFor("ada@example.com").replyTo).toBe("sam@finconnex.com");
+    expect("replyTo" in bodyFor("sam@finconnex.com")).toBe(false);
     for (const email of ["ada@example.com", "sam@finconnex.com"]) {
-      const body = bodyFor(email);
-      expect("cc" in body).toBe(false);
-      expect("replyTo" in body).toBe(false);
+      expect("cc" in bodyFor(email)).toBe(false);
     }
   });
 });

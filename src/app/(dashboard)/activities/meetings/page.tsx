@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { onRulesChange } from "@/lib/rules/storage";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   usePointerKanbanDrag,
   type PointerKanbanDrop,
@@ -165,13 +166,16 @@ export default function MeetingsPage() {
     );
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} meeting${count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} meeting${count === 1 ? "" : "s"}?`,
+        message: "This cannot be undone.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Info, Search } from "lucide-react";
 import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverPicker";
 import { loadWorkspaceConsultants, listAssignableOwnersLocal, type AssignableOwner } from "@/lib/users/assignable";
@@ -29,6 +29,7 @@ export function AssignConsultantsStep({
   initialPriorities,
   onBack,
   onCreate,
+  onDraftChange,
 }: {
   choice: CalendarTypeChoice;
   consultationName: string;
@@ -46,6 +47,11 @@ export function AssignConsultantsStep({
     consultants: string[],
     priorities: Record<string, ConsultantPriority>,
     userIds: Record<string, string>,
+  ) => void;
+  /** Every change, so it can be kept as a draft. */
+  onDraftChange?: (
+    consultants: string[],
+    priorities: Record<string, ConsultantPriority>,
   ) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -94,6 +100,18 @@ export function AssignConsultantsStep({
   function priorityOf(name: string): ConsultantPriority {
     return normalizeConsultantPriority(priorities[name], "Low");
   }
+
+  const draftChange = useRef(onDraftChange);
+  useEffect(() => {
+    draftChange.current = onDraftChange;
+  });
+  useEffect(() => {
+    const kept: Record<string, ConsultantPriority> = {};
+    for (const name of selected) {
+      kept[name] = normalizeConsultantPriority(priorities[name], "Low");
+    }
+    draftChange.current?.(selected, kept);
+  }, [selected, priorities]);
 
   function setPriority(name: string, priority: ConsultantPriority) {
     setPriorities((prev) => ({ ...prev, [name]: priority }));

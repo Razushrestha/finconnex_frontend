@@ -13,7 +13,7 @@ function render(
   return renderToStaticMarkup(
     createElement(EmailConfigFields, {
       audience,
-      value: { sendFrom: "default", replyTo: "", cc: "", ...value },
+      value: { sendFrom: "no_reply", replyTo: "", cc: "", ...value },
       superAdminEmail,
       onChange: () => {},
     }),
@@ -75,8 +75,8 @@ describe("EmailConfigFields", () => {
     );
   });
 
-  it("shows the default sender when nothing else is chosen", () => {
-    expect(trigger(render("user"), "Send from")).toContain("Default FinConnex email address");
+  it("shows the no-reply sender when nothing else is chosen", () => {
+    expect(trigger(render("user"), "Send from")).toContain("No-reply email address");
   });
 
   it("shows the empty 'Select …' prompts muted, not as a chosen value", () => {

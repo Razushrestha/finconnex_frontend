@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Info, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -109,16 +109,26 @@ export function BookingAdditionalSettingsStep({
   initial,
   onBack,
   onFinish,
+  onDraftChange,
   finishLabel = "Finish setup",
 }: {
   initial?: AdditionalSettingsValues;
   onBack: () => void;
   onFinish: (values: AdditionalSettingsValues) => void;
+  /** Every change in the wizard, so it can be kept as a draft. */
+  onDraftChange?: (values: AdditionalSettingsValues) => void;
   finishLabel?: string;
 }) {
   const [values, setValues] = useState<AdditionalSettingsValues>(
     initial ?? DEFAULT_ADDITIONAL_SETTINGS,
   );
+  const draftChange = useRef(onDraftChange);
+  useEffect(() => {
+    draftChange.current = onDraftChange;
+  });
+  useEffect(() => {
+    draftChange.current?.(values);
+  }, [values]);
 
   function patch(partial: Partial<AdditionalSettingsValues>) {
     setValues((prev) => ({ ...prev, ...partial }));

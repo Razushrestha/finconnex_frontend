@@ -75,7 +75,6 @@ import {
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
-  type Task,
   type TaskActionItem,
   type TaskStatus,
   type TaskType,

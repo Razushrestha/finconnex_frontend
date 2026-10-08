@@ -6,6 +6,8 @@ import {
 
 const HOURS_KEY = "organization/business-hours";
 const HOLIDAYS_KEY = "organization/holidays";
+/** Mirrored too: meeting and booking forms read the office address from it. */
+const COMPANY_PROFILE_KEY = "organization/company-profile";
 
 const WEEKDAY_NAMES: Array<[string, number]> = [
   ["sunday", 0],
@@ -58,7 +60,7 @@ export function mirrorOfficeCalendar(
   catalog: Record<string, SettingsValues> | null | undefined,
 ) {
   if (!catalog) return;
-  for (const key of [HOURS_KEY, HOLIDAYS_KEY]) {
+  for (const key of [HOURS_KEY, HOLIDAYS_KEY, COMPANY_PROFILE_KEY]) {
     const page = catalog[key];
     if (!page || typeof page !== "object") continue;
     const current = loadSettingsValues(key);

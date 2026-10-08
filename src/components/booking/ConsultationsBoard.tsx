@@ -2,8 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowLeft,
   CalendarDays,
+  Check,
   ChevronDown,
+  CloudOff,
+  FileText,
+  Loader2,
   ChevronRight,
   Copy,
   ExternalLink,
@@ -53,6 +58,7 @@ import {
   type ConsultationDetailsValues,
 } from "@/components/booking/ConsultationDetailsStep";
 import {
+  CONSULTATION_SETUP_STEPS,
   ConsultationWizardLayout,
   consultationSetupIndex,
   type AvailabilityPanelId,
@@ -69,17 +75,23 @@ import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   createCrmEventType,
+  deleteConsultationDraft,
+  listConsultationDrafts,
   saveBookingEventTypePage,
+  saveConsultationDraft,
+  type ConsultationDraftRecord,
   listCrmEventTypePages,
   mergeCrmEventTypePages,
   removeConsultationPage,
   tryCrmBooking,
 } from "@/lib/booking/api";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { mergeNotificationPrefs } from "@/lib/booking/notify-prefs";
 import {
   readLocalBookingPageBranding,
   writeLocalBookingPageBranding,
+  type BookingPageBranding,
 } from "@/lib/booking/page-branding";
 import { FINANCE_PRIMARY_BUTTON } from "@/components/finance/buttonStyles";
 import {
@@ -101,9 +113,54 @@ const SECTION_FILTERS = [
   "Active Consultations",
   "Non active Consultations",
   "My Consultations",
+  "Drafts",
 ] as const;
 
 type SectionFilter = (typeof SECTION_FILTERS)[number];
+
+/**
+ * Everything the setup wizard holds, saved on the server as a draft so an
+ * unfinished consultation can be picked up again from any browser.
+ */
+type WizardDraftData = {
+  version: 1;
+  step: ConsultationSetupStepId;
+  furthest: number;
+  choice: CalendarTypeChoice;
+  details: ConsultationDetailsValues | null;
+  consultants: string[];
+  priorities: Record<string, ConsultantPriority>;
+  userIds: Record<string, string>;
+  hostIds: string[];
+  availabilityPanel: AvailabilityPanelId;
+  availability: AvailabilityLimitsValues | null;
+  timezone: string;
+  rules: BookingRulesValues | null;
+  form: BookingFormValues | null;
+  notifyPanel: NotifyPanelId;
+  notify: NotificationRow[] | null;
+  notifyReminders?: BookingPage["notifyReminders"];
+  emailNotifyConfig?: EmailNotifyConfig;
+  whatsappNotifyConfig?: BookingPage["whatsappNotifyConfig"];
+  calendarInvite?: BookingPage["calendarInvite"];
+  additional: AdditionalSettingsValues | null;
+  branding: BookingPageBranding | null;
+};
+
+type DraftSaveState =
+  | { state: "idle" }
+  | { state: "saving" }
+  | { state: "saved"; at: number }
+  | { state: "error"; message: string };
+
+function draftData(record: ConsultationDraftRecord): WizardDraftData | null {
+  const data = record.data as Partial<WizardDraftData>;
+  if (!data.choice?.mode) return null;
+  return data as WizardDraftData;
+}
+
+/** Wait this long after the last edit before saving the draft. */
+const DRAFT_SAVE_DELAY_MS = 800;
 
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
   const remote = await tryCrmBooking(() => listCrmEventTypePages());
@@ -134,6 +191,8 @@ function matchesSection(
       return page.status !== "Live";
     case "My Consultations":
       return mine;
+    case "Drafts":
+      return false;
     default:
       return true;
   }
@@ -198,6 +257,21 @@ export function ConsultationsBoard() {
   const [additionalValues, setAdditionalValues] =
     useState<AdditionalSettingsValues | null>(null);
   const [wizardFurthest, setWizardFurthest] = useState(0);
+  const [pageBranding, setPageBranding] =
+    useState<BookingPageBranding | null>(null);
+  const [drafts, setDrafts] = useState<ConsultationDraftRecord[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(true);
+  const [draftsError, setDraftsError] = useState(false);
+  const [draftSave, setDraftSave] = useState<DraftSaveState>({
+    state: "idle",
+  });
+  // The server draft this wizard session saves to, once it has one.
+  const draftIdRef = useRef<string | null>(null);
+  const latestDraftJson = useRef("");
+  const savedDraftJson = useRef("");
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  // Set while publishing, so a late autosave cannot bring the draft back.
+  const publishing = useRef(false);
 
   function currentSetupStep(): ConsultationSetupStepId {
     if (pageStep) return "page";
@@ -232,6 +306,30 @@ export function ConsultationsBoard() {
   function wrapSetup(node: ReactNode) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => void saveDraftAndExit()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Consultations
+          </button>
+          <div className="flex items-center gap-3">
+            <DraftSaveStatus
+              save={draftSave}
+              hasName={Boolean(draftJson)}
+              onRetry={() => void flushDraft()}
+            />
+            <button
+              type="button"
+              onClick={() => void saveDraftAndExit()}
+              className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Save draft &amp; exit
+            </button>
+          </div>
+        </div>
         <ConsultationWizardLayout
           current={currentSetupStep()}
           furthest={wizardFurthest}
@@ -283,13 +381,226 @@ export function ConsultationsBoard() {
     setDetailsValues(null);
     setDetailsChoice(null);
     setWizardFurthest(0);
+    setPageBranding(null);
+    setWizardTimezone(browserTimezone());
+    draftIdRef.current = null;
+    latestDraftJson.current = "";
+    savedDraftJson.current = "";
+    setDraftSave({ state: "idle" });
+  }
+
+  function currentSnapshot(): WizardDraftData | null {
+    if (!detailsChoice) return null;
+    return {
+      version: 1,
+      step: currentSetupStep(),
+      furthest: wizardFurthest,
+      choice: detailsChoice,
+      details: detailsValues,
+      consultants: assignedConsultants,
+      priorities: assignedPriorities,
+      userIds: assignedUserIds,
+      hostIds: availabilityHostIds,
+      availabilityPanel,
+      availability: availabilityValues,
+      timezone: wizardTimezone,
+      rules: rulesValues,
+      form: formValues,
+      notifyPanel,
+      notify: notifyValues,
+      notifyReminders,
+      emailNotifyConfig,
+      whatsappNotifyConfig,
+      calendarInvite,
+      additional: additionalValues,
+      branding: pageBranding,
+    };
+  }
+
+  // Saved once the consultation has a name; nothing before is worth keeping.
+  const snapshot = currentSnapshot();
+  const draftJson =
+    snapshot?.details?.name.trim() ? JSON.stringify(snapshot) : "";
+
+  /** Saves the latest wizard state, one request at a time, in order. */
+  function flushDraft(): Promise<void> {
+    saveChain.current = saveChain.current.then(async () => {
+      const json = latestDraftJson.current;
+      if (publishing.current || !json || json === savedDraftJson.current) {
+        return;
+      }
+      const data = JSON.parse(json) as WizardDraftData;
+      setDraftSave({ state: "saving" });
+      try {
+        const saved = await saveConsultationDraft(
+          draftIdRef.current,
+          data.details?.name.trim() ?? "",
+          data as unknown as Record<string, unknown>,
+        );
+        if (publishing.current) return;
+        if (saved?.id) draftIdRef.current = saved.id;
+        savedDraftJson.current = json;
+        setDraftSave({ state: "saved", at: Date.now() });
+      } catch (err) {
+        setDraftSave({
+          state: "error",
+          message:
+            err instanceof Error && err.message
+              ? err.message
+              : "Could not save the draft",
+        });
+      }
+    });
+    return saveChain.current;
+  }
+
+  useEffect(() => {
+    latestDraftJson.current = draftJson;
+    if (!draftJson || draftJson === savedDraftJson.current) return;
+    const timer = window.setTimeout(
+      () => void flushDraft(),
+      DRAFT_SAVE_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+    // flushDraft reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftJson]);
+
+  // Warn before closing the tab while an edit has not reached the server.
+  useEffect(() => {
+    if (!draftJson) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (latestDraftJson.current === savedDraftJson.current) return;
+      void flushDraft();
+      event.preventDefault();
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(draftJson)]);
+
+  function refreshDrafts() {
+    setDraftsLoading(true);
+    void listConsultationDrafts()
+      .then((rows) => {
+        setDrafts(rows);
+        setDraftsError(false);
+      })
+      .catch(() => setDraftsError(true))
+      .finally(() => setDraftsLoading(false));
+  }
+
+  /** Leaves the wizard, keeping its work as a draft. */
+  async function saveDraftAndExit() {
+    const hadDraft = Boolean(latestDraftJson.current);
+    await flushDraft();
+    resetWizard();
+    refreshDrafts();
+    if (hadDraft) {
+      setSectionFilter("Drafts");
+      toast.success("Saved to Drafts");
+    }
+  }
+
+  function openDraft(record: ConsultationDraftRecord) {
+    const data = draftData(record);
+    if (!data) {
+      toast.error("This draft cannot be opened.");
+      return;
+    }
+    resetWizard();
+    draftIdRef.current = record.id;
+    setDetailsChoice(data.choice);
+    setDetailsValues(data.details ?? null);
+    setAssignedConsultants(data.consultants ?? []);
+    setAssignedPriorities(data.priorities ?? {});
+    setAssignedUserIds(data.userIds ?? {});
+    setAvailabilityHostIds(data.hostIds ?? []);
+    setAvailabilityPanel(data.availabilityPanel ?? "dates");
+    setAvailabilityValues(data.availability ?? null);
+    if (data.timezone) setWizardTimezone(data.timezone);
+    setRulesValues(data.rules ?? null);
+    setFormValues(data.form ?? null);
+    setNotifyPanel(data.notifyPanel ?? "email");
+    setNotifyValues(data.notify ?? null);
+    setNotifyReminders(data.notifyReminders);
+    setEmailNotifyConfig(data.emailNotifyConfig);
+    setWhatsappNotifyConfig(data.whatsappNotifyConfig);
+    setCalendarInvite(data.calendarInvite);
+    setAdditionalValues(data.additional ?? null);
+    setPageBranding(data.branding ?? null);
+    // The page designer reads its theme from here when it opens.
+    if (data.branding) writeLocalBookingPageBranding(draftPageId, data.branding);
+    // Only steps whose earlier answers exist can be shown.
+    const step = data.details ? data.step : "details";
+    setWizardFurthest(Math.max(data.furthest ?? 0, consultationSetupIndex(step)));
+    goToSetupStep(step, true);
+    setDraftSave({ state: "saved", at: Date.parse(record.updatedAt) || Date.now() });
+  }
+
+  async function discardDraft(record: ConsultationDraftRecord) {
+    const name = record.name || "Untitled consultation";
+    if (
+      !(await confirmDialog({
+        title: "Discard draft?",
+        message: `Discard the draft “${name}”? This cannot be undone.`,
+        confirmText: "Discard",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    try {
+      await deleteConsultationDraft(record.id);
+      setDrafts((list) => list.filter((item) => item.id !== record.id));
+      toast.success("Draft discarded");
+    } catch (err) {
+      toast.error(
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not discard this draft",
+      );
+    }
+  }
+
+  /** Publishes a draft from the list without reopening the wizard. */
+  function publishDraft(record: ConsultationDraftRecord) {
+    const data = draftData(record);
+    if (!data) {
+      toast.error("This draft cannot be published.");
+      return;
+    }
+    const missing = draftMissingStep(data);
+    if (missing) {
+      toast.error(`Finish “${missing.title}” before publishing.`);
+      openDraft(record);
+      return;
+    }
+    void finishConsultation(data, record.id);
   }
 
   async function finishConsultation(
-    form: BookingFormValues | null,
-    additional?: AdditionalSettingsValues,
+    snap: WizardDraftData,
+    draftId: string | null,
   ) {
-    if (!detailsChoice || !detailsValues || !rulesValues) return;
+    const missing = draftMissingStep(snap);
+    if (missing) {
+      toast.error(`Finish “${missing.title}” before publishing.`);
+      // In the wizard: take the user to that step.
+      if (currentSnapshot()) goToSetupStep(missing.id, true);
+      return;
+    }
+    const detailsChoice = snap.choice;
+    const detailsValues = snap.details!;
+    const rulesValues = snap.rules!;
+    const form = snap.form;
+    const additional = snap.additional ?? undefined;
+    const assignedConsultants = snap.consultants;
+    const assignedPriorities = snap.priorities;
+    const assignedUserIds = snap.userIds;
+    const availabilityHostIds = snap.hostIds;
+    const availabilityValues = snap.availability;
+    const wizardTimezone = snap.timezone || browserTimezone();
     const mapped = rulesToPageFields(rulesValues, {
       durationMinutes: detailsValues.durationMinutes,
       group: detailsChoice.mode === "group",
@@ -385,12 +696,13 @@ export function ConsultationsBoard() {
       allowReschedule: additional?.allowReschedule !== false,
       allowCancel: additional?.allowCancel !== false,
       additionalSettings: additional,
-      notifyPrefs: mergeNotificationPrefs(notifyValues),
-      notifyReminders,
-      emailNotifyConfig,
-      whatsappNotifyConfig,
-      calendarInvite,
+      notifyPrefs: mergeNotificationPrefs(snap.notify),
+      notifyReminders: snap.notifyReminders,
+      emailNotifyConfig: snap.emailNotifyConfig,
+      whatsappNotifyConfig: snap.whatsappNotifyConfig,
+      calendarInvite: snap.calendarInvite,
     };
+    publishing.current = true;
     const created = await tryCrmBooking(() =>
       createCrmEventType({
         name: page.title,
@@ -416,7 +728,7 @@ export function ConsultationsBoard() {
       }),
     );
     const savedId = created?.id || page.id;
-    const branding = readLocalBookingPageBranding(draftPageId);
+    const branding = snap.branding ?? readLocalBookingPageBranding(draftPageId);
     if (savedId !== draftPageId) {
       writeLocalBookingPageBranding(savedId, branding);
     }
@@ -433,8 +745,18 @@ export function ConsultationsBoard() {
           }
         : page,
     );
+    // Wait out any save already on its way before removing the draft. Kept
+    // when the CRM did not create the consultation, so nothing is lost.
+    await saveChain.current;
+    if (draftId && created?.id) {
+      await tryCrmBooking(() => deleteConsultationDraft(draftId));
+      setDrafts((list) => list.filter((item) => item.id !== draftId));
+    }
+    publishing.current = false;
+    toast.success(`“${page.title}” is published`);
     void loadConsultationPagesFromApi().then(setPages);
     resetWizard();
+    refreshDrafts();
   }
 
   function refreshPages() {
@@ -446,6 +768,8 @@ export function ConsultationsBoard() {
 
   useEffect(() => {
     refreshPages();
+    refreshDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -500,7 +824,7 @@ export function ConsultationsBoard() {
     };
     return wrapSetup(
       <div className="flex min-h-[640px] flex-col pb-8">
-        <BookingPageDesigner page={designerPage} />
+        <BookingPageDesigner page={designerPage} onSaved={setPageBranding} />
         <div className="mt-6 flex justify-center gap-3">
           <button
             type="button"
@@ -511,9 +835,10 @@ export function ConsultationsBoard() {
           </button>
           <button
             type="button"
-            onClick={() =>
-              void finishConsultation(formValues, additionalValues ?? undefined)
-            }
+            onClick={() => {
+              const snap = currentSnapshot();
+              if (snap) void finishConsultation(snap, draftIdRef.current);
+            }}
             className="h-10 min-w-[96px] rounded-lg bg-[var(--brand-primary)] px-6 text-[13px] font-semibold text-white hover:brightness-110"
           >
             Finish setup
@@ -527,6 +852,7 @@ export function ConsultationsBoard() {
     return wrapSetup(
       <BookingAdditionalSettingsStep
         initial={additionalValues ?? undefined}
+        onDraftChange={setAdditionalValues}
         onBack={() => goToSetupStep("notify")}
         finishLabel="Next"
         onFinish={(values) => {
@@ -602,6 +928,7 @@ export function ConsultationsBoard() {
     return wrapSetup(
       <BookingFormStep
         initial={formValues ?? undefined}
+        onDraftChange={setFormValues}
         onBack={() => goToSetupStep("rules")}
         onNext={(values) => {
           setFormValues(values);
@@ -616,6 +943,7 @@ export function ConsultationsBoard() {
       <BookingRulesStep
         group={detailsChoice.mode === "group"}
         initial={rulesValues}
+        onDraftChange={setRulesValues}
         onBack={() => goToSetupStep("availability")}
         onSave={(rules) => {
           setRulesValues(rules);
@@ -668,6 +996,10 @@ export function ConsultationsBoard() {
         }
         initialSelected={assignedConsultants}
         initialPriorities={assignedPriorities}
+        onDraftChange={(consultants, priorities) => {
+          setAssignedConsultants(consultants);
+          setAssignedPriorities(priorities);
+        }}
         onBack={(consultants, priorities) => {
           setAssignedConsultants(consultants);
           setAssignedPriorities(priorities);
@@ -689,6 +1021,7 @@ export function ConsultationsBoard() {
       <ConsultationDetailsStep
         choice={detailsChoice}
         initial={detailsValues ?? undefined}
+        onDraftChange={setDetailsValues}
         onBack={() => {
           setDetailsChoice(null);
           setDetailsValues(null);
@@ -776,7 +1109,10 @@ export function ConsultationsBoard() {
         </div>
         <button
           type="button"
-          onClick={() => setChooseType(true)}
+          onClick={() => {
+            resetWizard();
+            setChooseType(true);
+          }}
           className={`${FINANCE_PRIMARY_BUTTON} h-10 px-3.5 text-[13px] sm:px-4`}
         >
           <Plus className="h-4 w-4" />
@@ -794,7 +1130,7 @@ export function ConsultationsBoard() {
           >
             {sectionFilter}
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[var(--brand-primary-soft)] px-1.5 text-[11px] font-bold text-[var(--brand-primary)]">
-              {filtered.length}
+              {sectionFilter === "Drafts" ? drafts.length : filtered.length}
             </span>
             <ChevronDown
               className={cn(
@@ -828,7 +1164,19 @@ export function ConsultationsBoard() {
         </div>
       </div>
 
-      {pagesLoading ? (
+      {sectionFilter === "Drafts" ? (
+        <DraftsList
+          drafts={drafts}
+          loading={draftsLoading}
+          error={draftsError}
+          view={view}
+          query={query}
+          onRetry={refreshDrafts}
+          onOpen={openDraft}
+          onPublish={publishDraft}
+          onDiscard={(record) => void discardDraft(record)}
+        />
+      ) : pagesLoading ? (
         <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
           Loading consultation pages…
         </p>
@@ -880,6 +1228,315 @@ export function ConsultationsBoard() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** The first wizard step a draft still needs before it can be published. */
+function draftMissingStep(data: WizardDraftData) {
+  const step = (id: ConsultationSetupStepId) =>
+    CONSULTATION_SETUP_STEPS[consultationSetupIndex(id)];
+  const details = data.details;
+  if (!details?.name.trim() || details.durationMinutes < 5) {
+    return step("details");
+  }
+  if (!data.consultants?.length) return step("consultants");
+  if (!data.rules) return step("rules");
+  return null;
+}
+
+function DraftSaveStatus({
+  save,
+  hasName,
+  onRetry,
+}: {
+  save: DraftSaveState;
+  hasName: boolean;
+  onRetry: () => void;
+}) {
+  if (!hasName) {
+    return (
+      <span className="text-[12px] text-slate-400">
+        Name the consultation to save a draft
+      </span>
+    );
+  }
+  if (save.state === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[12px] text-slate-500">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Saving draft…
+      </span>
+    );
+  }
+  if (save.state === "error") {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-rose-600"
+        title={save.message}
+      >
+        <CloudOff className="h-3.5 w-3.5" />
+        Draft not saved
+        <button
+          type="button"
+          onClick={onRetry}
+          className="font-semibold underline underline-offset-2"
+        >
+          Retry
+        </button>
+      </span>
+    );
+  }
+  if (save.state === "saved") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[12px] text-slate-500">
+        <Check className="h-3.5 w-3.5 text-emerald-600" />
+        Draft saved {formatSavedAt(save.at)}
+      </span>
+    );
+  }
+  return null;
+}
+
+function formatSavedAt(at: number) {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return "";
+  const today = new Date();
+  const time = date
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .toLowerCase();
+  return date.toDateString() === today.toDateString()
+    ? `at ${time}`
+    : `on ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}, ${time}`;
+}
+
+function formatEditedAgo(iso: string) {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return "";
+  const minutes = Math.round((Date.now() - at) / 60000);
+  if (minutes < 1) return "Edited just now";
+  if (minutes < 60) return `Edited ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Edited ${hours} hr ago`;
+  return `Edited ${new Date(at).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
+function DraftsList({
+  drafts,
+  loading,
+  error,
+  view,
+  query,
+  onRetry,
+  onOpen,
+  onPublish,
+  onDiscard,
+}: {
+  drafts: ConsultationDraftRecord[];
+  loading: boolean;
+  error: boolean;
+  view: ViewMode;
+  query: string;
+  onRetry: () => void;
+  onOpen: (record: ConsultationDraftRecord) => void;
+  onPublish: (record: ConsultationDraftRecord) => void;
+  onDiscard: (record: ConsultationDraftRecord) => void;
+}) {
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? drafts.filter((record) => record.name.toLowerCase().includes(q))
+    : drafts;
+
+  if (loading && drafts.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
+        Loading drafts…
+      </p>
+    );
+  }
+  if (error && drafts.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-500">
+        Drafts could not be loaded.{" "}
+        <button
+          type="button"
+          onClick={onRetry}
+          className="font-semibold text-[var(--brand-primary)] hover:underline"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+  if (shown.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
+        {q
+          ? "No drafts match your search."
+          : "No drafts. Consultations you start and don’t finish are saved here."}
+      </p>
+    );
+  }
+  return (
+    <div
+      className={
+        view === "grid"
+          ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          : "overflow-hidden rounded-xl border border-[#E5E7EB] bg-white"
+      }
+    >
+      {shown.map((record) => (
+        <DraftItem
+          key={record.id}
+          record={record}
+          row={view === "list"}
+          onOpen={() => onOpen(record)}
+          onPublish={() => onPublish(record)}
+          onDiscard={() => onDiscard(record)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DraftItem({
+  record,
+  row,
+  onOpen,
+  onPublish,
+  onDiscard,
+}: {
+  record: ConsultationDraftRecord;
+  row: boolean;
+  onOpen: () => void;
+  onPublish: () => void;
+  onDiscard: () => void;
+}) {
+  const data = draftData(record);
+  const title = record.name || data?.details?.name || "Untitled consultation";
+  const index = data ? consultationSetupIndex(data.step) : 0;
+  const stepTitle = CONSULTATION_SETUP_STEPS[Math.max(0, index)]?.title ?? "";
+  const ready = data ? !draftMissingStep(data) : false;
+  const meta = [
+    data?.details?.durationMinutes ? `${data.details.durationMinutes} mins` : "",
+    data?.choice?.title ?? "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  const cover = data?.details?.coverImageUrl;
+
+  const mark = cover ? (
+    <span className="flex h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+      <img src={cover} alt="" className="h-full w-full object-cover" />
+    </span>
+  ) : (
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-dashed border-[var(--brand-primary)]/40 bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
+      <FileText className="h-5 w-5" />
+    </span>
+  );
+
+  const actions = (
+    <div
+      className="flex shrink-0 items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={onDiscard}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+        aria-label={`Discard draft ${title}`}
+        title="Discard draft"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onPublish}
+        disabled={!ready}
+        title={
+          ready ? "Publish this consultation" : "Finish the setup to publish"
+        }
+        className="inline-flex h-8 items-center rounded-md border border-[var(--brand-primary)]/35 px-2.5 text-[12px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+      >
+        Publish
+      </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="inline-flex h-8 items-center gap-1 rounded-md bg-[var(--brand-primary)] px-2.5 text-[12px] font-semibold text-white hover:brightness-110"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        Continue
+      </button>
+    </div>
+  );
+
+  const body = (
+    <div className="flex min-w-0 items-start gap-3 text-left">
+      {mark}
+      <div className="min-w-0 pt-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3
+            className={cn(
+              "truncate font-bold text-slate-900",
+              row ? "text-[14px]" : "text-[16px]",
+            )}
+          >
+            {title}
+          </h3>
+          <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-700 uppercase">
+            Draft
+          </span>
+        </div>
+        {meta ? (
+          <p className="mt-0.5 truncate text-[12px] text-slate-500">{meta}</p>
+        ) : null}
+        <p className="mt-0.5 truncate text-[12px] text-slate-400">
+          {stepTitle ? `Step ${index + 1} of ${CONSULTATION_SETUP_STEPS.length}: ${stepTitle}` : ""}
+          {stepTitle && record.updatedAt ? " · " : ""}
+          {formatEditedAgo(record.updatedAt)}
+        </p>
+      </div>
+    </div>
+  );
+
+  const open = {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onOpen,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onOpen();
+      }
+    },
+  };
+
+  if (row) {
+    return (
+      <div
+        {...open}
+        className="flex cursor-pointer flex-col gap-3 border-b border-[#F3F4F6] px-4 py-3.5 transition-colors last:border-0 hover:bg-[var(--brand-primary-soft)] sm:flex-row sm:items-center sm:justify-between"
+      >
+        {body}
+        {actions}
+      </div>
+    );
+  }
+  return (
+    <article
+      {...open}
+      className="relative flex min-w-0 cursor-pointer flex-col rounded-xl border border-dashed border-[var(--brand-primary)]/35 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-colors hover:bg-[var(--brand-primary-soft)]"
+    >
+      {body}
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <PeopleSlot people={data?.consultants ?? []} />
+        {actions}
+      </div>
+    </article>
   );
 }
 
@@ -1185,18 +1842,30 @@ function CardMenu({
           <MenuRow
             icon={FolderInput}
             label="Move"
-            onClick={() => {
-              const next =
-                page.status === "Live"
-                  ? window.confirm("Move this consultation to Draft?")
-                    ? "Draft"
-                    : null
-                  : window.confirm("Move this consultation to Active?")
-                    ? "Live"
-                    : null;
+            onClick={async () => {
+              setOpen(false);
+              let next: "Draft" | "Live" | null = null;
+              if (page.status === "Live") {
+                if (
+                  await confirmDialog({
+                    title: "Move to Draft?",
+                    message: "Move this consultation to Draft?",
+                    confirmText: "Move to Draft",
+                  })
+                ) {
+                  next = "Draft";
+                }
+              } else if (
+                await confirmDialog({
+                  title: "Make active?",
+                  message: "Move this consultation to Active?",
+                  confirmText: "Make active",
+                })
+              ) {
+                next = "Live";
+              }
               if (!next) return;
               upsertBookingPage({ ...page, status: next });
-              setOpen(false);
               onRefresh();
             }}
           />
@@ -1205,11 +1874,19 @@ function CardMenu({
             label="Delete"
             danger
             onClick={() => {
-              if (!window.confirm(`Delete “${page.title}”?`)) return;
+              setOpen(false);
               void (async () => {
+                if (
+                  !(await confirmDialog({
+                    title: "Delete consultation?",
+                    message: `Delete “${page.title}”?`,
+                    confirmText: "Delete",
+                    tone: "danger",
+                  }))
+                )
+                  return;
                 try {
                   await removeConsultationPage(page);
-                  setOpen(false);
                   onRefresh();
                 } catch (err) {
                   toast.error(

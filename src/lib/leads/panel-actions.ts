@@ -8,7 +8,8 @@ import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import type { LeadCardQuickActionState } from "@/lib/leads/card-types";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { createCall, formatCallDate } from "@/lib/calls/store";
-import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
+import { createMeetingPreferCrm } from "@/lib/meetings/api";
+import { formatMeetingDateTime } from "@/lib/meetings/store";
 import {
   createCrmMessage,
   CRM_SMS_TO_NUMBER,
@@ -149,16 +150,26 @@ export async function submitLeadQuickAction(
 
   if (kind === "meeting") {
     const end = new Date(when.getTime() + 60 * 60 * 1000);
-    const meeting = createMeeting({
-      title: title || `Meeting with ${leadName}`,
-      relatedTo,
-      type: "Video Call",
-      startDateTime: formatMeetingDateTime(when),
-      endDateTime: formatMeetingDateTime(end),
-      organizer: owner,
-      agenda: draft.body.trim() || undefined,
-    });
-    return { ok: true, message: "Appointment scheduled", id: meeting.id };
+    try {
+      const meeting = await createMeetingPreferCrm({
+        title: title || `Meeting with ${leadName}`,
+        relatedTo,
+        relatedKind: "Lead",
+        relatedId: opts?.leadId,
+        type: "Video Call",
+        status: "Scheduled",
+        startDateTime: formatMeetingDateTime(when),
+        endDateTime: formatMeetingDateTime(end),
+        organizer: owner,
+        agenda: draft.body.trim() || undefined,
+      });
+      return { ok: true, message: "Appointment scheduled", id: meeting.id };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Could not schedule",
+      };
+    }
   }
 
   if (kind === "sms") {

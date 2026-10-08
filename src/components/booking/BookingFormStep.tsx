@@ -835,11 +835,14 @@ export function BookingFormStep({
   initial,
   onBack,
   onNext,
+  onDraftChange,
   embedded,
 }: {
   initial?: BookingFormValues;
   onBack?: () => void;
   onNext: (values: BookingFormValues) => void;
+  /** Every change in the wizard, so it can be kept as a draft. */
+  onDraftChange?: (values: BookingFormValues) => void;
   embedded?: boolean;
 }) {
   const [fields, setFields] = useState<BookingFormField[]>(
@@ -863,13 +866,32 @@ export function BookingFormStep({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [addFieldOpen, setAddFieldOpen] = useState(false);
+  // The button labels are locked until the user switches editing on.
+  const [buttonsEditable, setButtonsEditable] = useState(false);
+
+  const captcha = initial?.captcha ?? false;
+  const draftChange = useRef(onDraftChange);
+  useEffect(() => {
+    draftChange.current = onDraftChange;
+  });
+  useEffect(() => {
+    draftChange.current?.({
+      fields,
+      terms,
+      termsText,
+      captcha,
+      emailVerification,
+      freeButton,
+      paidButton,
+    });
+  }, [fields, terms, termsText, captcha, emailVerification, freeButton, paidButton]);
 
   function commit() {
     onNext({
       fields,
       terms,
       termsText,
-      captcha: initial?.captcha ?? false,
+      captcha,
       emailVerification,
       freeButton,
       paidButton,
@@ -1128,9 +1150,15 @@ export function BookingFormStep({
             </div>
           </div>
 
-          <h3 className="mt-8 mb-3 text-[14px] font-bold text-slate-800">
-            Booking Confirmation Button
-          </h3>
+          <div className="mt-8 mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-[14px] font-bold text-slate-800">
+              Booking Confirmation Button
+            </h3>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-[12px] font-medium text-slate-600">
+              Edit
+              <Toggle on={buttonsEditable} onChange={setButtonsEditable} />
+            </label>
+          </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
@@ -1139,7 +1167,8 @@ export function BookingFormStep({
               <input
                 value={freeButton}
                 onChange={(e) => setFreeButton(e.target.value)}
-                className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40"
+                disabled={!buttonsEditable}
+                className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
               />
             </label>
             <label className="block">
@@ -1149,7 +1178,8 @@ export function BookingFormStep({
               <input
                 value={paidButton}
                 onChange={(e) => setPaidButton(e.target.value)}
-                className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40"
+                disabled={!buttonsEditable}
+                className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]/40 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
               />
             </label>
           </div>

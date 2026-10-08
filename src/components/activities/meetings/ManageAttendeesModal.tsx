@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { Search, Trash2, UserPlus, X } from "lucide-react";
 import {
   MEETING_ATTENDEE_ROLES,

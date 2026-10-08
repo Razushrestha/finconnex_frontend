@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ACTIVITY_OWNERS, initials } from "@/lib/activities/shared";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { relatedMatchesLead } from "@/lib/leads/activity-index";
 import { emitLeadActivityChange, onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import {
@@ -544,8 +545,17 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
     notify("Note duplicated");
   }
 
-  function removeNote(note: Note) {
-    if (!window.confirm(`Delete “${note.title}”? This cannot be undone.`)) return;
+  async function removeNote(note: Note) {
+    if (
+      !(await confirmDialog({
+        title: "Delete note?",
+        message: `Delete “${note.title}”? This cannot be undone.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     deleteNote(note.id);
     if (isCrmNoteId(note.id)) {
       void tryCrmNote(() => deleteCrmNote(note.id));
@@ -753,7 +763,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
                               icon={Trash2}
                               label="Delete"
                               danger
-                              onClick={() => removeNote(note)}
+                              onClick={() => void removeNote(note)}
                             />
                           </div>
                         </>

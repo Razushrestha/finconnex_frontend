@@ -21,10 +21,7 @@ import {
 import { onPipelineSlaChange, arePipelineSlaBadgesVisible } from "@/lib/pipeline-sla/settings";
 import { buildLeadCardViewModelFromCard } from "@/lib/leads/card-view-model";
 import { truncateActivityTitle } from "@/lib/leads/activity-summary";
-import {
-  ACTIVITY_TITLE_TRUNCATE_AT,
-  type LeadCardQuickActionState,
-} from "@/lib/leads/card-types";
+import { ACTIVITY_TITLE_TRUNCATE_AT } from "@/lib/leads/card-types";
 import {
   QUICK_STATE_WORDS,
   QUICK_URGENCY,
@@ -35,7 +32,6 @@ import type { QuickActionKind } from "@/lib/leads/panel-actions";
 import { LeadSlaChip } from "@/components/sales/leads/LeadSlaChip";
 import type { LeadFilters } from "./FilterLeadsPanel";
 import { leadMatchesFilters } from "@/lib/filters/records";
-import { sortLeadCards } from "@/lib/leads/sort";
 import {
   LeadCardPanelHost,
   type LeadPanelState,
@@ -375,7 +371,6 @@ function buildColumnRenderers(
 export function LeadListView({
   columns: columnsProp,
   filters,
-  sortValue,
   manageColumns: manageColumnsProp,
   onManageColumnsChange,
   pageSize: pageSizeProp,

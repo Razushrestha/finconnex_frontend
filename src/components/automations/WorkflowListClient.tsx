@@ -53,6 +53,7 @@ import {
 } from "@/lib/automations/types";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 function fmt(value?: string | null): string {
   if (!value) return "—";
@@ -497,8 +498,15 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
                           icon={<Trash2 className="h-3.5 w-3.5" />}
                           label="Delete"
                           danger
-                          onClick={() => {
-                            if (window.confirm(`Delete "${automation.name}"?`)) {
+                          onClick={async () => {
+                            if (
+                              await confirmDialog({
+                                title: "Delete automation?",
+                                message: `Delete "${automation.name}"?`,
+                                confirmText: "Delete",
+                                tone: "danger",
+                              })
+                            ) {
                               void withBusy(automation.id, () => deleteAutomation(automation.id));
                             }
                           }}

@@ -52,6 +52,7 @@ import {
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function ResourceDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -216,9 +217,18 @@ export function ResourceDetailClient({ id }: { id: string }) {
     setTab("overview");
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!row) return;
-    if (!window.confirm(`Delete ${row.resourceId}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete resource?",
+        message: `Delete ${row.resourceId}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     const gate = softDeleteRecord({
       action: "resources.delete",
       module: "resources",
@@ -329,7 +339,7 @@ export function ResourceDetailClient({ id }: { id: string }) {
             </button>
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => void onDelete()}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50"
             >
               <Trash2 className="h-3.5 w-3.5" />

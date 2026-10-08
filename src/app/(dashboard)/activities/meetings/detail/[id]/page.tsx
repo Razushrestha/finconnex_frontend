@@ -28,6 +28,7 @@ import { MeetingSidebarCard } from "@/components/activities/meetings/detail/Meet
 import { EditMeetingModal } from "@/components/activities/meetings/detail/EditMeetingModal";
 import { onRulesChange } from "@/lib/rules";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog, promptDialog } from "@/lib/notify/dialog";
 
 export default function MeetingDetailsPage({
   params,
@@ -172,8 +173,14 @@ export default function MeetingDetailsPage({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  const raw = window.prompt("Reminder minutes before start", "15");
+                onClick={async () => {
+                  const raw = await promptDialog({
+                    title: "Set reminder",
+                    label: "Reminder minutes before start",
+                    defaultValue: "15",
+                    inputType: "number",
+                    confirmText: "Save",
+                  });
                   if (raw == null) return;
                   const minutes = Number(raw);
                   if (!Number.isFinite(minutes)) {
@@ -214,8 +221,17 @@ export default function MeetingDetailsPage({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  if (!window.confirm(`Delete ${meeting.title}?`)) return;
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog({
+                      title: "Delete meeting?",
+                      message: `${meeting.title} will be deleted.`,
+                      confirmText: "Delete",
+                      tone: "danger",
+                    }))
+                  ) {
+                    return;
+                  }
                   deleteMeeting(meeting.id);
                   void tryCrmMeeting(() => deleteCrmMeeting(meeting.id));
                   router.push("/activities/meetings");

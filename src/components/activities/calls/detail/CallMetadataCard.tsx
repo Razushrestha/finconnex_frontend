@@ -60,7 +60,7 @@ function fromDateTime(date: string, time: string, fallback: string): string {
   if (!d) return fallback;
   const t = time.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!t) return `${d[3]}/${d[2]}/${d[1]}`;
-  let hours = Number(t[1]);
+  const hours = Number(t[1]);
   const minutes = t[2];
   const ap = hours >= 12 ? "PM" : "AM";
   const display = hours % 12 || 12;

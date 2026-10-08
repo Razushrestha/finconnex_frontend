@@ -21,6 +21,7 @@ import {
 } from "@/lib/recycle-bin/api";
 import { useCrmRecycleBin } from "@/lib/recycle-bin/use-crm-recycle-bin";
 import { cn } from "@/lib/utils";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 /** Settings → Data Management → Recycle Bin */
 export function RecycleBinSettingsClient({
@@ -85,9 +86,12 @@ export function RecycleBinSettingsClient({
 
   async function onPurge(item: RecycleBinItem) {
     if (
-      !window.confirm(
-        `Permanently delete ${item.recordLabel}? This cannot be undone.`,
-      )
+      !(await confirmDialog({
+        title: "Permanently delete?",
+        message: `Permanently delete ${item.recordLabel}? This cannot be undone.`,
+        confirmText: "Delete permanently",
+        tone: "danger",
+      }))
     ) {
       return;
     }

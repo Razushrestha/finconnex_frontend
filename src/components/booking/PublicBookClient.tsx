@@ -95,6 +95,10 @@ import {
 import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 import { cn } from "@/lib/utils";
 import { BackgroundCredit } from "@/components/booking/BackgroundCredit";
+import {
+  BrandFooter,
+  BrandSocialFollow,
+} from "@/components/booking/BrandSocialLinks";
 
 type Step = "date" | "details" | "done";
 
@@ -1515,6 +1519,10 @@ function BookFlow({
                     </button>
                   );
                 })}
+                <BrandSocialFollow
+                  branding={pageBranding}
+                  className="mx-4 mt-3 pt-4 pb-2"
+                />
               </nav>
 
               <section className="min-w-0 px-5 py-6 sm:px-8">
@@ -2405,7 +2413,11 @@ function BookFlow({
           </div>
         ) : null}
       </div>
-      <PublicBrandFooter branding={pageBranding} />
+      {/* Basic shows the socials under its step list instead. */}
+      <PublicBrandFooter
+        branding={pageBranding}
+        socials={pageBranding.layout !== "basic"}
+      />
     </div>
   );
 }
@@ -2461,22 +2473,19 @@ function slotPeriods<T extends { start: string }>(slots: T[]) {
   return periods.filter((period) => period.slots.length);
 }
 
-function PublicBrandFooter({ branding }: { branding: BookingPageBranding }) {
-  const items = [
-    branding.footer.contactVisible && branding.footer.contact,
-    branding.footer.emailVisible && branding.footer.email,
-    branding.footer.addressVisible && branding.footer.address,
-    branding.footer.facebookVisible && branding.footer.facebook,
-    branding.footer.instagramVisible && branding.footer.instagram,
-    branding.footer.xVisible && branding.footer.x,
-    branding.footer.linkedinVisible && branding.footer.linkedin,
-  ].filter(Boolean);
-  if (!items.length) return null;
+function PublicBrandFooter({
+  branding,
+  socials,
+}: {
+  branding: BookingPageBranding;
+  socials: boolean;
+}) {
   return (
-    <div className="mt-4 flex w-full max-w-[980px] flex-wrap gap-x-4 gap-y-1 px-1 text-[12px] text-slate-500">
-      {items.map((item) => (
-        <span key={String(item)}>{item}</span>
-      ))}
+    <div
+      className="mt-4 w-full max-w-[980px] px-1"
+      style={{ ["--booking-brand" as string]: branding.primaryColor }}
+    >
+      <BrandFooter branding={branding} socials={socials} />
     </div>
   );
 }

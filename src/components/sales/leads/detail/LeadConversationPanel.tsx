@@ -232,12 +232,16 @@ export function LeadConversationPanel({
   const plusRef = useRef<HTMLDivElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // A new lead, or new opening defaults, resets the composer and filters.
+  // Adjusted during render (not in an effect) so it never shows a frame of
+  // the previous lead's choices.
+  const resetKey = `${card.id}|${initialComposerChannel}|${initialChannelFilters?.join(",") ?? ""}`;
+  const [appliedResetKey, setAppliedResetKey] = useState(resetKey);
+  if (appliedResetKey !== resetKey) {
+    setAppliedResetKey(resetKey);
     setComposerChannel(initialComposerChannel);
-    if (initialChannelFilters) {
-      setChannelFilters(initialChannelFilters);
-    }
-  }, [initialComposerChannel, initialChannelFilters, card.id]);
+    if (initialChannelFilters) setChannelFilters(initialChannelFilters);
+  }
 
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
 

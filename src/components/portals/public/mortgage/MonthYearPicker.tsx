@@ -95,8 +95,8 @@ export function MonthYearPicker({
   }
 
   const threeYearsAgo = () => {
-    let year = now.year - 3;
-    let month = now.month;
+    const year = now.year - 3;
+    const month = now.month;
     onChange(toValue(year, month));
     setOpen(false);
   };

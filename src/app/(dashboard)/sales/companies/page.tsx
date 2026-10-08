@@ -59,6 +59,7 @@ import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportM
 import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog, promptDialog } from "@/lib/notify/dialog";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
@@ -227,13 +228,16 @@ export default function CompaniesPage() {
     setBulkFlash(`Exported ${n} selected companies`);
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} compan${count === 1 ? "y" : "ies"}? This moves them to the recycle bin.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} compan${count === 1 ? "y" : "ies"}?`,
+        message: "This moves them to the recycle bin.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }
@@ -254,12 +258,15 @@ export default function CompaniesPage() {
     setBulkFlash(`Deleted ${n} compan${n === 1 ? "y" : "ies"}`);
   }
 
-  function changeOwnerSelected() {
+  async function changeOwnerSelected() {
     if (!selectedIds.length) return;
-    const owner = window.prompt(
-      `Assign owner UUID for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}.`,
-      "",
-    );
+    const owner = await promptDialog({
+      title: "Change owner",
+      message: `Assign owner UUID for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}.`,
+      label: "Owner UUID",
+      defaultValue: "",
+      confirmText: "Assign",
+    });
     if (!owner?.trim()) return;
     const liveIds = selectedIds.filter(isUuid);
     if (isUuid(owner.trim()) && liveIds.length) {
@@ -280,12 +287,15 @@ export default function CompaniesPage() {
     setBulkFlash(`Updated owner on ${n} compan${n === 1 ? "y" : "ies"}`);
   }
 
-  function changeStatusSelected() {
+  async function changeStatusSelected() {
     if (!selectedIds.length) return;
-    const status = window.prompt(
-      `CRM status for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}.\nUse one of: ${COMPANY_STATUSES.join(", ")}`,
-      "Prospect",
-    );
+    const status = await promptDialog({
+      title: "Change status",
+      message: `CRM status for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}. Use one of: ${COMPANY_STATUSES.join(", ")}`,
+      label: "Status",
+      defaultValue: "Prospect",
+      confirmText: "Update",
+    });
     if (!status?.trim()) return;
     const next = COMPANY_STATUSES.find(
       (s) => s.toLowerCase() === status.trim().toLowerCase(),
@@ -464,8 +474,8 @@ export default function CompaniesPage() {
           onRunMacro={() => console.log("run macro clicked")}
           onCreateTask={() => console.log("create task clicked")}
           onSetReminder={() => console.log("set reminder clicked")}
-          onMassUpdate={() => changeStatusSelected()}
-          onChangeOwner={() => changeOwnerSelected()}
+          onMassUpdate={() => void changeStatusSelected()}
+          onChangeOwner={() => void changeOwnerSelected()}
           onCadences={() => console.log("cadences clicked")}
           onAddToCampaigns={() => console.log("add to campaigns clicked")}
           onPrintMailingLabels={() =>
@@ -473,7 +483,7 @@ export default function CompaniesPage() {
           }
           onMailMerge={() => setMergeOpen(true)}
           onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={runBulkDelete}
+          onDelete={() => void runBulkDelete()}
           onExportSelectedRecords={() => exportSelected()}
         />
       ) : bulkFlash ? (

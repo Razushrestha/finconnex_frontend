@@ -24,6 +24,7 @@ import {
 } from "@/lib/workflow-rules/types";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 const emptyDraft = {
   name: "",
@@ -185,7 +186,16 @@ export function WorkflowRulesSettingsClient() {
   }
 
   async function onDelete(row: WorkflowRule) {
-    if (!window.confirm(`Soft-delete “${row.name}”?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Soft-delete rule?",
+        message: `Soft-delete “${row.name}”?`,
+        confirmText: "Soft-delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       try {

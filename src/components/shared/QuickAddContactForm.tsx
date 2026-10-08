@@ -12,6 +12,7 @@ import { splitNameParts } from "@/components/sales/leads/LeadContactPicker";
 import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
 import { emailAddressProblem } from "@/lib/emails/address";
+import { EmailProblemText } from "@/components/shared/EmailProblemText";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -180,7 +181,16 @@ export function QuickAddContactForm({
         </Field>
       </div>
       {error ? (
-        <p className="mt-1.5 text-[11px] font-medium text-rose-500">{error}</p>
+        <EmailProblemText
+          message={error}
+          email={email}
+          onUseSuggestion={(address) => {
+            setEmail(address);
+            setError("");
+            setFieldErrors((prev) => ({ ...prev, email: false }));
+          }}
+          className="mt-1.5 text-[11px] font-medium text-rose-500"
+        />
       ) : null}
       <div className="mt-2 flex justify-end gap-2">
         <button

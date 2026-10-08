@@ -135,7 +135,12 @@ export function smokeTablePreferencesWiring() {
     fail("applyTablePreferenceToColumns did not hide phone");
   }
   const body = tablePreferenceFromColumns("leads", applied);
-  if (!body.visibleColumnIds.includes("name") || body.columnOrder[0] !== "email") {
+  // Required columns always lead (orderManageColumnsByPin); the saved order
+  // follows for the rest.
+  if (
+    !body.visibleColumnIds.includes("name") ||
+    body.columnOrder.join(",") !== "name,email,phone"
+  ) {
     fail("tablePreferenceFromColumns lost column order");
   }
 }

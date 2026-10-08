@@ -60,6 +60,22 @@ const LOCAL_PART = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{
 const DOMAIN_LABEL = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 
 /**
+ * The address the user most likely meant, when the domain is a common
+ * provider with extra characters after it ("ram@gmail.comcomcom" →
+ * "ram@gmail.com"). Null when there is nothing to suggest.
+ */
+export function emailAddressSuggestion(value: string): string | null {
+  const address = value.trim();
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return null;
+  const domain = address.slice(at + 1).toLowerCase();
+  const near = COMMON_DOMAINS.find(
+    (known) => domain !== known && domain.startsWith(known) && domain.length > known.length,
+  );
+  return near ? `${address.slice(0, at)}@${near}` : null;
+}
+
+/**
  * Why an email address cannot be used, or null when it looks deliverable.
  *
  * Stricter than isEmailAddress: the domain's ending must be a real
@@ -84,10 +100,8 @@ export function emailAddressProblem(value: string): string | null {
   if (labels.length < 2 || domain.length > 253 || !labels.every((label) => DOMAIN_LABEL.test(label))) {
     return "Enter an email address like name@example.com.";
   }
-  const near = COMMON_DOMAINS.find(
-    (known) => domain !== known && domain.startsWith(known) && domain.length > known.length,
-  );
-  if (near) return `Did you mean ${local}@${near}?`;
+  const suggestion = emailAddressSuggestion(address);
+  if (suggestion) return `Did you mean ${suggestion}?`;
   const ending = labels[labels.length - 1];
   if (!TOP_LEVEL_DOMAINS.has(ending)) {
     return `“.${ending}” is not a real email domain ending. Check the address.`;

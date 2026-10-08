@@ -46,6 +46,7 @@ import {
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { defaultActorName } from "@/lib/rules/actor";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function TimeEntryDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -184,13 +185,22 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
     router.push(`/finance/invoices/${result.invoice.id}`);
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!row) return;
     if (row.status === "Invoiced") {
       flash("Cannot delete invoiced entry");
       return;
     }
-    if (!window.confirm(`Delete ${row.entryId}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete time entry?",
+        message: `Delete ${row.entryId}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     const gate = softDeleteRecord({
       action: "time-tracking.delete",
       module: "time-tracking",
@@ -303,7 +313,7 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
             </ActionBtn>
           )}
           {row.status !== "Invoiced" && (
-            <ActionBtn onClick={onDelete} tone="rose" icon={Trash2}>
+            <ActionBtn onClick={() => void onDelete()} tone="rose" icon={Trash2}>
               Delete
             </ActionBtn>
           )}

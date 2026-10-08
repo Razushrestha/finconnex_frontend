@@ -66,6 +66,7 @@ import {
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 const PAGE_SIZE = 25;
 
@@ -326,7 +327,12 @@ export function WorkQueueView() {
   }
 
   async function handleDeleteRow(row: QueueRow) {
-    const ok = window.confirm(`Delete “${row.subject}”?`);
+    const ok = await confirmDialog({
+      title: "Delete item?",
+      message: `Delete “${row.subject}”?`,
+      confirmText: "Delete",
+      tone: "danger",
+    });
     if (!ok) return;
     crm.removeRow(row);
     try {

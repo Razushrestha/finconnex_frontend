@@ -41,6 +41,13 @@ import { toast } from "@/lib/notify/toast";
 import { fitImageDataUrl } from "@/lib/booking/image-fit";
 import { ImageEditModal } from "@/components/booking/ImageEditModal";
 import { BackgroundLibraryModal } from "@/components/booking/BackgroundLibraryModal";
+import { libraryImageCredit } from "@/lib/booking/background-library";
+import { BackgroundCredit } from "@/components/booking/BackgroundCredit";
+import {
+  BrandFooter,
+  BrandSocialFollow,
+  hasBrandFooter,
+} from "@/components/booking/BrandSocialLinks";
 import {
   assignedCalendarMembers,
   calendarDefaultHost,
@@ -69,7 +76,14 @@ const LAYOUT_LABEL: Record<BookingPageLayout, string> = {
   compact: "Compact",
 };
 
-export function BookingPageDesigner({ page }: { page: BookingPage }) {
+export function BookingPageDesigner({
+  page,
+  onSaved,
+}: {
+  page: BookingPage;
+  /** Each saved theme, e.g. so the setup wizard can keep it in its draft. */
+  onSaved?: (branding: BookingPageBranding) => void;
+}) {
   // The theme belongs to this consultation alone: it is loaded from and saved
   // to this consultation's own record, never the workspace's shared one.
   const eventTypeId = crmEventTypeIdOf(page);
@@ -123,6 +137,7 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
       };
       setBranding(next);
       writeLocalBookingPageBranding(page.id, next);
+      onSaved?.(next);
       if (!eventTypeId) {
         toast("Booking page saved");
         return;
@@ -361,11 +376,12 @@ function BasicThemePreview({
 
   return (
     <div
-      className="min-h-full bg-white"
+      className="relative min-h-full bg-white"
       style={{
         ...brandingBackgroundStyle(branding),
       }}
     >
+      <BackgroundCredit branding={branding} />
       <div className="px-5 pt-6 @lg:px-8">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
@@ -421,6 +437,13 @@ function BasicThemePreview({
               </button>
             );
           })}
+          <div style={{ ["--booking-brand" as string]: color }}>
+            <BrandSocialFollow
+              branding={branding}
+              size="sm"
+              className="mx-3 mt-2 pt-3 pb-1"
+            />
+          </div>
         </div>
         <div className="min-w-0 py-5 @2xl:pl-6">
           {stage === "service" ? (
@@ -575,6 +598,7 @@ function ModernThemePreview({
         ...brandingBackgroundStyle(branding),
       }}
     >
+      <BackgroundCredit branding={branding} />
       <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
@@ -753,11 +777,12 @@ function ClassicThemePreview({
 
   return (
     <div
-      className="min-h-full bg-slate-50/60"
+      className="relative min-h-full bg-slate-50/60"
       style={{
         ...brandingBackgroundStyle(branding),
       }}
     >
+      <BackgroundCredit branding={branding} />
       <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
@@ -970,11 +995,12 @@ function FreshThemePreview({
 
   return (
     <div
-      className="min-h-full bg-white"
+      className="relative min-h-full bg-white"
       style={{
         ...brandingBackgroundStyle(branding),
       }}
     >
+      <BackgroundCredit branding={branding} />
       <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
@@ -1203,11 +1229,12 @@ function CompactThemePreview({
 
   return (
     <div
-      className="min-h-full bg-white"
+      className="relative min-h-full bg-white"
       style={{
         ...brandingBackgroundStyle(branding),
       }}
     >
+      <BackgroundCredit branding={branding} />
       <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
@@ -1382,21 +1409,15 @@ function colorWash(hex: string, alpha: number) {
 }
 
 function PreviewFooter({ branding }: { branding: BookingPageBranding }) {
-  const items = [
-    branding.footer.contactVisible && branding.footer.contact,
-    branding.footer.emailVisible && branding.footer.email,
-    branding.footer.addressVisible && branding.footer.address,
-    branding.footer.facebookVisible && branding.footer.facebook,
-    branding.footer.instagramVisible && branding.footer.instagram,
-    branding.footer.xVisible && branding.footer.x,
-    branding.footer.linkedinVisible && branding.footer.linkedin,
-  ].filter(Boolean);
-  if (!items.length) return null;
+  // Basic shows the socials under its step list instead.
+  const socials = branding.layout !== "basic";
+  if (!hasBrandFooter(branding, { socials })) return null;
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 px-6 py-3 text-[11px] text-slate-500">
-      {items.map((item) => (
-        <span key={String(item)}>{item}</span>
-      ))}
+    <div
+      className="border-t border-slate-100 px-6 py-3"
+      style={{ ["--booking-brand" as string]: branding.primaryColor }}
+    >
+      <BrandFooter branding={branding} size="sm" socials={socials} />
     </div>
   );
 }
@@ -1485,8 +1506,19 @@ function ThemePanel({
       <BackgroundImageField
         value={branding.backgroundImageUrl}
         opacity={branding.backgroundOpacity}
-        onChange={(backgroundImageUrl, backgroundOpacity) =>
-          onChange({ ...branding, backgroundImageUrl, backgroundOpacity })
+        onChange={(backgroundImageUrl, backgroundOpacity, credit) =>
+          onChange({
+            ...branding,
+            backgroundImageUrl,
+            backgroundOpacity,
+            // undefined keeps the current credit (re-editing the same photo).
+            ...(credit !== undefined
+              ? {
+                  backgroundCredit: credit?.text ?? "",
+                  backgroundCreditUrl: credit?.url ?? null,
+                }
+              : {}),
+          })
         }
       />
       <div className="mt-4 flex items-center justify-between">
@@ -1600,6 +1632,15 @@ function FooterPanel({
 }) {
   const set = (patch: Partial<BookingPageBranding["footer"]>) =>
     onChange({ ...branding, footer: { ...branding.footer, ...patch } });
+  // Typing into an empty, hidden field shows it: filling in a handle and
+  // then finding it missing from the page because the eye was off is a trap.
+  type TextKey = "contact" | "email" | "address" | "facebook" | "instagram" | "x" | "linkedin";
+  const typed = (key: TextKey, value: string) => {
+    const visibleKey = `${key}Visible` as const;
+    const show =
+      value.trim() && !branding.footer[key].trim() && !branding.footer[visibleKey];
+    set({ [key]: value, ...(show ? { [visibleKey]: true } : {}) });
+  };
   return (
     <div className="space-y-3">
       <LabeledInput
@@ -1608,7 +1649,7 @@ function FooterPanel({
         value={branding.footer.contact}
         placeholder="+977"
         onVisible={(contactVisible) => set({ contactVisible })}
-        onChange={(contact) => set({ contact })}
+        onChange={(contact) => typed("contact", contact)}
       />
       <LabeledInput
         label="Email"
@@ -1616,7 +1657,7 @@ function FooterPanel({
         value={branding.footer.email}
         placeholder="Email"
         onVisible={(emailVisible) => set({ emailVisible })}
-        onChange={(email) => set({ email })}
+        onChange={(email) => typed("email", email)}
       />
       <LabeledInput
         label="Address"
@@ -1624,7 +1665,7 @@ function FooterPanel({
         value={branding.footer.address}
         placeholder="Address"
         onVisible={(addressVisible) => set({ addressVisible })}
-        onChange={(address) => set({ address })}
+        onChange={(address) => typed("address", address)}
       />
       <LabeledInput
         label="Facebook"
@@ -1632,7 +1673,7 @@ function FooterPanel({
         value={branding.footer.facebook}
         placeholder="facebook"
         onVisible={(facebookVisible) => set({ facebookVisible })}
-        onChange={(facebook) => set({ facebook })}
+        onChange={(facebook) => typed("facebook", facebook)}
       />
       <LabeledInput
         label="Instagram"
@@ -1640,7 +1681,7 @@ function FooterPanel({
         value={branding.footer.instagram}
         placeholder="Instagram"
         onVisible={(instagramVisible) => set({ instagramVisible })}
-        onChange={(instagram) => set({ instagram })}
+        onChange={(instagram) => typed("instagram", instagram)}
       />
       <LabeledInput
         label="X"
@@ -1648,7 +1689,7 @@ function FooterPanel({
         value={branding.footer.x}
         placeholder="x"
         onVisible={(xVisible) => set({ xVisible })}
-        onChange={(x) => set({ x })}
+        onChange={(x) => typed("x", x)}
       />
       <LabeledInput
         label="LinkedIn"
@@ -1656,7 +1697,7 @@ function FooterPanel({
         value={branding.footer.linkedin}
         placeholder="LinkedIn"
         onVisible={(linkedinVisible) => set({ linkedinVisible })}
-        onChange={(linkedin) => set({ linkedin })}
+        onChange={(linkedin) => typed("linkedin", linkedin)}
       />
       <SaveButton saving={saving} onClick={onSave} />
     </div>
@@ -1897,7 +1938,15 @@ function BackgroundImageField({
 }: {
   value: string | null;
   opacity: number;
-  onChange: (value: string | null, opacity: number) => void;
+  /**
+   * `credit`: a library photo's credit; null clears it (upload, delete);
+   * left out keeps it (re-editing the same photo).
+   */
+  onChange: (
+    value: string | null,
+    opacity: number,
+    credit?: { text: string; url: string | null } | null,
+  ) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -1941,7 +1990,7 @@ function BackgroundImageField({
           </button>
           <button
             type="button"
-            onClick={() => onChange(null, 100)}
+            onClick={() => onChange(null, 100, null)}
             aria-label="Delete background image"
             className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 px-2 text-[12px] font-medium text-rose-600 hover:bg-rose-50"
           >
@@ -1974,7 +2023,10 @@ function BackgroundImageField({
           onPick={(image) => {
             setPicking(false);
             // Only the link is kept; the page loads the photo from its source.
-            onChange(image.imageUrl, opacity || 100);
+            onChange(image.imageUrl, opacity || 100, {
+              text: libraryImageCredit(image),
+              url: image.landingUrl,
+            });
           }}
         />
       ) : null}
@@ -1984,7 +2036,9 @@ function BackgroundImageField({
           opacity={value && editing === value ? opacity : 100}
           onCancel={() => setEditing(null)}
           onApply={({ dataUrl, opacity: nextOpacity }) => {
-            onChange(dataUrl, nextOpacity);
+            // Re-editing the current photo keeps its credit; a new upload
+            // is the user's own image and has none.
+            onChange(dataUrl, nextOpacity, editing === value ? undefined : null);
             setEditing(null);
           }}
         />

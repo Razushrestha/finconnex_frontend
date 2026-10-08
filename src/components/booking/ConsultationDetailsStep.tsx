@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -10,10 +10,10 @@ import {
   type OfflineKind,
 } from "@/components/booking/OfflineLocationFields";
 import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverPicker";
+import { useMeetingPlatforms } from "@/lib/booking/conference-providers";
 import type { ConsultationMode } from "@/lib/booking/types";
 import {
   defaultOfficeAddress,
-  selectableOnlinePlatforms,
   type OnlineMeetingPlatform,
 } from "@/lib/booking/meeting-platforms";
 
@@ -51,11 +51,14 @@ export function ConsultationDetailsStep({
   initial,
   onBack,
   onNext,
+  onDraftChange,
 }: {
   choice: CalendarTypeChoice;
   initial?: ConsultationDetailsValues;
   onBack: () => void;
   onNext: (values: ConsultationDetailsValues) => void;
+  /** Every edit as typed (not yet validated), so it can be kept as a draft. */
+  onDraftChange?: (values: ConsultationDetailsValues) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [hours, setHours] = useState(
@@ -78,17 +81,10 @@ export function ConsultationDetailsStep({
       (initial?.online === false ? "offline" : "online");
     return place === "phone" ? "online" : place;
   });
-  const [connectedPlatforms, setConnectedPlatforms] = useState<
-    OnlineMeetingPlatform[]
-  >(() => selectableOnlinePlatforms());
-  const [platform, setPlatform] = useState(() => {
-    const list = selectableOnlinePlatforms();
-    const preferred = initial?.platform;
-    if (preferred && list.includes(preferred as OnlineMeetingPlatform)) {
-      return preferred;
-    }
-    return list[0] ?? "Zoom";
-  });
+  // Only the platforms that are actually integrated (CRM-reported).
+  const meetingPlatforms = useMeetingPlatforms();
+  const connectedPlatforms: OnlineMeetingPlatform[] = meetingPlatforms.platforms;
+  const [platform, setPlatform] = useState(() => initial?.platform ?? "");
   const officeAddress = defaultOfficeAddress();
   const [offlineStart] = useState(() =>
     initialOfflineLocation(initial?.locationDetail ?? "", officeAddress),
@@ -111,20 +107,47 @@ export function ConsultationDetailsStep({
     );
   }, [connectedPlatforms, platformQuery]);
 
-  useEffect(() => {
-    refreshConnectedPlatforms(initial?.platform);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Once the integrated platforms are known, a choice that isn't one of
+  // them (or none yet) falls back to the first that is.
+  const platformChoice = connectedPlatforms.includes(platform as OnlineMeetingPlatform)
+    ? platform
+    : (connectedPlatforms[0] ?? "");
 
-  function refreshConnectedPlatforms(preferred?: string) {
-    const list = selectableOnlinePlatforms();
-    setConnectedPlatforms(list);
-    setPlatform((current) => {
-      const pick = preferred || current;
-      if (list.includes(pick as OnlineMeetingPlatform)) return pick;
-      return list[0] ?? "Zoom";
+  const draftChange = useRef(onDraftChange);
+  useEffect(() => {
+    draftChange.current = onDraftChange;
+  });
+  useEffect(() => {
+    const paid = Number(priceDraft);
+    draftChange.current?.({
+      name: name.trim(),
+      durationMinutes: hours * 60 + minutes,
+      isFree,
+      price: isFree || !Number.isFinite(paid) ? 0 : paid,
+      online: meetingPlace === "online",
+      meetingPlace,
+      platform,
+      locationDetail:
+        meetingPlace === "offline"
+          ? resolveOfflineAddress(offlineKind, officeAddress, customAddress)
+          : "",
+      phoneDetail: phoneDetail.trim(),
+      coverImageUrl: coverImageUrl || undefined,
     });
-  }
+  }, [
+    name,
+    hours,
+    minutes,
+    isFree,
+    priceDraft,
+    meetingPlace,
+    platform,
+    offlineKind,
+    officeAddress,
+    customAddress,
+    phoneDetail,
+    coverImageUrl,
+  ]);
 
   const heading = name.trim() || "Consultation title";
   const subtitle = modeSubtitle(choice);
@@ -147,8 +170,10 @@ export function ConsultationDetailsStep({
       setError("Enter a price for paid consultations");
       return;
     }
-    if (meetingPlace === "online" && !platform) {
-      setError("Choose Zoom or Google Meet");
+    if (meetingPlace === "online" && !platformChoice) {
+      setError(
+        "No meeting platform integrated. Connect one in Settings → Integrations.",
+      );
       return;
     }
     const offlineAddress =
@@ -170,7 +195,7 @@ export function ConsultationDetailsStep({
       price: isFree ? 0 : paidAmount,
       online: meetingPlace === "online",
       meetingPlace,
-      platform,
+      platform: meetingPlace === "online" ? platformChoice : platform,
       locationDetail: meetingPlace === "offline" ? offlineAddress : "",
       phoneDetail: phoneDetail.trim(),
       coverImageUrl: coverImageUrl || undefined,
@@ -355,7 +380,6 @@ export function ConsultationDetailsStep({
                     onClick={() => {
                       setMeetingPlace(value);
                       setPlatformOpen(false);
-                      if (value === "online") refreshConnectedPlatforms();
                       if (error) setError("");
                     }}
                     className={cn(
@@ -372,23 +396,45 @@ export function ConsultationDetailsStep({
               </div>
 
               {meetingPlace === "online" ? (
-                connectedPlatforms.length === 0 ? (
-                  <div className="min-w-0 flex-1 rounded-lg border border-dashed border-[#E5E7EB] bg-slate-50 px-3 py-2.5">
-                    <p className="text-[13px] text-slate-600">
-                      Choose Zoom or Google Meet for this consultation.
+                meetingPlatforms.loading ? (
+                  <div className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-slate-50 px-3 py-2.5 text-[13px] text-slate-500">
+                    Checking connected meeting platforms…
+                  </div>
+                ) : connectedPlatforms.length === 0 ? (
+                  <div
+                    role="alert"
+                    className="min-w-0 flex-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5"
+                  >
+                    <p className="text-[13px] font-semibold text-rose-700">
+                      No meeting platform integrated
                     </p>
+                    <ul className="mt-1 space-y-0.5 text-[12px] text-rose-600">
+                      {(meetingPlatforms.error
+                        ? [meetingPlatforms.error]
+                        : meetingPlatforms.unavailable.map(
+                            (item) => item.reason ?? `${item.platform} is not connected.`,
+                          )
+                      ).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <a
+                      href="/settings/integrations"
+                      target="_blank"
+                      rel="noopener"
+                      className="mt-1.5 inline-block text-[12px] font-semibold text-rose-700 underline"
+                    >
+                      Open Settings → Integrations
+                    </a>
                   </div>
                 ) : (
                   <div className="relative min-w-0 flex-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        refreshConnectedPlatforms();
-                        setPlatformOpen((open) => !open);
-                      }}
+                      onClick={() => setPlatformOpen((open) => !open)}
                       className="flex h-11 w-full items-center justify-between rounded-lg border border-[#E5E7EB] bg-white px-3 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      <span>{platform || "Choose a platform"}</span>
+                      <span>{platformChoice || "Choose a platform"}</span>
                       <ChevronDown
                         className={cn(
                           "h-4 w-4 text-slate-400 transition-transform",
@@ -420,7 +466,7 @@ export function ConsultationDetailsStep({
                                 }}
                                 className={cn(
                                   "flex w-full px-3 py-2 text-left text-[13px]",
-                                  item === platform
+                                  item === platformChoice
                                     ? "bg-[var(--brand-primary-soft)] font-semibold text-[var(--brand-primary)]"
                                     : "text-slate-700 hover:bg-slate-50",
                                 )}

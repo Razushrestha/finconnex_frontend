@@ -70,13 +70,18 @@ export async function POST(request: Request) {
     accessToken?: string | null;
     refreshToken?: string | null;
   };
-  let accessToken =
+  // Cookies are the source of truth; the browser copy only fills gaps (an
+  // access JWT too large for a cookie). A tab's stored refresh token goes stale
+  // whenever the server or another tab rotates, and spending it after Nest's
+  // grace window counts as reuse — Nest then deletes the whole session.
+  const liveAccess = live?.accessToken?.trim() || "";
+  const bodyAccess =
     typeof body.accessToken === "string" ? body.accessToken.trim() : "";
+  let accessToken =
+    liveAccess && !isCrmJwtExpired(liveAccess) ? liveAccess : bodyAccess || liveAccess;
   let refreshToken =
-    typeof body.refreshToken === "string" ? body.refreshToken.trim() : "";
-
-  if (!accessToken) accessToken = live?.accessToken?.trim() || "";
-  if (!refreshToken) refreshToken = live?.refreshToken?.trim() || "";
+    live?.refreshToken?.trim() ||
+    (typeof body.refreshToken === "string" ? body.refreshToken.trim() : "");
 
   if (!session && !accessToken && !refreshToken) {
     return NextResponse.json({ authenticated: false });

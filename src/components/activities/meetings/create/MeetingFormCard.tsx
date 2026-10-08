@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FC } from "react";
-import { ChevronDown, Link2, MapPin, LocateFixed } from "lucide-react";
+import { ChevronDown, Link2, MapPin } from "lucide-react";
+import { UseCurrentLocationButton } from "@/components/shared/UseCurrentLocationButton";
 import type { MeetingType } from "@/lib/meetings/types";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
@@ -22,8 +23,10 @@ import { type RelatedEntityKind } from "@/lib/activities/shared";
 import {
   availableCustomLocationKinds,
   isOnlineLocationKind,
+  savedOfficeAddress,
   type MeetingLocationKind,
 } from "@/lib/booking/meeting-platforms";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import {
   MeetingGuestPicker,
   type MeetingGuest,
@@ -254,8 +257,22 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
   dateTimeError,
 }) => {
   const locationKinds = useMemo(() => availableCustomLocationKinds(), []);
-  const [locating, setLocating] = useState(false);
-  const [geoError, setGeoError] = useState("");
+  const crmSettings = useCrmSettings();
+  const officeAddress = savedOfficeAddress(crmSettings.settings?.catalog);
+
+  // Office address starts as the one in Settings → Company Profile — also when
+  // that arrives after the form opened (CRM settings load asynchronously).
+  // Anything already typed is left alone.
+  useEffect(() => {
+    if (
+      locationKind === "Office address" &&
+      officeAddress &&
+      !locationDetail.trim()
+    ) {
+      onLocationDetailChange(officeAddress);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationKind, officeAddress]);
 
   useEffect(() => {
     if (!locationKinds.includes(locationKind)) {
@@ -266,45 +283,14 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
 
   function applyLocationKind(kind: MeetingLocationKind) {
     onLocationKindChange(kind);
+    if (kind === "Office address" && officeAddress) {
+      onLocationDetailChange(officeAddress);
+    }
     if (kind === "Office address" || kind === "Custom") {
       onMeetingTypeChange("In-person");
     } else {
       onMeetingTypeChange("Video Call");
     }
-  }
-
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setGeoError("Geolocation is not supported in this browser");
-      return;
-    }
-    setLocating(true);
-    setGeoError("");
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-          );
-          if (!response.ok) throw new Error("lookup failed");
-          const data = (await response.json()) as { display_name?: string };
-          onLocationDetailChange(
-            data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-          );
-        } catch {
-          onLocationDetailChange(
-            `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-          );
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocating(false);
-        setGeoError("Could not read your location. Allow access and try again.");
-      },
-    );
   }
 
   const showLink =
@@ -523,7 +509,11 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
                       type="text"
                       value={locationDetail}
                       onChange={(e) => onLocationDetailChange(e.target.value)}
-                      placeholder="Office street, suburb, state"
+                      placeholder={
+                        officeAddress
+                          ? "Office street, suburb, state"
+                          : "Office street, suburb, state (set a default in Settings → Company Profile)"
+                      }
                       className={inputClass + " pl-9"}
                     />
                   </div>
@@ -540,20 +530,7 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
                         className={inputClass + " pl-9"}
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={useCurrentLocation}
-                      disabled={locating}
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 hover:text-violet-800 disabled:opacity-60"
-                    >
-                      <LocateFixed className="h-3.5 w-3.5" />
-                      {locating ? "Finding location…" : "Use current location"}
-                    </button>
-                    {geoError ? (
-                      <p className="text-[11px] font-medium text-rose-500">
-                        {geoError}
-                      </p>
-                    ) : null}
+                    <UseCurrentLocationButton onAddress={onLocationDetailChange} />
                   </div>
                 ) : null}
               </div>

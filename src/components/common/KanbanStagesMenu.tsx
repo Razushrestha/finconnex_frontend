@@ -2,6 +2,7 @@
 
 import { useState, type DragEvent, type FormEvent } from "react";
 import { ChevronDown, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { alertDialog } from "@/lib/notify/dialog";
 
 function StageDropGap() {
   return (
@@ -140,9 +141,10 @@ export function KanbanStagesMenu({
       return;
     }
     if (count > 0 && !others.length) {
-      window.alert(
-        `“${col.label}” still has ${count} record${count === 1 ? "" : "s"}. Show another stage first, then delete this title.`,
-      );
+      void alertDialog({
+        title: "Can't delete this stage",
+        message: `“${col.label}” still has ${count} record${count === 1 ? "" : "s"}. Show another stage first, then delete this title.`,
+      });
       return;
     }
     onToggle?.(col.id);

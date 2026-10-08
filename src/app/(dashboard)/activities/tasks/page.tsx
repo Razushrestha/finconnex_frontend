@@ -45,6 +45,7 @@ import { emitRulesChange } from "@/lib/rules/storage";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { BOARD_PAGE } from "@/lib/layout";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { defaultActorName } from "@/lib/rules/actor";
 import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
 import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
@@ -233,13 +234,16 @@ export default function TasksPage() {
     flash(`Reassigned ${n} to ${owner}`);
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedTaskIds.length) return;
     const count = selectedTaskIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} task${count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} task${count === 1 ? "" : "s"}?`,
+        message: "This cannot be undone.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }

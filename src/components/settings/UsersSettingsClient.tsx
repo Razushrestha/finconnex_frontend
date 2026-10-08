@@ -40,6 +40,7 @@ import {
 } from "@/lib/workspace-members/api";
 import { sendMemberWelcomeEmail } from "@/lib/workspace-members/welcome-email";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   activateCrmWorkspaceMember,
   deactivateCrmWorkspaceMember,
@@ -360,7 +361,16 @@ export function UsersSettingsClient() {
   }
 
   async function removeMember(row: WorkspaceMember) {
-    if (!window.confirm(`Remove ${row.name} from this workspace?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Remove member?",
+        message: `Remove ${row.name} from this workspace?`,
+        confirmText: "Remove",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await deleteCrmWorkspaceMember(row.id);
@@ -376,9 +386,12 @@ export function UsersSettingsClient() {
 
   async function onReissue(row: WorkspaceMember) {
     if (
-      !window.confirm(
-        `Email ${row.name} new sign-in details? Their current password stops working and they're signed out everywhere.`,
-      )
+      !(await confirmDialog({
+        title: "Reissue sign-in details?",
+        message: `Email ${row.name} new sign-in details? Their current password stops working and they're signed out everywhere.`,
+        confirmText: "Send new details",
+        tone: "danger",
+      }))
     ) {
       return;
     }
@@ -441,7 +454,16 @@ export function UsersSettingsClient() {
   }
 
   async function onTransfer(row: WorkspaceMember) {
-    if (!window.confirm(`Transfer workspace ownership to ${row.name}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Transfer ownership?",
+        message: `Transfer workspace ownership to ${row.name}?`,
+        confirmText: "Transfer ownership",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       persistRemoteWorkspaceMember(

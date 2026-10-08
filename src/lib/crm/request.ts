@@ -129,6 +129,10 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Calendly OAuth is not configured on the CRM server. Use a personal access token, or set Calendly client id/secret on that API.",
   "calendar.error.notConfigured":
     "Google/Outlook calendar OAuth is not configured on the CRM server.",
+  "calendarSync.error.notConfigured":
+    "Google/Outlook calendar OAuth is not configured on the CRM server. Set the calendar client ID, secret and redirect URI on that API.",
+  "Calendar sync is not configured":
+    "Google/Outlook calendar OAuth is not configured on the CRM server. Set the calendar client ID, secret and redirect URI on that API.",
   "booking.error.slotUnavailable":
     "That time is no longer available. Pick another slot and try again.",
   "booking.error.noHostsAvailable":

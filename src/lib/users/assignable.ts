@@ -81,6 +81,32 @@ function fromDirectory(): AssignableOwner[] {
   return mergeOwners([...users, ...members]);
 }
 
+/**
+ * Signed in and working: an active member who has replaced the password an
+ * admin set for them. Accounts that never signed in are still "Active" in the
+ * workspace, so the password flag is what tells them apart.
+ */
+export function isActivatedMember(
+  member: Pick<WorkspaceMember, "status" | "mustChangePassword">,
+): boolean {
+  return member.status === "Active" && !member.mustChangePassword;
+}
+
+/** This browser's directory, limited to people who can take bookings. */
+function activatedDirectory(): AssignableOwner[] {
+  const users = listCrmUsers()
+    .filter((user) => user.status === "Active")
+    .map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    }));
+  const members = listWorkspaceMembers()
+    .filter(isActivatedMember)
+    .map(toOwner);
+  return mergeOwners([...users, ...members]);
+}
+
 function fallbackOwners(): AssignableOwner[] {
   return OWNERS.map((name) => ({ id: name, name, email: "" }));
 }
@@ -182,23 +208,35 @@ function hostToOwner(host: CrmBookingHost): AssignableOwner {
 }
 
 /**
- * Every workspace user is a booking consultant (hosts, members, and directory).
+ * Every activated workspace user is a booking consultant (hosts, members, and
+ * directory). Invited, deactivated, and not-yet-signed-in users are left out.
  */
 export async function loadWorkspaceConsultants(): Promise<AssignableOwner[]> {
-  const local = fromDirectory();
-  const [live, hosts, consultants] = await Promise.all([
-    listRemoteMembers()
-      .then((rows) => rows.map(toOwner))
-      .catch(() => [] as AssignableOwner[]),
+  const local = activatedDirectory();
+  const [members, hosts, consultants] = await Promise.all([
+    listRemoteMembers().catch(() => [] as WorkspaceMember[]),
     tryCrmBooking(() => listCrmBookingHosts()).then((rows) => rows ?? []),
     tryCrmBooking(() => listCrmConsultants()).then((rows) => rows ?? []),
   ]);
+  // Hosts and the local directory do not know who has signed in; the
+  // workspace does, so anyone it lists as not activated is dropped.
+  const blocked = new Set<string>();
+  for (const member of members) {
+    if (isActivatedMember(member)) continue;
+    for (const key of [member.userId, member.id, member.email]) {
+      const value = key?.trim().toLowerCase();
+      if (value) blocked.add(value);
+    }
+  }
+  const allowed = (row: AssignableOwner) =>
+    !blocked.has(row.id.trim().toLowerCase()) &&
+    !blocked.has(row.email.trim().toLowerCase());
   const self = actorConsultant();
   return mergeOwners([
-    ...live,
-    ...hosts.map(hostToOwner),
-    ...consultants.map(hostToOwner),
-    ...local,
+    ...members.filter(isActivatedMember).map(toOwner),
+    ...hosts.map(hostToOwner).filter(allowed),
+    ...consultants.map(hostToOwner).filter(allowed),
+    ...local.filter(allowed),
     ...(self ? [self] : []),
   ]).filter((row) => row.name.trim() || row.email.trim());
 }

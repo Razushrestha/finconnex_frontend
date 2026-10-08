@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calendar, Landmark, ChevronRight } from "lucide-react";
 import { formatAUD, type Payment } from "@/lib/finance/payments/types";
 
@@ -87,13 +88,13 @@ export function SettlementMethodsVelocityCard({ data }: { data: Payment[] }) {
             </p>
           </div>
         </div>
-        <a
+        <Link
           href="/finance/payments"
           className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
         >
           View transfer log
           <ChevronRight className="h-3.5 w-3.5" />
-        </a>
+        </Link>
       </div>
     </div>
   );
