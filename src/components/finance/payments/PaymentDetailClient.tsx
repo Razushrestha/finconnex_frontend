@@ -103,7 +103,7 @@ export function PaymentDetailClient({ id }: { id: string }) {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className="relative min-h-full overflow-hidden bg-white">
 
       <div className="relative mx-auto flex max-w-[900px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

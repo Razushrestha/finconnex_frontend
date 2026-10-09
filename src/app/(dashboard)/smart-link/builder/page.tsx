@@ -104,7 +104,7 @@ function BuilderWorkspace() {
 
   if (!initialConfig) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-slate-50 text-[13px] text-slate-500">
+      <div className="flex min-h-full items-center justify-center bg-white text-[13px] text-slate-500">
         Loading builder…
       </div>
     );
@@ -123,7 +123,7 @@ export default function SmartLinkBuilderPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-full items-center justify-center bg-slate-50 text-[13px] text-slate-500">
+        <div className="flex min-h-full items-center justify-center bg-white text-[13px] text-slate-500">
           Loading builder…
         </div>
       }

@@ -315,7 +315,7 @@ export function CreateEntityFormShell({
               <X className="h-4 w-4" />
             </button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 dark:bg-zinc-900/40">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-zinc-900/40">
             <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
               {children}
             </div>
@@ -353,7 +353,7 @@ export function CreateEntityFormShell({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-slate-50/70 dark:bg-zinc-900/40">
+      <div className="min-h-0 flex-1 overflow-auto bg-white dark:bg-zinc-900/40">
         <div className={cn(FORM_CANVAS, formEnter)}>
           <div className="col-span-full flex justify-end">
             <CreateFormTip text={tip} testId="create-entity-tip" />

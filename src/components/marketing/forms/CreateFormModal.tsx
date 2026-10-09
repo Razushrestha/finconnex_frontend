@@ -76,7 +76,7 @@ export function CreateFormModal({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white px-5 py-4">
           <p className="mb-4 text-center text-[13px] text-slate-500">
             Choose how to create your form
           </p>

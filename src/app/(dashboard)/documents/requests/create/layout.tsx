@@ -4,7 +4,7 @@ export default function CreateDocumentRequestLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-full min-h-0 w-full overflow-hidden bg-slate-50">
+    <div className="h-full min-h-0 w-full overflow-hidden bg-white">
       {children}
     </div>
   );

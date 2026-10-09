@@ -1,5 +1,6 @@
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
+  RELATED_ENTITY_KINDS,
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
   type RelatedTo,
@@ -16,8 +17,8 @@ import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import { listLeadColumns, upsertLeadFromCard } from "@/lib/leads/store";
 import { namesEqual } from "@/lib/related-entity";
 
-export const TASK_RELATED_ENTITY_KINDS = ["Lead", "Deal", "Company"] as const;
-export type TaskRelatedEntityKind = (typeof TASK_RELATED_ENTITY_KINDS)[number];
+export const TASK_RELATED_ENTITY_KINDS = RELATED_ENTITY_KINDS;
+export type TaskRelatedEntityKind = RelatedEntityKind;
 
 /** True when a record title belongs to the chosen contact (e.g. Mohit → Mohit - Home loans). */
 export function nameLinkedToContact(recordName: string, contactName: string) {

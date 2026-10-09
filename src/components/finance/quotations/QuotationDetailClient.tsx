@@ -364,7 +364,7 @@ export function QuotationDetailClient({ id }: { id: string }) {
     : null;
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className="relative min-h-full overflow-hidden bg-white">
 
       <div className="relative mx-auto flex w-full max-w-[1600px] flex-col p-3 sm:p-4 lg:px-6 2xl:px-8">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

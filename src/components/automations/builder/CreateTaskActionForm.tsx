@@ -395,7 +395,7 @@ export function CreateTaskActionForm({
               <option value="">None</option>
               {TASK_RELATED_ENTITY_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
-                  {kind === "Company" ? "Organization" : kind}
+                  {kind}
                 </option>
               ))}
             </select>
@@ -418,7 +418,7 @@ export function CreateTaskActionForm({
               disabled={!form.relatedKind}
               placeholder={
                 form.relatedKind
-                  ? `Search ${form.relatedKind === "Company" ? "organization" : form.relatedKind.toLowerCase()}…`
+                  ? `Search ${form.relatedKind.toLowerCase()}…`
                   : "Select related entity first"
               }
             />

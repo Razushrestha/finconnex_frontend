@@ -177,9 +177,10 @@ function newActionItemId() {
 }
 
 function relatedOptionsFor(
-  kind: RelatedEntityKind,
+  kind: RelatedEntityKind | "",
   extra?: { kind: RelatedEntityKind; name: string },
 ) {
+  if (!kind) return [];
   return liveRelatedRecords(kind, extra);
 }
 
@@ -246,7 +247,7 @@ export function LeadCreateTaskModal({
   const [contactName, setContactName] = useState(
     () => leadApplicants(card)[0]?.name || card.name,
   );
-  const [relatedKind, setRelatedKind] = useState<RelatedEntityKind>("Lead");
+  const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("Lead");
   const [relatedName, setRelatedName] = useState(card.name);
   const [taskType, setTaskType] = useState<TaskType>("Follow-up");
   const [status, setStatus] = useState<TaskStatus>("Not Started");
@@ -556,6 +557,7 @@ export function LeadCreateTaskModal({
         name: card.name,
       };
       const extraRelated =
+        relatedKind &&
         relatedName.trim() &&
         (relatedKind !== "Lead" || relatedName.trim() !== card.name)
           ? `Related to ${relatedKind}: ${relatedName.trim()}`
@@ -1026,11 +1028,12 @@ export function LeadCreateTaskModal({
                     className={inputClass}
                     value={relatedKind}
                     onChange={(e) => {
-                      const next = e.target.value as RelatedEntityKind;
+                      const next = e.target.value as RelatedEntityKind | "";
                       setRelatedKind(next);
                       setRelatedName(next === "Lead" ? card.name : "");
                     }}
                   >
+                    <option value="">None</option>
                     {RELATED_ENTITY_KINDS.map((kind) => (
                       <option key={kind} value={kind}>
                         {kind}

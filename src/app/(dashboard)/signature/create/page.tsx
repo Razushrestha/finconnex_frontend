@@ -480,7 +480,18 @@ function CreateSignatureRequestForm() {
     description: "",
     allowComments: false,
     automaticReminders: true,
+    reminderVia: "email",
     reminderEveryDays: 5,
+    reminderStop: "occurrences",
+    reminderStopAfter: 3,
+    reminderStopDate: (() => {
+      const next = new Date();
+      next.setDate(next.getDate() + 5);
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, "0");
+      const d = String(next.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    })(),
     reminderDay: (() => {
       const next = new Date();
       next.setDate(next.getDate() + 5);

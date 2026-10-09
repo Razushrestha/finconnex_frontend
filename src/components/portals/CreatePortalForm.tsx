@@ -85,7 +85,14 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   ]);
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
   const [contacts, setContacts] = useState<
-    Array<{ id: string; name: string; email: string; companyId?: string }>
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      phone?: string;
+      mobile?: string;
+      companyId?: string;
+    }>
   >([]);
   const [catalogError, setCatalogError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -111,6 +118,8 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
               id: row.contact.id,
               name: row.contact.name,
               email: row.contact.email,
+              phone: row.contact.phone,
+              mobile: row.contact.mobile,
               companyId: row.contact.companyId,
             }))
             .filter((row) => isUuid(row.id)),
@@ -186,6 +195,11 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
             clientName: remote.clientName || client.name,
             primaryContactName: remote.primaryContactName || contact.name,
             primaryContactEmail: remote.primaryContactEmail || contact.email,
+            primaryContactPhone:
+              remote.primaryContactPhone ||
+              contact.mobile?.trim() ||
+              contact.phone?.trim() ||
+              undefined,
             createdBy: defaultActorName(),
             createdAt: remote.createdAt || formatPortalDate(),
           },
@@ -218,7 +232,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   const publicUrl = "Assigned by CRM on create";
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
+    <div className="relative flex min-h-full flex-col overflow-hidden bg-white">
 
       <div className="relative mx-auto flex w-full max-w-[1920px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

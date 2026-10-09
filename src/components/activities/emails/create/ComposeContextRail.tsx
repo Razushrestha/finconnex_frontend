@@ -80,7 +80,7 @@ export function ComposeContextRail({
   }, {});
 
   return (
-    <aside className="hidden h-full min-h-0 overflow-y-auto border-l border-slate-200 bg-[#F7F6FA] p-2 lg:flex lg:flex-col lg:gap-2">
+    <aside className="hidden h-full min-h-0 overflow-y-auto border-l border-slate-200 bg-white p-2 lg:flex lg:flex-col lg:gap-2">
       <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
         <h2 className="mb-2 text-[12px] font-semibold text-slate-800">Contact Overview</h2>
         {loading ? (

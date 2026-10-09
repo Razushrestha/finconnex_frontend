@@ -669,7 +669,7 @@ export type CreateCrmTaskInput = {
 };
 
 export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unknown> {
-  const dueDate = toTaskIso(input.dueDate) || new Date().toISOString();
+  const dueDate = toTaskIso(input.dueDate);
   const startDate = toTaskIso(input.startDate ?? "") || dueDate;
   const owners = isUuid(input.assignedTo) ? [input.assignedTo] : [];
   const collaboratorIds = (input.collaborators ?? []).filter(
@@ -679,8 +679,8 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
     subject: input.title.trim(),
     taskType: apiTaskType(input.taskType),
     priority: apiTaskPriority(input.priority),
-    startDate,
-    dueDate,
+    startDate: startDate || undefined,
+    dueDate: dueDate || undefined,
     reminderAt: input.reminderDate
       ? toTaskIso(input.reminderDate) || undefined
       : undefined,

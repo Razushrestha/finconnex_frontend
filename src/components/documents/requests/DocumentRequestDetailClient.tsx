@@ -594,7 +594,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
 
   if (!request) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 p-8 text-center">
+      <div className="flex min-h-full flex-col items-center justify-center bg-white p-8 text-center">
         <FileText className="mb-3 h-10 w-10 text-slate-300" />
         <h1 className="text-lg font-bold text-slate-900">Request not found</h1>
         <Link
@@ -616,7 +616,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   const timeline = interactionTimeline(request);
 
   return (
-    <div className="relative flex min-h-full flex-col bg-slate-50">
+    <div className="relative flex min-h-full flex-col bg-white">
       <input
         ref={fileInputRef}
         type="file"

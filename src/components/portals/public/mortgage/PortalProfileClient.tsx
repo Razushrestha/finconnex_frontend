@@ -1,15 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { InitialsAvatar } from "@/components/portals/public/mortgage/PortalBrand";
 import { useMortgagePortal } from "@/components/portals/public/mortgage/useMortgagePortal";
-import type { MortgageClient } from "@/lib/portals/mortgage";
+import { getCrmContact, tryCrmContact } from "@/lib/contacts/api";
+import { mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import { writePortalProfileToCrmContact } from "@/lib/portals/contact-sync";
+import {
+  syncMortgageClientFromCrmContact,
+  type MortgageClient,
+} from "@/lib/portals/mortgage";
+import {
+  getPortalBySlug,
+  upsertPortal,
+  type ClientPortal,
+} from "@/lib/portals/types";
 
 export function PortalProfileClient({ slug }: { slug: string }) {
-  const { mortgage, update, logActivity, canWrite, isReadOnly } = useMortgagePortal(slug);
+  const { mortgage, update, logActivity, canWrite, isReadOnly, portal, reload } =
+    useMortgagePortal(slug);
   const [saved, setSaved] = useState(false);
 
-  if (!mortgage) return null;
+  useEffect(() => {
+    if (!portal) return;
+    const sync = () => {
+      const latest = getPortalBySlug(slug) ?? portal;
+      syncMortgageClientFromCrmContact(latest);
+      reload();
+    };
+    sync();
+
+    let cancelled = false;
+    void (async () => {
+      const contactId =
+        getPortalBySlug(slug)?.primaryContactId ?? portal.primaryContactId;
+      if (!contactId) return;
+      await tryCrmContact(async () => {
+        const remote = await getCrmContact(contactId);
+        if (!remote || cancelled) return;
+        mergeCrmContactsIntoBoard([remote]);
+        if (!cancelled) sync();
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [portal, reload, slug]);
+
+  if (!mortgage || !portal) return null;
+  const currentPortal: ClientPortal = portal;
   const { client, broker } = mortgage;
   const initials = `${client.firstName[0] ?? ""}${client.lastName[0] ?? ""}`;
   const locked = isReadOnly || !canWrite;
@@ -21,11 +60,26 @@ export function PortalProfileClient({ slug }: { slug: string }) {
       factFind:
         key === "firstName" || key === "lastName"
           ? { ...prev.factFind, [key]: String(value) }
-          : prev.factFind,
+          : key === "phone"
+            ? { ...prev.factFind, mobile: String(value) }
+            : prev.factFind,
     }));
   }
 
   function save() {
+    const nextPortal: ClientPortal = {
+      ...currentPortal,
+      primaryContactName: `${client.firstName} ${client.lastName}`.trim(),
+      primaryContactEmail: client.email.trim(),
+      primaryContactPhone: client.phone.trim() || undefined,
+    };
+    upsertPortal(nextPortal);
+    writePortalProfileToCrmContact(nextPortal, {
+      email: client.email,
+      phone: client.phone,
+      firstName: client.firstName,
+      lastName: client.lastName,
+    });
     logActivity("Updated profile");
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2200);

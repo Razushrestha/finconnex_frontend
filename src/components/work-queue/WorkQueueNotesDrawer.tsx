@@ -43,6 +43,8 @@ export type NotesDrawerTarget = {
   related?: string;
   contactName?: string;
   href: string;
+  /** Stable key for notes saved before the record exists. Hidden from the header. */
+  noteKey?: string;
 };
 import { useContentEditableMentions } from "@/components/shared/useContentEditableMentions";
 import { AdvancedColorPicker } from "@/components/common/AdvancedColorPicker";
@@ -524,6 +526,8 @@ export function WorkQueueNotesDrawer({
   onChanged,
   layerClassName = "z-[80]",
   embedded = false,
+  composerStartsOpen = false,
+  inlineComposer = false,
 }: {
   row: NotesDrawerTarget;
   onClose: () => void;
@@ -532,8 +536,13 @@ export function WorkQueueNotesDrawer({
   layerClassName?: string;
   /** Render inline (lead Notes tab) without portal / overlay chrome. */
   embedded?: boolean;
+  /** Open the title/body composer immediately. */
+  composerStartsOpen?: boolean;
+  /** Expand the composer in place. No side drawer and no extra Add a note click. */
+  inlineComposer?: boolean;
 }) {
   const [mounted, setMounted] = React.useState(false);
+  const openComposerOnShow = composerStartsOpen || inlineComposer;
   const [sort, setSort] = React.useState<SortOrder>("recent-first");
   const [sortOpen, setSortOpen] = React.useState(false);
   const [showAll, setShowAll] = React.useState(false);
@@ -545,7 +554,7 @@ export function WorkQueueNotesDrawer({
     null,
   );
   const [tick, setTick] = React.useState(0);
-  const [composing, setComposing] = React.useState(false);
+  const [composing, setComposing] = React.useState(openComposerOnShow);
   const [attachments, setAttachments] = React.useState<NoteAttachment[]>([]);
   const [previewItem, setPreviewItem] = React.useState<NoteAttachment | null>(
     null,
@@ -685,7 +694,7 @@ export function WorkQueueNotesDrawer({
     setTitle("");
     setBody("");
     setEditingId(null);
-    setComposing(false);
+    setComposing(openComposerOnShow);
     setMenuOpen(null);
     setLinkOpen(false);
     setLinkUrl("https://");
@@ -704,7 +713,7 @@ export function WorkQueueNotesDrawer({
     setSort("recent-first");
     setExpanded(new Set());
     setConfirmDeleteNote(null);
-  }, [row.id]);
+  }, [row.id, openComposerOnShow]);
 
   React.useEffect(() => {
     return () => {
@@ -819,7 +828,7 @@ export function WorkQueueNotesDrawer({
     return ordered;
     // tick forces refresh after create/update/delete
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.id, row.related, row.subject, row.contactName, sort, tick]);
+  }, [row.id, row.noteKey, row.related, row.subject, row.contactName, sort, tick]);
 
   const visible = showAll ? notes : notes.slice(0, PREVIEW_COUNT);
   const hasMore = notes.length > PREVIEW_COUNT;
@@ -861,7 +870,7 @@ export function WorkQueueNotesDrawer({
     setTitle("");
     setBody("");
     setEditingId(null);
-    setComposing(false);
+    setComposing(inlineComposer);
     setMenuOpen(null);
     setLinkOpen(false);
     setLinkUrl("https://");
@@ -927,7 +936,7 @@ export function WorkQueueNotesDrawer({
     createNote({
       title: noteTitle,
       body: noteBody,
-      relatedTo: row.related || row.subject,
+      relatedTo: row.noteKey || row.related || row.subject,
       createdBy: actor,
       attachments: savedAttachments,
     });
@@ -1441,6 +1450,7 @@ export function WorkQueueNotesDrawer({
           </button>
         ) : null}
 
+        {!inlineComposer ? (
         <header className="flex shrink-0 items-start gap-3 border-b border-slate-200 px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -1509,6 +1519,7 @@ export function WorkQueueNotesDrawer({
             ) : null}
           </div>
         </header>
+        ) : null}
 
         <div className="shrink-0 border-b border-slate-100 px-5 py-3">
           {!composerOpen ? (
@@ -2102,7 +2113,13 @@ export function WorkQueueNotesDrawer({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={resetForm}
+                    onClick={() => {
+                      if (inlineComposer) {
+                        onClose();
+                        return;
+                      }
+                      resetForm();
+                    }}
                     className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
                   >
                     Cancel
@@ -2121,12 +2138,14 @@ export function WorkQueueNotesDrawer({
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className={inlineComposer ? "" : "min-h-0 flex-1 overflow-y-auto"}>
           {visible.length === 0 ? (
+            inlineComposer ? null : (
             <p className="px-5 py-10 text-center text-[13px] text-slate-400">
               No notes yet for this {kind.toLowerCase()}. Click “Add a note”
               above to get started.
             </p>
+            )
           ) : (
             visible.map((note) => {
               const displayBody = noteDisplayBody(note);
@@ -2378,9 +2397,9 @@ export function WorkQueueNotesDrawer({
     </>
   );
 
-  if (embedded) {
+  if (embedded || inlineComposer) {
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-white">
+      <div className={inlineComposer ? "relative bg-white" : "relative flex h-full min-h-0 flex-col bg-white"}>
         {panel}
         {overlays}
       </div>

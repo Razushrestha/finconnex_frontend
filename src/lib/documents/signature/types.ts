@@ -1,5 +1,9 @@
 import { emitRecordsChange } from "@/lib/records-sync";
 import { tenantOverlayKey } from "@/lib/persistence/tenant";
+import {
+  demoSignatureRequests,
+  isDemoSignatureRequest,
+} from "@/lib/documents/signature/demo-requests";
 
 export type SignatureStatus =
   | "Draft"
@@ -626,8 +630,35 @@ function loadStored(): SignatureRequest[] {
   return seeded;
 }
 
+const dismissedDemoIds = new Set<string>();
+
+function withDemoDocuments(rows: SignatureRequest[]): SignatureRequest[] {
+  const realDocuments = rows.filter(
+    (row) => row.recordType !== "template" && !isDemoSignatureRequest(row),
+  );
+  const templates = rows.filter(
+    (row) => row.recordType === "template" && !isDemoSignatureRequest(row),
+  );
+  if (realDocuments.length > 0) return [...realDocuments, ...templates];
+  const storedDemos = rows.filter(
+    (row) =>
+      row.recordType !== "template" &&
+      isDemoSignatureRequest(row) &&
+      !dismissedDemoIds.has(row.id),
+  );
+  const demos =
+    storedDemos.length > 0
+      ? storedDemos
+      : demoSignatureRequests()
+          .map((row) =>
+            normalizeSignatureRequest(row, { allowEmptyFields: true }),
+          )
+          .filter((row) => !dismissedDemoIds.has(row.id));
+  return [...demos, ...templates];
+}
+
 export function listSignatureRequests(): SignatureRequest[] {
-  return loadStored().map(applyLiveFiles);
+  return withDemoDocuments(loadStored().map(applyLiveFiles));
 }
 
 export function upsertSignatureRequest(
@@ -1049,6 +1080,7 @@ export function fieldKindLabel(kind: SignatureFieldKind): string {
 }
 
 export function deleteSignatureRequest(id: string): SignatureRequest[] {
+  if (isDemoSignatureRequest({ id })) dismissedDemoIds.add(id);
   liveFileUrls.delete(id);
   const list = loadStored().filter((r) => r.id !== id);
   writeStore(list);
@@ -1067,14 +1099,20 @@ export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
     if (row.recordType === "template") return true;
     return !isCrmUuid(row.id);
   });
-  writeStore([
+  const remoteDocuments = remote.filter((row) => row.recordType !== "template");
+  const merged = [
     ...keep.map((row) =>
       normalizeSignatureRequest(row, { allowEmptyFields: true }),
     ),
     ...remote.map((row) =>
       normalizeSignatureRequest(row, { allowEmptyFields: true }),
     ),
-  ]);
+  ];
+  writeStore(
+    remoteDocuments.length > 0
+      ? merged.filter((row) => !isDemoSignatureRequest(row))
+      : merged,
+  );
 }
 
 /** Replace CRM template rows; keep unsynced local drafts (non-UUID ids). */

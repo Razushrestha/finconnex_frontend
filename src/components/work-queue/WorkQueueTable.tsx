@@ -648,18 +648,12 @@ export function WorkQueueTable({
             <ul className="m-0 list-none p-0" aria-label={title}>
               {rows.map((row) => {
               const isMenuOpen = activeMenuId === row.id;
-              const overdue =
-                row.dueLabel === "Yesterday" ||
-                row.dueLabel.includes("overdue");
 
               return (
                 <li key={row.id} className="block">
                 <div
                   style={gridStyle}
-                  className={cn(
-                    "group/row relative grid w-full items-center gap-x-3 border-b border-slate-200 px-5 py-2 text-left transition-colors hover:bg-slate-50/80 sm:px-6",
-                    overdue && "bg-red-50/40 hover:bg-red-50/70",
-                  )}
+                  className="group/row relative grid w-full items-center gap-x-3 border-b border-slate-200 bg-white px-5 py-2 text-left transition-colors hover:bg-slate-50/80 sm:px-6"
                 >
                   <Link
                     href={row.href}

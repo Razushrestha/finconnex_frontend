@@ -928,7 +928,7 @@ export function AddressHistoryForm({
           ) : null}
 
           {underThreeYears ? (
-            <div className="space-y-4 rounded-xl bg-[#F7F6F9] p-4">
+            <div className="space-y-4 rounded-xl bg-white p-4">
               <p className="text-[12px] leading-relaxed text-slate-500">
                 Lenders need 3 years of address history. Please add where you lived before this.
               </p>
@@ -1142,7 +1142,7 @@ export function IdDetailsForm({
         </>
       ) : (
         <>
-          <div className="rounded-xl bg-[#F3F0F7] px-4 py-3">
+          <div className="rounded-xl bg-white px-4 py-3">
             <p className="text-[13px] font-bold text-slate-900">
               Why we request Driver Licence details
             </p>

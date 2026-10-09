@@ -524,7 +524,7 @@ export function ContactDetailView({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-screen flex-col overflow-hidden bg-white">
       <EntityDetailHeader
         avatarFallback={contact.initials}
         avatarClassName={contact.avatarBgClass}

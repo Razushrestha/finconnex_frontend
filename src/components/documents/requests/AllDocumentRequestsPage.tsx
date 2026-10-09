@@ -63,7 +63,7 @@ export function AllDocumentRequestsPage({
   }
 
   return (
-    <div className="min-h-full bg-[#f4f2f7]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto w-full max-w-[1920px] px-5 py-5">
         <section className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">

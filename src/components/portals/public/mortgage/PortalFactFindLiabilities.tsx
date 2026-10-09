@@ -200,7 +200,7 @@ export function PortalFactFindLiabilities({
                 </div>
 
                 {isMortgage ? (
-                  <div className="mt-4 grid gap-4 rounded-xl bg-[#F7F6F9] p-4 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-4 rounded-xl bg-white p-4 sm:grid-cols-2">
                     <div data-invalid={undefined}>
                       <span className="mb-1.5 block text-[13px] font-semibold text-slate-900">
                         Loan type

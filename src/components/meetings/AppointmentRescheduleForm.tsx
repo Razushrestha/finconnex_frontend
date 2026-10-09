@@ -103,7 +103,7 @@ export function AppointmentRescheduleForm({ token }: { token: string }) {
   const initial = record.title.trim().charAt(0).toLowerCase() || "a";
 
   return (
-    <div className="min-h-dvh bg-[#f3f4f8] px-3 py-4 sm:px-6 sm:py-8">
+    <div className="min-h-dvh bg-white px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-lg sm:min-h-0">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           <h1 className="text-base font-semibold text-slate-800 sm:text-lg">Reschedule Appointment</h1>

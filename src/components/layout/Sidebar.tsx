@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { resolveWorkspaceBrand } from "@/lib/settings/brand";
+import { BrandLogo } from "@/components/settings/BrandLogo";
+import type { LogoFrame, LogoSlot } from "@/lib/settings/logo-frame";
 import {
   isDisplayableImageSrc,
   resolveCrmStorageUrl,
@@ -122,15 +124,7 @@ const dashboardItems: NavItem[] = [
       { label: "All Requests", href: "/documents/requests/all" },
     ],
   },
-  {
-    label: "E-Signature",
-    icon: Folder,
-    children: [
-      { label: "Overview", href: "/signature" },
-      { label: "Documents", href: "/signature/documents" },
-      { label: "Templates", href: "/signature/templates" },
-    ],
-  },
+  { label: "E-Signature", href: "/signature", icon: Folder },
   {
     label: "Marketing",
     icon: Megaphone,
@@ -306,9 +300,35 @@ export function Sidebar({
   // Icon-only rail only applies on md+; the mobile drawer always shows labels.
   const hideLabel = collapsed ? "md:hidden" : undefined;
   const iconOnly = collapsed ? "md:justify-center md:px-0" : undefined;
-  const logoKey = brand.secondaryIsLight
-    ? brand.logoLightUrl || brand.logoDarkUrl
-    : brand.logoDarkUrl || brand.logoLightUrl;
+  const savedSlot: LogoSlot | null = brand.secondaryIsLight
+    ? brand.logoLightUrl
+      ? "logoLight"
+      : brand.logoDarkUrl
+        ? "logoDark"
+        : null
+    : brand.logoDarkUrl
+      ? "logoDark"
+      : brand.logoLightUrl
+        ? "logoLight"
+        : null;
+  const focus = crm.previewLogos?.focus;
+  const focusHasLogo =
+    focus === "logoLight"
+      ? Boolean(brand.logoLightUrl)
+      : focus === "logoDark"
+        ? Boolean(brand.logoDarkUrl)
+        : false;
+  const logoSlot = focusHasLogo ? focus : savedSlot;
+  const logoKey =
+    logoSlot === "logoLight"
+      ? brand.logoLightUrl
+      : logoSlot === "logoDark"
+        ? brand.logoDarkUrl
+        : "";
+  const logoFrame: LogoFrame | null = logoSlot
+    ? (crm.previewLogos?.frames[logoSlot] ??
+      (logoSlot === "logoLight" ? brand.logoLightFrame : brand.logoDarkFrame))
+    : null;
   const [logoSrc, setLogoSrc] = React.useState("");
 
   React.useEffect(() => {
@@ -343,7 +363,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] bg-[var(--brand-secondary)] px-5 py-6 text-[var(--brand-on-secondary)] transition-transform duration-200 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] [background-image:var(--brand-gradient)] px-5 py-6 text-[var(--brand-on-secondary)] transition-transform duration-200 ease-in-out",
           "border-r border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius] md:pb-10",
@@ -365,12 +385,11 @@ export function Sidebar({
               collapsed && "md:text-base",
             )}
           >
-            {logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+            {logoSrc && logoFrame ? (
+              <BrandLogo
                 src={logoSrc}
-                alt=""
-                className="h-8 w-8 shrink-0 rounded-md object-contain"
+                frame={logoFrame}
+                className="h-8 w-8 shrink-0 rounded-full bg-white/15"
               />
             ) : null}
             <span className={collapsed ? "md:hidden" : undefined}>

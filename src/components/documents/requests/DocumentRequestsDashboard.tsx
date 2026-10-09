@@ -153,7 +153,7 @@ export function DocumentRequestsDashboard({
   }
 
   return (
-    <div className="min-h-full bg-[#f4f2f7]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 px-5 py-4">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard

@@ -175,7 +175,7 @@ export function MeetingRelatedFields({
             <option value="">None</option>
             {TASK_RELATED_ENTITY_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {kind === "Company" ? "Organization" : kind}
+                {kind}
               </option>
             ))}
           </select>
@@ -194,7 +194,7 @@ export function MeetingRelatedFields({
               loading
                 ? "Loading CRM records…"
                 : relatedKind
-                  ? `Search ${relatedKind === "Company" ? "organization" : relatedKind.toLowerCase()}…`
+                  ? `Search ${relatedKind.toLowerCase()}…`
                   : "Select related entity first"
             }
           />

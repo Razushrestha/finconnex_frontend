@@ -11,7 +11,7 @@ export function PortalLegalPage({
   body: string[];
 }) {
   return (
-    <div className="min-h-dvh bg-[#F7F6F9] px-4 py-10">
+    <div className="min-h-dvh bg-white px-4 py-10">
       <div className="mx-auto max-w-2xl">
         <PortalBrand />
         <h1 className="mt-6 text-[24px] font-bold tracking-tight text-slate-900">

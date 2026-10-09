@@ -545,7 +545,7 @@ export default function TeamChatPage() {
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh-0px)] min-h-full flex-col overflow-hidden bg-slate-50">
+    <div className="relative flex h-[calc(100dvh-0px)] min-h-full flex-col overflow-hidden bg-white">
       <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)]">
           {/* Left rail — Skote-style chat sidebar */}

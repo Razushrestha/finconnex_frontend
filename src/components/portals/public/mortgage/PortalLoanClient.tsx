@@ -62,7 +62,7 @@ export function PortalLoanClient({ slug }: { slug: string }) {
             ["Interest rate", `${loan.rate.toFixed(2)}% p.a.`],
             ["Term", `${loan.termYears} years`],
           ].map(([k, v]) => (
-            <div key={k} className="rounded-xl bg-[#F7F6F9] px-3 py-2.5">
+            <div key={k} className="rounded-xl bg-white px-3 py-2.5">
               <dt className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                 {k}
               </dt>

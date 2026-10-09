@@ -126,7 +126,7 @@ export function PortalFactFindAssets({
           <p className="text-[13px] text-slate-500">No properties added yet.</p>
         ) : null}
         {properties.map((property, index) => (
-          <div key={property.id} className="space-y-3 rounded-xl bg-[#F7F6F9] p-3">
+          <div key={property.id} className="space-y-3 rounded-xl bg-white p-3">
             <div className="flex items-center justify-between">
               <div className="text-[13px] font-bold text-slate-900">Property {index + 1}</div>
               {!disabled ? (
@@ -286,7 +286,7 @@ export function PortalFactFindAssets({
           <p className="text-[13px] text-slate-500">No vehicles added yet.</p>
         ) : null}
         {vehicles.map((vehicle, index) => (
-          <div key={vehicle.id} className="space-y-3 rounded-xl bg-[#F7F6F9] p-3">
+          <div key={vehicle.id} className="space-y-3 rounded-xl bg-white p-3">
             <div className="flex items-center justify-between">
               <div className="text-[13px] font-bold text-slate-900">
                 {vehicle.type || "Vehicle"} {index + 1}

@@ -507,7 +507,7 @@ export function ResizableColumns({
           "w-full [&_td]:overflow-hidden",
           hasOverflow && "h-full min-h-0",
           "[&_th]:border-r [&_th]:border-slate-200",
-          "[&_td]:border-r [&_td]:border-slate-200/80",
+          "[&_td]:border-r-0",
           "[&_table]:border-b [&_table]:border-slate-200",
           inner,
         )}

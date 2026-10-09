@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   FileText,
   PenLine,
@@ -15,6 +14,8 @@ import {
   SignatureRequest,
 } from "@/lib/documents/signature/types";
 import { onRecordsChange } from "@/lib/records-sync";
+import type { RecentDocStatus } from "@/lib/documents/signature/recent-filters";
+import { cn } from "@/lib/utils";
 
 type StatCard = {
   icon: React.ElementType;
@@ -22,7 +23,7 @@ type StatCard = {
   value: number;
   label: string;
   link: string;
-  href: string;
+  status: RecentDocStatus | null;
 };
 
 function buildStats(requests: SignatureRequest[]): StatCard[] {
@@ -47,7 +48,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: docs.length,
       label: "All Documents",
       link: "View all documents",
-      href: "/signature/documents",
+      status: null,
     },
     {
       icon: PenLine,
@@ -55,7 +56,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: draft,
       label: "Draft",
       link: "View draft documents",
-      href: "/signature/documents?status=draft",
+      status: "Draft",
     },
     {
       icon: Clock,
@@ -63,7 +64,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: inProgress,
       label: "In Progress",
       link: "View in-progress documents",
-      href: "/signature/documents?status=in-progress",
+      status: "In Progress",
     },
     {
       icon: CheckCircle2,
@@ -71,7 +72,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: signed,
       label: "Signed",
       link: "View signed documents",
-      href: "/signature/documents?status=signed",
+      status: "Signed",
     },
     {
       icon: CalendarX2,
@@ -79,12 +80,18 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: expired,
       label: "Expired",
       link: "View expired documents",
-      href: "/signature/documents?status=expired",
+      status: "Expired",
     },
   ];
 }
 
-export function SignatureStatsGrid() {
+export function SignatureStatsGrid({
+  activeStatus = null,
+  onSelect,
+}: {
+  activeStatus?: RecentDocStatus | null | undefined;
+  onSelect?: (status: RecentDocStatus | null) => void;
+}) {
   const [requests, setRequests] = useState<SignatureRequest[]>(() =>
     listSignatureRequests(),
   );
@@ -99,11 +106,20 @@ export function SignatureStatsGrid() {
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      {stats.map((stat) => (
-        <Link
+      {stats.map((stat) => {
+        const active = stat.status === activeStatus;
+        return (
+        <button
           key={stat.label}
-          href={stat.href}
-          className="group rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-[var(--brand-primary)]/25"
+          type="button"
+          aria-pressed={active}
+          onClick={() => onSelect?.(stat.status)}
+          className={cn(
+            "group rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm transition-colors",
+            active
+              ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]/30"
+              : "border-slate-200/80 hover:border-[var(--brand-primary)]/25",
+          )}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -123,8 +139,9 @@ export function SignatureStatsGrid() {
               <stat.icon className="h-5 w-5" strokeWidth={2} />
             </span>
           </div>
-        </Link>
-      ))}
+        </button>
+        );
+      })}
     </div>
   );
 }

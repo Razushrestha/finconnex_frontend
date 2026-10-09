@@ -158,7 +158,11 @@ function toLocal(iso: unknown): string {
   return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
-const RELATION_KEY: Record<TaskRelatedEntityKind, "leadId" | "dealId" | "companyId"> = {
+const RELATION_KEY: Record<
+  TaskRelatedEntityKind,
+  "contactId" | "leadId" | "dealId" | "companyId"
+> = {
+  Contact: "contactId",
   Lead: "leadId",
   Deal: "dealId",
   Company: "companyId",
@@ -277,7 +281,7 @@ export function taskActionFormFromConfig(
   }
 
   const relatedType = str(config.relatedType);
-  const kind = (["Lead", "Deal", "Company"] as const).find(
+  const kind = (["Contact", "Lead", "Deal", "Company"] as const).find(
     (item) => item.toUpperCase() === relatedType,
   );
   if (kind && str(config[RELATION_KEY[kind]])) {

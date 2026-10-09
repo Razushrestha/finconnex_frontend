@@ -43,7 +43,7 @@ export function PlatformShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--brand-primary-soft)] font-sans text-slate-900">
+    <div className="flex min-h-screen bg-white font-sans text-slate-900">
       <aside className="hidden w-[260px] shrink-0 flex-col bg-[#0F172A] text-slate-200 lg:flex">
         <div className="border-b border-white/10 px-5 py-6">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-[#C4B5FD] uppercase">

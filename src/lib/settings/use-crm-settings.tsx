@@ -18,6 +18,7 @@ import {
   type CrmWorkspaceSettings,
 } from "@/lib/settings/api";
 import { mirrorOfficeCalendar } from "@/lib/settings/office-calendar";
+import type { LogoFrame, LogoSlot } from "@/lib/settings/logo-frame";
 
 export type SettingsDataSource = "api" | "demo";
 
@@ -35,6 +36,16 @@ export type CrmSettingsState = {
   previewBrand: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null;
   setPreviewBrand: (
     next: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null,
+  ) => void;
+  previewLogos: {
+    focus: LogoSlot;
+    frames: Partial<Record<LogoSlot, LogoFrame>>;
+  } | null;
+  setPreviewLogos: (
+    next: {
+      focus: LogoSlot;
+      frames: Partial<Record<LogoSlot, LogoFrame>>;
+    } | null,
   ) => void;
 };
 
@@ -123,6 +134,10 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   const [previewBrand, setPreviewBrand] = useState<
     Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null
   >(null);
+  const [previewLogos, setPreviewLogos] = useState<{
+    focus: LogoSlot;
+    frames: Partial<Record<LogoSlot, LogoFrame>>;
+  } | null>(null);
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
@@ -252,6 +267,8 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
     setCapabilities,
     previewBrand,
     setPreviewBrand,
+    previewLogos,
+    setPreviewLogos,
   };
 }
 

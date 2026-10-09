@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "@/lib/notify/toast";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
@@ -19,7 +19,6 @@ import {
   UserPlus,
   Search,
   Plus,
-  X,
 } from "lucide-react";
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
 import { TASK_STATUSES, TASK_PRIORITIES, TASK_OWNERS } from "@/lib/tasks/types";
@@ -29,6 +28,10 @@ import { ArrowTag } from "@/components/common/ArrowTag";
 import { useRouter } from "next/navigation";
 import { formatRelatedTo } from "@/lib/activities/shared";
 import { WorkQueueNotesDrawer } from "@/components/work-queue/WorkQueueNotesDrawer";
+import {
+  LeadSideDrawer,
+  LEAD_QUICK_DRAWER_WIDTH,
+} from "@/components/sales/leads/panels/LeadSideDrawer";
 
 interface TaskCardProps {
   task: Task;
@@ -52,6 +55,28 @@ const priorityClass: Record<string, string> = {
   High: "bg-orange-500",
   Medium: "bg-amber-500",
   Low: "bg-sky-500",
+};
+
+const priorityTone: Record<
+  Priority,
+  { dot: string; selected: string }
+> = {
+  Critical: {
+    dot: "bg-red-500",
+    selected: "border-red-200 bg-red-50 text-red-700",
+  },
+  High: {
+    dot: "bg-orange-500",
+    selected: "border-orange-200 bg-orange-50 text-orange-700",
+  },
+  Medium: {
+    dot: "bg-amber-500",
+    selected: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  Low: {
+    dot: "bg-sky-500",
+    selected: "border-sky-200 bg-sky-50 text-sky-700",
+  },
 };
 
 const priorityIcon: Record<string, React.ElementType> = {
@@ -87,7 +112,17 @@ function initialsOf(name: string) {
     .toUpperCase();
 }
 
-type OpenMenu = "status" | "priority" | null;
+type TaskQuickPanel = "status" | "priority" | "owner" | "notes";
+
+const QUICK_PANELS: { id: TaskQuickPanel; label: string }[] = [
+  { id: "status", label: "Status" },
+  { id: "owner", label: "Owner" },
+  { id: "priority", label: "Priority" },
+  { id: "notes", label: "Notes" },
+];
+
+/** Survives the card moving between kanban columns so the drawer stays open. */
+const openTaskPanels = new Map<string, TaskQuickPanel>();
 
 export function TaskCard({
   task,
@@ -118,10 +153,15 @@ export function TaskCard({
     !!task.attachmentsCount;
   const isCompleted = task.status === "Completed";
 
-  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showNotesDrawer, setShowNotesDrawer] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [panel, setPanel] = useState<TaskQuickPanel | null>(
+    () => openTaskPanels.get(task.taskId) ?? null,
+  );
+
+  function rememberPanel(next: TaskQuickPanel | null) {
+    if (next) openTaskPanels.set(task.taskId, next);
+    else openTaskPanels.delete(task.taskId);
+    setPanel(next);
+  }
   const [assignModalTab, setAssignModalTab] = useState<
     "owner" | "collaborators"
   >("owner");
@@ -129,17 +169,6 @@ export function TaskCard({
 
   const footerRef = useRef<HTMLDivElement>(null);
   const wasDragging = useRef(false);
-
-  useEffect(() => {
-    if (!openMenu) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (footerRef.current && !footerRef.current.contains(e.target as Node)) {
-        setOpenMenu(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openMenu]);
 
   const handleDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
     onDragPointerDown(e);
@@ -154,19 +183,16 @@ export function TaskCard({
   const selectStatus = (status: TaskStatus) => {
     onChangeStatus?.(task.taskId, status);
     toast.success(`Status changed to "${status}"`);
-    setOpenMenu(null);
   };
 
   const selectPriority = (priority: Priority) => {
     onChangePriority?.(task.taskId, priority);
     toast.success(`Priority changed to "${priority}"`);
-    setOpenMenu(null);
   };
 
   const selectUser = (user: string) => {
     onAssignUser?.(task.taskId, user);
     toast.success(`Assigned to ${user}`);
-    closeAssignModal();
   };
 
   function toggleCollaborator(name: string) {
@@ -197,15 +223,17 @@ export function TaskCard({
     toast.success(`Added ${name} as collaborator`);
   }
 
-  function openAssignModal() {
-    setAssignModalTab("owner");
-    setAssignSearch("");
-    setShowAssignModal(true);
+  function openPanel(next: TaskQuickPanel) {
+    rememberPanel(panel === next ? null : next);
+    if (next === "owner") {
+      setAssignModalTab("owner");
+      setAssignSearch("");
+    }
   }
 
-  function closeAssignModal() {
-    setShowAssignModal(false);
-    setAssignSearch("");
+  function selectPanel(next: TaskQuickPanel) {
+    rememberPanel(next);
+    if (next === "owner") setAssignSearch("");
   }
 
   const assignQuery = assignSearch.trim().toLowerCase();
@@ -298,18 +326,20 @@ export function TaskCard({
         </div>
 
         <div className="mb-2.5 flex items-center justify-between gap-2">
-          {days !== null ? (
+          {task.dueDate.trim() && days !== null ? (
             <span className="flex items-center gap-1 text-[11px] font-medium text-rose-500">
               <Calendar className="h-3 w-3 shrink-0" />
               <span className="truncate">
                 Overdue {days} {days === 1 ? "day" : "days"}
               </span>
             </span>
-          ) : (
+          ) : task.dueDate.trim() ? (
             <span className="flex items-center gap-1 text-[11px] text-slate-500">
               <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
               <span className="truncate">Due {task.dueDate}</span>
             </span>
+          ) : (
+            <span />
           )}
           <ArrowTag
             compact
@@ -396,116 +426,164 @@ export function TaskCard({
             <Check className="h-3.5 w-3.5" />
           </button>
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() =>
-                setOpenMenu((m) => (m === "status" ? null : "status"))
-              }
-              title={`Status: ${task.status}`}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
-                openMenu === "status" ? "bg-slate-100 text-slate-600" : ""
-              }`}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-            {openMenu === "status" ? (
-              <div className="absolute bottom-9 left-1/2 z-20 w-36 -translate-x-1/2 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-                {TASK_STATUSES.map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => selectStatus(status)}
-                    className={`block w-full px-3 py-1.5 text-left text-[12px] hover:bg-slate-50 ${
-                      status === task.status
-                        ? "font-semibold text-sky-600"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() =>
-                setOpenMenu((m) => (m === "priority" ? null : "priority"))
-              }
-              title={`Priority: ${task.priority}`}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
-                openMenu === "priority" ? "bg-slate-100 text-slate-600" : ""
-              }`}
-            >
-              <Flag className="h-3.5 w-3.5" />
-            </button>
-            {openMenu === "priority" ? (
-              <div className="absolute bottom-9 left-1/2 z-20 w-32 -translate-x-1/2 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-                {TASK_PRIORITIES.map((priority) => (
-                  <button
-                    key={priority}
-                    type="button"
-                    onClick={() => selectPriority(priority)}
-                    className={`block w-full px-3 py-1.5 text-left text-[12px] hover:bg-slate-50 ${
-                      priority === task.priority
-                        ? "font-semibold text-sky-600"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {priority}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={() => openPanel("status")}
+            title={`Status: ${task.status}`}
+            aria-pressed={panel === "status"}
+            className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
+              panel === "status" ? "bg-slate-100 text-slate-600" : ""
+            }`}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
 
           <button
             type="button"
-            onClick={openAssignModal}
-            title="Assign Owner"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            onClick={() => openPanel("priority")}
+            title={`Priority: ${task.priority}`}
+            aria-pressed={panel === "priority"}
+            className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
+              panel === "priority" ? "bg-slate-100 text-slate-600" : ""
+            }`}
+          >
+            <Flag className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openPanel("owner")}
+            title="Change owner"
+            aria-pressed={panel === "owner"}
+            className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
+              panel === "owner" ? "bg-slate-100 text-slate-600" : ""
+            }`}
           >
             <UserPlus className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
-            onClick={() => setShowNotesDrawer(true)}
+            onClick={() => openPanel("notes")}
             title="Notes"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            aria-pressed={panel === "notes"}
+            className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600 ${
+              panel === "notes" ? "bg-slate-100 text-slate-600" : ""
+            }`}
           >
             <FileText className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Assign user modal */}
-      {showAssignModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={closeAssignModal}
+      {panel ? (
+        <LeadSideDrawer
+          open
+          onClose={() => rememberPanel(null)}
+          title={task.title}
+          subtitle={QUICK_PANELS.find((item) => item.id === panel)?.label}
+          widthClassName={LEAD_QUICK_DRAWER_WIDTH}
+          ariaLabel={`${QUICK_PANELS.find((item) => item.id === panel)?.label} for ${task.title}`}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xs rounded-xl bg-white p-4 shadow-xl"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">
-                {assignModalTab === "owner"
-                  ? "Assign Owner"
-                  : "Add Collaborators"}
-              </h3>
-              <button
-                type="button"
-                onClick={closeAssignModal}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+          <div className="flex h-full min-h-0">
+            <nav className="w-40 shrink-0 border-r border-slate-100 bg-slate-50/40 py-3 sm:w-44">
+              {QUICK_PANELS.map((item) => {
+                const active = panel === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectPanel(item.id)}
+                    aria-pressed={active}
+                    className={cn(
+                      "block w-full border-l-2 px-4 py-2 text-left text-[13px] font-medium transition-colors",
+                      active
+                        ? "border-violet-600 bg-violet-50 text-violet-700"
+                        : "border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
 
+            {panel === "notes" ? (
+              <div className="relative min-h-0 min-w-0 flex-1">
+                <div className="absolute inset-0">
+                  <WorkQueueNotesDrawer
+                    embedded
+                    row={{
+                      id: task.taskId,
+                      subject: task.title,
+                      related: formatRelatedTo(task.relatedTo) || undefined,
+                      href: `/activities/tasks/detail/${task.taskId}`,
+                    }}
+                    onClose={() => rememberPanel(null)}
+                    onChanged={(message) => toast.success(message)}
+                  />
+                </div>
+              </div>
+            ) : panel === "status" ? (
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3">
+                <div className="space-y-1">
+                  {TASK_STATUSES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => selectStatus(status)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-slate-50 ${
+                        status === task.status
+                          ? "bg-sky-50 font-semibold text-sky-700"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      {status}
+                      {status === task.status ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : panel === "priority" ? (
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
+                <div className="space-y-1.5">
+                  {TASK_PRIORITIES.map((priority) => {
+                    const selected = priority === task.priority;
+                    const tone = priorityTone[priority];
+                    return (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => selectPriority(priority)}
+                        aria-pressed={selected}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-[13px] transition-colors",
+                          selected
+                            ? cn("font-semibold", tone.selected)
+                            : "border-transparent text-slate-700 hover:bg-slate-50",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-2.5 w-2.5 shrink-0 rounded-full",
+                            tone.dot,
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1">{priority}</span>
+                        {selected ? (
+                          <Check className="h-3.5 w-3.5 shrink-0" />
+                        ) : (
+                          <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4">
             <div className="mb-3 flex rounded-md bg-slate-100 p-0.5 text-[13px]">
               <button
                 type="button"
@@ -651,21 +729,10 @@ export function TaskCard({
                 </>
               )}
             </div>
+              </div>
+            )}
           </div>
-        </div>
-      ) : null}
-
-      {showNotesDrawer ? (
-        <WorkQueueNotesDrawer
-          row={{
-            id: task.taskId,
-            subject: task.title,
-            related: formatRelatedTo(task.relatedTo) || undefined,
-            href: `/activities/tasks/detail/${task.taskId}`,
-          }}
-          onClose={() => setShowNotesDrawer(false)}
-          onChanged={(message) => toast.success(message)}
-        />
+        </LeadSideDrawer>
       ) : null}
     </>
   );

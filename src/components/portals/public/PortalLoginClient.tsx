@@ -85,7 +85,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F7F6F9] text-sm text-slate-500">
+      <div className="flex min-h-dvh items-center justify-center bg-white text-sm text-slate-500">
         Loading…
       </div>
     );
@@ -93,7 +93,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
 
   if (!portal) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F7F6F9] px-4 text-center">
+      <div className="flex min-h-dvh items-center justify-center bg-white px-4 text-center">
         <h1 className="text-xl font-bold text-slate-900">Portal not found</h1>
       </div>
     );
@@ -101,7 +101,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
 
   if (portal.status !== "Active") {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F7F6F9] px-4 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-white px-4 text-center">
         <p className="text-[11px] font-semibold tracking-widest text-[#5A32A3] uppercase">
           FinConnex
         </p>
@@ -114,7 +114,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#F7F6F9] px-4">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-white px-4">
       <div className="relative w-full max-w-md">
         <div className="mb-7 text-center">
           <div className="mb-5 flex justify-center">
@@ -195,7 +195,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
           />
 
           {firstVisit ? (
-            <label className="mt-4 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-[#F7F6F9] px-3 py-2.5">
+            <label className="mt-4 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
               <input
                 type="checkbox"
                 checked={accepted}

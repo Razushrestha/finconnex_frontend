@@ -3,6 +3,10 @@
 import React, { useState } from "react";
 import { Calendar, ChevronDown, FileText, Plus } from "lucide-react";
 import {
+  REMINDER_STOP_OPTIONS,
+  REMINDER_VIA_OPTIONS,
+  type ReminderStop,
+  type ReminderVia,
   type ZohoSendFormSettings,
 } from "@/components/documents/signature/create/ZohoStyleSendForm";
 import {
@@ -200,10 +204,25 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
             </label>
             {settings.automaticReminders ? (
               <>
-                <p className="text-[12px] leading-5 text-slate-400">
-                  Automatic reminders will only be delivered via email even if
-                  the delivery mode is set to &quot;Email + SMS&quot;.
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
+                  <span>Remind via</span>
+                  <select
+                    value={settings.reminderVia ?? "email"}
+                    onChange={(e) =>
+                      onChangeSettings({
+                        reminderVia: e.target.value as ReminderVia,
+                      })
+                    }
+                    aria-label="Remind via"
+                    className={cn(fieldClass, "h-9 w-[148px]")}
+                  >
+                    {REMINDER_VIA_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex flex-col gap-3 text-[13px] text-slate-600">
                   <div className="flex flex-wrap items-center gap-2">
                     <span>Send a reminder every</span>
@@ -215,6 +234,48 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
                       className={cn(fieldClass, "w-[72px]")}
                     />
                     <span>day(s)</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Stop reminding</span>
+                    <select
+                      value={settings.reminderStop ?? "occurrences"}
+                      onChange={(e) =>
+                        onChangeSettings({
+                          reminderStop: e.target.value as ReminderStop,
+                        })
+                      }
+                      aria-label="Stop reminding"
+                      className={cn(fieldClass, "h-9 w-[88px]")}
+                    >
+                      {REMINDER_STOP_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {(settings.reminderStop ?? "occurrences") === "date" ? (
+                      <input
+                        type="date"
+                        value={settings.reminderStopDate ?? ""}
+                        onChange={(e) =>
+                          onChangeSettings({ reminderStopDate: e.target.value })
+                        }
+                        aria-label="Stop reminder date"
+                        className={cn(fieldClass, "h-9 w-[168px]")}
+                      />
+                    ) : (
+                      <>
+                        <ReminderEveryDaysInput
+                          value={settings.reminderStopAfter ?? 3}
+                          onChange={(reminderStopAfter) =>
+                            onChangeSettings({ reminderStopAfter })
+                          }
+                          ariaLabel="Stop after occurrences"
+                          className={cn(fieldClass, "w-[72px]")}
+                        />
+                        <span>occurrence(s)</span>
+                      </>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span>on</span>
@@ -262,7 +323,11 @@ export function defaultTemplateMoreSettings(): ZohoSendFormSettings {
     description: "",
     allowComments: false,
     automaticReminders: true,
+    reminderVia: "email",
     reminderEveryDays: 5,
+    reminderStop: "occurrences",
+    reminderStopAfter: 3,
+    reminderStopDate: `${y}-${m}-${d}`,
     reminderDay: `${y}-${m}-${d}`,
     reminderTime: "09:00",
   };

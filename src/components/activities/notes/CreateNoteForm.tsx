@@ -188,7 +188,7 @@ export function CreateNoteForm({
               update("relatedId", "");
             }}
           >
-            <option value="">Select entity</option>
+            <option value="">None</option>
             {RELATED_ENTITY_KINDS.map((k) => (
               <option key={k} value={k}>
                 {k}

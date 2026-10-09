@@ -8,6 +8,7 @@ export type AddressHit = {
   suburb: string;
   state: string;
   postcode: string;
+  country: string;
   lat?: number;
   lon?: number;
 };
@@ -83,6 +84,7 @@ function hitFromPhoton(
     ).trim(),
     state: normalizeAuState(String(properties.state ?? "")),
     postcode: String(properties.postcode ?? "").trim(),
+    country: String(properties.country ?? "").trim(),
     lon: coords?.[0],
     lat: coords?.[1],
   };

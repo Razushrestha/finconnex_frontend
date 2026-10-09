@@ -13,7 +13,10 @@ import {
   type ClientPortal,
 } from "@/lib/portals/types";
 import { sendEmailDemoLive, sendSmsDemoLive } from "@/lib/comms/send-gateway";
-import { getMortgageState } from "@/lib/portals/mortgage";
+import {
+  getMortgageState,
+  syncMortgageClientFromCrmContact,
+} from "@/lib/portals/mortgage";
 
 const CREDS_KEY = "portal:credentials:v1";
 const DEFAULT_PASSWORD = "portal123";
@@ -222,15 +225,17 @@ export async function sendPortalInvite(
   if (portal.status !== "Active") {
     return { ok: false, message: "Activate portal before inviting" };
   }
-  ensurePortalCredentials(portal);
+  syncMortgageClientFromCrmContact(portal);
+  const synced = getPortalBySlug(portal.slug) ?? portal;
+  ensurePortalCredentials(synced);
   const loginUrl = portalAbsoluteUrl(portalLoginPath(portal.slug));
   const sent = await sendEmailDemoLive({
-    email: portal.primaryContactEmail,
+    email: synced.primaryContactEmail,
     subject: `Your FinConnex client portal is ready`,
     body: [
-      `Hi ${portal.primaryContactName},`,
+      `Hi ${synced.primaryContactName},`,
       "",
-      `Your broker has set up a private client portal for ${portal.clientName}.`,
+      `Your broker has set up a private client portal for ${synced.clientName}.`,
       "Open this unique link to verify it's you, then continue your application:",
       "",
       loginUrl,
@@ -242,13 +247,13 @@ export async function sendPortalInvite(
   if (!sent.ok) return { ok: false, message: sent.message };
 
   let next = appendPortalAudit(
-    { ...portal, inviteSentAt: formatPortalAt() },
+    { ...synced, inviteSentAt: formatPortalAt() },
     "Invite sent (email gateway)",
     actor,
   );
   next = appendPortalActivity(
     next,
-    `Invite emailed to ${portal.primaryContactEmail}`,
+    `Invite emailed to ${synced.primaryContactEmail}`,
     actor,
   );
   upsertPortal(next);

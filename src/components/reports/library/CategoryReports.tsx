@@ -163,7 +163,7 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
   }
 
   return (
-    <div className="min-h-full bg-[#F5F7FB]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="flex items-center justify-between gap-3">
           <Link

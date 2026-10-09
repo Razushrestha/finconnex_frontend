@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDataTable } from "@/hooks/useDataTable";
 import { Tooltip } from "@/components/ui/tooltip";
+import { HeaderColumnGrip } from "@/components/common/ColumnResizeHandle";
 import {
   listSignatureRequests,
   deleteSignatureRequest,
@@ -204,7 +205,7 @@ export default function SignatureTemplatesPage() {
               {/* Active Resize Indicator Line */}
               {resizeLineX !== null && (
                 <div
-                  className="absolute top-0 bottom-0 w-[2px] bg-violet-500 z-30 pointer-events-none"
+                  className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-slate-300"
                   style={{ left: `${resizeLineX}px` }}
                 />
               )}
@@ -217,13 +218,9 @@ export default function SignatureTemplatesPage() {
                       className="group relative select-none truncate py-3 px-4"
                     >
                       Template Name
-                      <div
+                      <HeaderColumnGrip
+                        active={activeResizeKey === "name"}
                         onMouseDown={onMouseDown("name")}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeResizeKey === "name"
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
                       />
                     </th>
                     <th
@@ -231,13 +228,9 @@ export default function SignatureTemplatesPage() {
                       className="group relative select-none truncate py-3 px-4"
                     >
                       Description
-                      <div
+                      <HeaderColumnGrip
+                        active={activeResizeKey === "description"}
                         onMouseDown={onMouseDown("description")}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeResizeKey === "description"
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
                       />
                     </th>
                     <th
@@ -245,13 +238,9 @@ export default function SignatureTemplatesPage() {
                       className="group relative select-none truncate py-3 px-4"
                     >
                       Last Updated
-                      <div
+                      <HeaderColumnGrip
+                        active={activeResizeKey === "lastUpdated"}
                         onMouseDown={onMouseDown("lastUpdated")}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeResizeKey === "lastUpdated"
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
                       />
                     </th>
                     <th
@@ -259,13 +248,9 @@ export default function SignatureTemplatesPage() {
                       className="group relative select-none truncate py-3 px-4"
                     >
                       Created By
-                      <div
+                      <HeaderColumnGrip
+                        active={activeResizeKey === "createdBy"}
                         onMouseDown={onMouseDown("createdBy")}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeResizeKey === "createdBy"
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
                       />
                     </th>
                     <th

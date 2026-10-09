@@ -153,7 +153,7 @@ export function labelForRecord(record: SoftphoneRecord | null, fallback?: string
   return fallback || "Unlinked number";
 }
 
-export type SoftphoneRelatedKind = "Lead" | "Deal" | "Company";
+export type SoftphoneRelatedKind = "Contact" | "Lead" | "Deal" | "Company";
 
 export type SoftphoneRelatedPick = {
   kind: SoftphoneRelatedKind;
@@ -199,6 +199,7 @@ export function listSoftphoneRelatedOptions(input: {
   phone?: string;
   name?: string;
 }): {
+  contacts: SoftphoneRelatedPick[];
   leads: SoftphoneRelatedPick[];
   deals: SoftphoneRelatedPick[];
   companies: SoftphoneRelatedPick[];
@@ -255,7 +256,23 @@ export function listSoftphoneRelatedOptions(input: {
   }
   companyRows.sort((a, b) => Number(b.hit) - Number(a.hit) || a.name.localeCompare(b.name));
 
+  const contactRows = listAllContacts().map((row) => ({
+    kind: "Contact" as const,
+    id: row.id,
+    name: row.name,
+    hit:
+      phonesMatch(row.phone, phone) ||
+      phonesMatch(row.mobile, phone) ||
+      namesMatch(row.name, name),
+  }));
+  contactRows.sort((a, b) => Number(b.hit) - Number(a.hit) || a.name.localeCompare(b.name));
+
   return {
+    contacts: contactRows.map(({ kind, id, name: contactName }) => ({
+      kind,
+      id,
+      name: contactName,
+    })),
     leads: leadRows.map(({ kind, id, name: leadName }) => ({
       kind,
       id,

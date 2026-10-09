@@ -65,7 +65,7 @@ export function ReportsLibrary() {
   }, []);
 
   return (
-    <div className="min-h-full bg-[#F4F6F9]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="flex items-center justify-end gap-2">
           <span

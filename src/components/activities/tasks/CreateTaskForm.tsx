@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
   ChevronLeft,
   ListChecks,
+  ChevronDown,
   Plus,
   Search,
   User,
@@ -33,9 +34,7 @@ import {
   createCrmTask,
   persistRemoteTask,
 } from "@/lib/tasks/api";
-import { attachFilesToTask } from "@/lib/tasks/attach-files";
 import {
-  addTaskActivityNote,
   createTask,
   deleteTask,
   findTaskById,
@@ -52,7 +51,6 @@ import { mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { upsertLeadFromCard } from "@/lib/leads/store";
 import type { RelatedTo } from "@/lib/activities/shared";
 import {
-  assignableOwnerLabel,
   defaultAssignableOwnerId,
   listAssignableOwnersLocal,
   loadAssignableOwners,
@@ -81,8 +79,8 @@ import {
   Field,
   TextAreaShell,
 } from "@/components/sales/CreateEntityForm";
-import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import AttachmentUpload from "./AttachmentUpload";
+import { WorkQueueNotesDrawer } from "@/components/work-queue/WorkQueueNotesDrawer";
+import { listNotesForQueueRow, relinkNotesRelated } from "@/lib/notes/store";
 import { type NotificationMethod } from "@/lib/reminders/types";
 import {
   defaultReminderRepeatRule,
@@ -113,11 +111,9 @@ interface FormState {
   reminderDate: string;
   assignedTo: string;
   description: string;
-  attachments: File[];
   collaborators: string[];
   actionItems: TaskActionItem[];
   notifyBy: NotificationMethod[];
-  notes: string;
   taskRepeat: ReminderRepeatRule;
   reminderRepeat: ReminderRepeatRule;
 }
@@ -134,17 +130,21 @@ const initialState: FormState = {
   reminderDate: "",
   assignedTo: defaultAssignableOwnerId(listAssignableOwnersLocal()),
   description: "",
-  attachments: [],
   collaborators: [],
   actionItems: [],
   notifyBy: ["Email"],
-  notes: "",
   taskRepeat: defaultReminderRepeatRule,
   reminderRepeat: defaultReminderRepeatRule,
 };
 
 // Only Task Subject is required before the task can be saved.
 const REQUIRED_FIELDS = ["title"] as const;
+
+function newTaskNoteKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `task-draft:${crypto.randomUUID()}`
+    : `task-draft:${Date.now()}`;
+}
 const TASK_SUBJECT_MAX = 150;
 const MAX_COLLABORATORS = 3;
 
@@ -156,6 +156,15 @@ function collaboratorAddLabel(count: number) {
   return `Add collaborator ${nextSlot}`;
 }
 
+function matchesPersonQuery(owner: AssignableOwner, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    owner.name.toLowerCase().includes(q) ||
+    owner.email.toLowerCase().includes(q)
+  );
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -163,6 +172,81 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function PersonSearchMenu({
+  query,
+  onQueryChange,
+  placeholder,
+  people,
+  emptyQuery,
+  emptyLabel,
+  idleLabel,
+  onPick,
+  className = "w-full",
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  placeholder: string;
+  people: AssignableOwner[];
+  emptyQuery: string;
+  emptyLabel: string;
+  idleLabel: string;
+  onPick: (id: string) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`absolute top-full left-0 z-30 mt-1 min-w-[280px] rounded-lg border border-gray-200 bg-white shadow-lg ${className}`}
+    >
+      <div className="border-b border-gray-100 p-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            className="w-full rounded-md border border-gray-200 py-1.5 pr-2 pl-8 text-sm text-gray-700 placeholder:text-gray-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
+          />
+        </div>
+      </div>
+      <ul className="max-h-64 overflow-y-auto py-1" role="listbox">
+        {people.length > 0 ? (
+          people.map((owner) => (
+            <li key={owner.id}>
+              <button
+                type="button"
+                role="option"
+                onClick={() => onPick(owner.id)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-violet-50"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
+                  {initials(owner.name)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-gray-800">
+                    {owner.name}
+                  </span>
+                  {owner.email ? (
+                    <span className="block truncate text-[11px] text-gray-400">
+                      {owner.email}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          ))
+        ) : (
+          <li className="px-3 py-2 text-sm text-gray-400">
+            {emptyQuery.trim() ? emptyLabel : idleLabel}
+          </li>
+        )}
+      </ul>
+    </div>
+  );
 }
 
 const inputClass =
@@ -282,13 +366,13 @@ function formFromDefaults(
   const kind = defaults?.relatedKind ?? "";
   const name = defaults?.relatedName ?? "";
   const dueDate = defaults?.dueDate ?? "";
-  if (kind === "Contact") {
-    return { ...initialState, contactName: name, dueDate };
-  }
   const relatedKind =
-    kind === "Lead" || kind === "Deal" || kind === "Company" ? kind : "";
+    kind === "Contact" || kind === "Lead" || kind === "Deal" || kind === "Company"
+      ? kind
+      : "";
   return {
     ...initialState,
+    contactName: kind === "Contact" ? name : "",
     relatedKind,
     relatedName: relatedKind ? name : "",
     dueDate,
@@ -302,6 +386,17 @@ export function CreateTaskForm({
 }: CreateTaskFormProps) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => formFromDefaults(defaults));
+  const [noteKey, setNoteKey] = useState(newTaskNoteKey);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteTick, setNoteTick] = useState(0);
+  const taskNoteCount = useMemo(
+    () =>
+      listNotesForQueueRow({
+        subject: form.title.trim() || "New task",
+        noteKey,
+      }).length,
+    [form.title, noteKey, noteTick],
+  );
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
@@ -311,8 +406,11 @@ export function CreateTaskForm({
   const [newActionItem, setNewActionItem] = useState("");
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [collaboratorSearch, setCollaboratorSearch] = useState("");
+  const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
+  const [ownerSearch, setOwnerSearch] = useState("");
   const newActionItemRef = useRef<HTMLInputElement>(null);
   const collaboratorPickerRef = useRef<HTMLDivElement>(null);
+  const ownerPickerRef = useRef<HTMLDivElement>(null);
   const [ownerOptions, setOwnerOptions] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
   );
@@ -500,32 +598,35 @@ export function CreateTaskForm({
   const auditPreviewOn = formatTaskTimestamp(new Date());
 
   useEffect(() => {
-    if (!addingCollaborator) return;
+    if (!addingCollaborator && !ownerPickerOpen) return;
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
       if (
         collaboratorPickerRef.current &&
-        !collaboratorPickerRef.current.contains(event.target as Node)
+        !collaboratorPickerRef.current.contains(target)
       ) {
         setAddingCollaborator(false);
         setCollaboratorSearch("");
       }
+      if (ownerPickerRef.current && !ownerPickerRef.current.contains(target)) {
+        setOwnerPickerOpen(false);
+        setOwnerSearch("");
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [addingCollaborator]);
+  }, [addingCollaborator, ownerPickerOpen]);
 
   const availableCollaborators = ownerOptions.filter(
     (owner) =>
       owner.id !== form.assignedTo && !form.collaborators.includes(owner.id),
   );
-  const filteredCollaborators = availableCollaborators.filter((owner) => {
-    const q = collaboratorSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      owner.name.toLowerCase().includes(q) ||
-      owner.email.toLowerCase().includes(q)
-    );
-  });
+  const filteredCollaborators = availableCollaborators.filter((owner) =>
+    matchesPersonQuery(owner, collaboratorSearch),
+  );
+  const filteredOwners = ownerOptions.filter((owner) =>
+    matchesPersonQuery(owner, ownerSearch),
+  );
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {
@@ -700,7 +801,6 @@ export function CreateTaskForm({
       relatedTo: related,
       relatedId: related?.id && isUuid(related.id) ? related.id : undefined,
       description: form.description || undefined,
-      notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
       actionItems: actionItems.length ? actionItems : undefined,
       notifyBy:
@@ -734,6 +834,9 @@ export function CreateTaskForm({
           relatedTo: related ?? remote.relatedTo,
           description: local.description ?? remote.description,
           notes: local.notes ?? remote.notes,
+          dueDate: draft.dueDate.trim()
+            ? remote.dueDate || local.dueDate
+            : "",
           activityNotes: local.activityNotes,
           reminders: local.reminders,
           actionItems: local.actionItems,
@@ -753,24 +856,11 @@ export function CreateTaskForm({
       );
       return;
     }
-    if (form.attachments.length) {
-      const attached = await attachFilesToTask(task.taskId, form.attachments);
-      task =
-        findTaskById(task.taskId)?.task ??
-        (attached.length
-          ? { ...task, attachments: attached, attachmentsCount: attached.length }
-          : task);
-    }
-    const createNote = form.notes.trim();
-    if (createNote) {
-      const already = (findTaskById(task.taskId)?.task.activityNotes ?? []).some(
-        (note) => note.body.trim() === createNote,
-      );
-      if (!already) {
-        const withNote = addTaskActivityNote(task.taskId, createNote);
-        if (withNote) task = withNote;
-      }
-    }
+    relinkNotesRelated(noteKey, {
+      relatedTo: task.title,
+      relatedId: task.taskId,
+      relatedType: "Task",
+    });
     logCreate("activities.tasks", ownerName, task.taskId, form.title);
     notifyOwnerAssigned({
       owner: ownerName,
@@ -786,6 +876,7 @@ export function CreateTaskForm({
       relatedHref: "/activities/tasks",
     });
     if (createAnother) {
+      setNoteKey(newTaskNoteKey());
       setForm({ ...initialState, assignedTo: form.assignedTo });
       setErrors({});
       setSubmitted(false);
@@ -900,7 +991,7 @@ export function CreateTaskForm({
                   <option value="">None</option>
                   {TASK_RELATED_ENTITY_KINDS.map((k) => (
                     <option key={k} value={k}>
-                      {k === "Company" ? "Organization" : k}
+                      {k}
                     </option>
                   ))}
                 </select>
@@ -914,7 +1005,7 @@ export function CreateTaskForm({
                   disabled={!form.relatedKind}
                   placeholder={
                     form.relatedKind
-                      ? `Search ${form.relatedKind === "Company" ? "organization" : form.relatedKind.toLowerCase()}…`
+                      ? `Search ${form.relatedKind.toLowerCase()}…`
                       : "Select related entity first"
                   }
                 />
@@ -1037,20 +1128,35 @@ export function CreateTaskForm({
             </button>
           </div>
 
-          <Field label="Notes" className="col-span-full">
-            <MentionNotesTextarea
-              value={form.notes}
-              onChange={(notes) => update("notes", notes)}
-              placeholder="Internal notes… Type @ to assign someone."
-            />
-          </Field>
-
-          <Field label="Attachments" className="col-span-full">
-            <AttachmentUpload
-              files={form.attachments}
-              onChange={(files) => update("attachments", files)}
-            />
-          </Field>
+          <button
+            type="button"
+            onClick={() => setNotesOpen((open) => !open)}
+            className="flex h-11 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-left text-[14px] text-slate-400 transition-colors hover:border-slate-300 hover:bg-slate-50"
+          >
+            <span>Notes</span>
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-600">
+              {taskNoteCount}
+            </span>
+          </button>
+          {notesOpen ? (
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <WorkQueueNotesDrawer
+                key={noteKey}
+                inlineComposer
+                row={{
+                  id: noteKey,
+                  subject: form.title.trim() || "New task",
+                  href: "/activities/tasks",
+                  noteKey,
+                }}
+                onClose={() => setNotesOpen(false)}
+                onChanged={(message) => {
+                  setNoteTick((n) => n + 1);
+                  toast.success(message);
+                }}
+              />
+            </div>
+          ) : null}
           </div>
 
         {/* Right column */}
@@ -1076,22 +1182,39 @@ export function CreateTaskForm({
                     </button>
                   </span>
                 ) : (
-                  <div className="relative w-full">
-                    <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <select
-                      className={inputClass + " pl-9"}
-                      value=""
-                      onChange={(e) => update("assignedTo", e.target.value)}
+                  <div ref={ownerPickerRef} className="relative w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOwnerPickerOpen((open) => !open);
+                        if (ownerPickerOpen) setOwnerSearch("");
+                      }}
+                      className={`${inputClass} relative flex items-center gap-2 pl-9 text-left text-gray-400 ${
+                        submitted && errors.assignedTo ? "border-red-300" : ""
+                      }`}
+                      aria-haspopup="listbox"
+                      aria-expanded={ownerPickerOpen}
                     >
-                      <option value="" disabled>
-                        Select an owner
-                      </option>
-                      {ownerOptions.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {assignableOwnerLabel(o)}
-                        </option>
-                      ))}
-                    </select>
+                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      Select an owner
+                      <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-gray-400" />
+                    </button>
+                    {ownerPickerOpen ? (
+                      <PersonSearchMenu
+                        query={ownerSearch}
+                        onQueryChange={setOwnerSearch}
+                        placeholder="Search owners…"
+                        people={filteredOwners}
+                        emptyQuery={ownerSearch}
+                        emptyLabel="No owners match your search"
+                        idleLabel="No owners available"
+                        onPick={(id) => {
+                          update("assignedTo", id);
+                          setOwnerPickerOpen(false);
+                          setOwnerSearch("");
+                        }}
+                      />
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -1143,47 +1266,17 @@ export function CreateTaskForm({
                     <Plus className="h-4 w-4" />
                   </button>
                   {addingCollaborator && (
-                    <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-                      <div className="border-b border-gray-100 p-2">
-                        <div className="relative">
-                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-            <input
-                            autoFocus
-              type="text"
-                            value={collaboratorSearch}
-                            onChange={(e) =>
-                              setCollaboratorSearch(e.target.value)
-                            }
-                            placeholder="Search collaborators…"
-                            className="w-full rounded-md border border-gray-200 py-1.5 pl-8 pr-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                          />
-                        </div>
-                      </div>
-                      <ul className="max-h-44 overflow-y-auto py-1">
-                        {filteredCollaborators.length > 0 ? (
-                          filteredCollaborators.map((owner) => (
-                            <li key={owner.id}>
-                              <button
-                                type="button"
-                                onClick={() => addCollaborator(owner.id)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700"
-                              >
-                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
-                                  {initials(owner.name)}
-                                </span>
-                                {assignableOwnerLabel(owner)}
-                              </button>
-                            </li>
-                          ))
-                        ) : (
-                          <li className="px-3 py-2 text-sm text-gray-400">
-                            {collaboratorSearch.trim()
-                              ? "No collaborators match your search"
-                              : "No collaborators available"}
-                          </li>
-                        )}
-                      </ul>
-                    </div>
+                    <PersonSearchMenu
+                      query={collaboratorSearch}
+                      onQueryChange={setCollaboratorSearch}
+                      placeholder="Search collaborators…"
+                      people={filteredCollaborators}
+                      emptyQuery={collaboratorSearch}
+                      emptyLabel="No collaborators match your search"
+                      idleLabel="No collaborators available"
+                      onPick={(id) => addCollaborator(id)}
+                      className="w-72"
+                    />
                   )}
                 </div>
                 ) : null}
@@ -1244,11 +1337,19 @@ export function CreateTaskForm({
                   className={
                     inputClass +
                     " pl-9" +
+                    (form.dueDate
+                      ? ""
+                      : " text-transparent [&::-webkit-datetime-edit]:text-transparent") +
                     (submitted && errors.dueDate ? " border-red-300" : "")
                   }
                   value={form.dueDate}
                   onChange={(e) => handleDueDateChange(e.target.value)}
                 />
+                {form.dueDate ? null : (
+                  <span className="pointer-events-none absolute top-1/2 left-9 -translate-y-1/2 text-sm text-gray-400">
+                    Select due date
+                  </span>
+                )}
               </div>
               {(submitted || form.dueDate) && errors.dueDate ? (
                 <p className="mt-1 text-xs text-red-600">{errors.dueDate}</p>

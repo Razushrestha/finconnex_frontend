@@ -254,7 +254,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-slate-50 text-[13px] text-slate-400">
+      <div className="flex min-h-full items-center justify-center bg-white text-[13px] text-slate-400">
         Loading…
       </div>
     );
@@ -262,7 +262,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
 
   if (!req) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 p-8">
+      <div className="flex min-h-full flex-col items-center justify-center bg-white p-8">
         <p className="font-bold text-slate-900">Request not found</p>
         <Link
           href="/documents/signature"
@@ -276,7 +276,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
 
   if (req.status !== "Draft") {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 p-8 text-center">
+      <div className="flex min-h-full flex-col items-center justify-center bg-white p-8 text-center">
         <p className="font-bold text-slate-900">Fields locked</p>
         <p className="mt-1 max-w-sm text-[13px] text-slate-500">
           This request is {req.status.toLowerCase()}. Field placement is only
@@ -301,7 +301,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
   );
 
   return (
-    <div className="relative flex min-h-full flex-col bg-slate-50">
+    <div className="relative flex min-h-full flex-col bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200/80 bg-white px-3 py-2.5 sm:px-4">
         <button
           type="button"

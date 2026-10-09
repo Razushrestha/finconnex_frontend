@@ -30,7 +30,7 @@ const ICONS = {
 
 export function AnalyticsLibrary() {
   return (
-    <div className="min-h-full bg-[#F4F6FB]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {ANALYTICS_SECTIONS.map((section) => {

@@ -338,7 +338,7 @@ export default function TimeTrackingPage() {
     "h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-8 text-sm text-slate-700 shadow-sm outline-none focus:border-violet-300";
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-[#F5F7FB]">
+    <div className="relative min-h-full overflow-hidden bg-white">
       <div className="relative mx-auto flex max-w-[1920px] flex-col gap-4 p-4 sm:p-5 lg:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-1 flex-wrap items-end gap-4">

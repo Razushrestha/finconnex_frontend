@@ -57,10 +57,10 @@
  * inherit it.
  */
 :root {
-  --brand-primary: #5a32a3;
-  --brand-secondary: #0f172a;
+  --brand-primary: #6376b5;
+  --brand-secondary: #bf83b8;
   --brand-gradient: linear-gradient(
-    135deg,
+    168deg,
     var(--brand-primary) 0%,
     var(--brand-secondary) 100%
   );
