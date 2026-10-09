@@ -228,6 +228,9 @@ const SILENT_SEGMENTS = new Set([
   "health",
   "capabilities",
   "sync-status",
+  // Consultation drafts autosave while the wizard is open. The CRM may not
+  // have this route, and the wizard shows its own save status.
+  "drafts",
   "download",
   "pdf",
   "chat",

@@ -491,6 +491,16 @@ function isFormDataBody(body: unknown): body is FormData {
   return typeof FormData !== "undefined" && body instanceof FormData;
 }
 
+/** Headers from `new Headers()` do not spread into a plain object. */
+function plainHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!headers) return out;
+  new Headers(headers).forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
 async function sendCrm(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
@@ -503,7 +513,7 @@ async function sendCrm(
       Accept: "application/json",
       Authorization: `Bearer ${session.accessToken}`,
       ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
+      ...plainHeaders(init?.headers),
     },
   });
   const text = await res.text();
@@ -623,7 +633,7 @@ async function crmBffFetchUncached<T>(
       headers: {
         Accept: "application/json",
         ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
+        ...plainHeaders(init?.headers),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     });

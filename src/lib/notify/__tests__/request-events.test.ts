@@ -59,6 +59,9 @@ describe("describeRequestEvent", () => {
     expect(describeRequestEvent("PATCH", `${API}/v1/workspaces/${WS}/notifications/${ID}/read`)).toBeNull();
     expect(describeRequestEvent("POST", `${API}/v1/workspaces/${WS}/chat/${ID}/messages`)).toBeNull();
     expect(describeRequestEvent("POST", `${API}/v1/storage/uploads`)).toBeNull();
+    expect(
+      describeRequestEvent("POST", `${API}/v1/workspaces/${WS}/booking/drafts`),
+    ).toBeNull();
     expect(describeRequestEvent("POST", `${API}/v1/__no_such_module_tasks_probe__`)).toBeNull();
   });
 
