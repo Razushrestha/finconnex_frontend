@@ -1188,6 +1188,72 @@ export function listCrmHostSchedules(
   );
 }
 
+function errorText(err: unknown) {
+  return err instanceof Error ? err.message : String(err ?? "");
+}
+
+/** The CRM rejected a missing or non-string `date` (`@IsISO8601` + `@IsString`). */
+function isDateValueError(err: unknown) {
+  const message = errorText(err);
+  return /date/i.test(message) && /iso-?8601|must be a string/i.test(message);
+}
+
+function isUnknownDateProperty(err: unknown) {
+  const message = errorText(err);
+  return /date/i.test(message) && /not allowed|should not exist/i.test(message);
+}
+
+/**
+ * Calendar day or any parseable date, as a full ISO-8601 string.
+ * Date-only values fail the CRM's date check.
+ */
+export function toCrmIsoDate(value: string): string {
+  const trimmed = value.trim();
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      trimmed,
+    )
+  ) {
+    return trimmed;
+  }
+  const day = trimmed.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return `${day}T00:00:00.000Z`;
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return trimmed;
+  return new Date(parsed).toISOString();
+}
+
+/**
+ * Working-hours save. The CRM requires `date` as an ISO-8601 string; a body
+ * without one fails both "must be a valid ISO-8601 value" and "must be a
+ * string". Send it when the server asks, on the schedule or on each rule.
+ */
+async function writeHostSchedule(
+  path: string,
+  method: "POST" | "PATCH",
+  body: {
+    name: string;
+    timezone: string;
+    isDefault: boolean;
+    rules: CrmAvailabilityWindow[];
+  },
+) {
+  try {
+    return await bookingCall(path, jsonInit(method, body));
+  } catch (err) {
+    if (!isDateValueError(err)) throw err;
+  }
+  const date = new Date().toISOString();
+  try {
+    return await bookingCall(path, jsonInit(method, { ...body, date }));
+  } catch (err) {
+    if (!isDateValueError(err) && !isUnknownDateProperty(err)) throw err;
+    const rules = body.rules.map((rule) => ({ ...rule, date }));
+    const next = isUnknownDateProperty(err) ? { ...body, rules } : { ...body, date, rules };
+    return await bookingCall(path, jsonInit(method, next));
+  }
+}
+
 export function saveCrmHostSchedule(
   hostId: string,
   input: {
@@ -1207,13 +1273,11 @@ export function saveCrmHostSchedule(
   const path = input.scheduleId
     ? `/hosts/schedules/${input.scheduleId}`
     : `/hosts/${hostId}/schedules`;
-  return bookingCall(
-    path,
-    jsonInit(input.scheduleId ? "PATCH" : "POST", body),
-  ).then((data) =>
-    normalizeCrmAvailabilitySchedule(
-      asRecord(data) ?? extractRecords(data)[0] ?? {},
-    ),
+  return writeHostSchedule(path, input.scheduleId ? "PATCH" : "POST", body).then(
+    (data) =>
+      normalizeCrmAvailabilitySchedule(
+        asRecord(data) ?? extractRecords(data)[0] ?? {},
+      ),
   );
 }
 
@@ -1230,7 +1294,7 @@ export function addCrmScheduleOverride(
 ): Promise<unknown> {
   return bookingCall(
     `/hosts/schedules/${scheduleId}/overrides`,
-    jsonInit("POST", input, silent),
+    jsonInit("POST", { ...input, date: toCrmIsoDate(input.date) }, silent),
   );
 }
 
@@ -1249,9 +1313,16 @@ export function updateCrmBookingHost(
   hostId: string,
   body: { dailyBookingLimit?: number | null; isConsultant?: boolean },
 ): Promise<CrmBookingHost> {
-  return bookingCall(`/hosts/${hostId}`, jsonInit("PATCH", body)).then((data) =>
-    normalizeCrmBookingHost(asRecord(data) ?? extractRecords(data)[0] ?? {}),
-  );
+  const path = `/hosts/${hostId}`;
+  const send = (payload: object) => bookingCall(path, jsonInit("PATCH", payload));
+  return send(body)
+    .catch((err) => {
+      if (!isDateValueError(err)) throw err;
+      return send({ ...body, date: new Date().toISOString() });
+    })
+    .then((data) =>
+      normalizeCrmBookingHost(asRecord(data) ?? extractRecords(data)[0] ?? {}),
+    );
 }
 
 export async function resolveCrmBookingHosts(
