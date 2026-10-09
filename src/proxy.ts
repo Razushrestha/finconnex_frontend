@@ -7,6 +7,9 @@ import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 const PUBLIC_EXACT = new Set([
   "/login",
   "/signup",
+  // OneDrive's file chooser redirects its pop-up here. It only loads
+  // Microsoft's script, so a login redirect would break the hand-off.
+  "/onedrive/picker",
   "/forgot-password",
   "/reset-password",
   "/verify-email",

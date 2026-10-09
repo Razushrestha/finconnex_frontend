@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
-  getCrmDocumentDownload,
-  listCrmDocuments,
-} from "@/lib/documents/library/api";
-import type { LibraryDocument } from "@/lib/documents/library/types";
+  pickOneDriveFiles,
+  preloadOneDrivePicker,
+} from "@/lib/documents/onedrive/picker";
 import {
   getCrmSignatureTemplate,
   listCrmSignatureTemplates,
@@ -15,7 +14,7 @@ import {
   getRequestDocuments,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
-type Picker = "cloud" | "templates";
+type Picker = "templates";
 
 const MENU = [
   { id: "desktop", label: "Desktop" },
@@ -50,8 +49,11 @@ export function AddDocumentMenu({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [cloud, setCloud] = useState<LibraryDocument[]>([]);
   const [templates, setTemplates] = useState<SignatureRequest[]>([]);
+
+  useEffect(() => {
+    preloadOneDrivePicker();
+  }, []);
 
   useEffect(() => {
     if (!picker) return;
@@ -60,10 +62,7 @@ export function AddDocumentMenu({
     setError("");
     void (async () => {
       try {
-        if (picker === "cloud") {
-          const rows = await listCrmDocuments({ limit: 100 });
-          if (alive) setCloud(rows.filter((row) => row.fileName.trim()));
-        } else if (picker === "templates") {
+        if (picker === "templates") {
           const rows = await listCrmSignatureTemplates();
           if (alive) setTemplates(rows);
         }
@@ -86,18 +85,18 @@ export function AddDocumentMenu({
     setBusyId(null);
   }
 
-  async function addCloud(doc: LibraryDocument) {
-    setBusyId(doc.id);
+  async function openOneDrive() {
+    setOpen(false);
+    setPicker(null);
     setError("");
+    setLoading(true);
     try {
-      const remote = await getCrmDocumentDownload(doc.id);
-      if (!remote.url) throw new Error(`${doc.fileName} has no file to attach.`);
-      onFiles([await fileFromUrl(remote.url, doc.fileName)]);
-      closeAll();
+      const files = await pickOneDriveFiles();
+      if (files.length) onFiles(files);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add that file.");
+      setError(err instanceof Error ? err.message : "Could not open OneDrive.");
     } finally {
-      setBusyId(null);
+      setLoading(false);
     }
   }
 
@@ -155,7 +154,11 @@ export function AddDocumentMenu({
                     onDesktop();
                     return;
                   }
-                  setPicker(item.id);
+                  if (item.id === "cloud") {
+                    void openOneDrive();
+                    return;
+                  }
+                  setPicker("templates");
                 }}
               >
                 {item.label}
@@ -173,20 +176,6 @@ export function AddDocumentMenu({
             </p>
             {loading ? (
               <p className="px-2 py-3 text-[12px] text-slate-400">Loading…</p>
-            ) : picker === "cloud" ? (
-              <PickerList
-                rows={cloud.map((doc) => ({
-                  id: doc.id,
-                  label: doc.fileName,
-                  detail: doc.folder,
-                }))}
-                empty="No cloud files yet."
-                busyId={busyId}
-                onPick={(id) => {
-                  const doc = cloud.find((row) => row.id === id);
-                  if (doc) void addCloud(doc);
-                }}
-              />
             ) : picker === "templates" ? (
               <PickerList
                 rows={templates.map((row) => ({
@@ -206,6 +195,20 @@ export function AddDocumentMenu({
             ) : null}
           </div>
         </>
+      ) : null}
+      {error && !picker ? (
+        <p
+          className={
+            error.startsWith("OneDrive is open")
+              ? "mt-2 max-w-xs text-[11px] font-medium text-slate-500"
+              : "mt-2 max-w-xs text-[11px] font-medium text-rose-600"
+          }
+        >
+          {error}
+        </p>
+      ) : null}
+      {loading && !picker ? (
+        <p className="mt-2 text-[11px] text-slate-400">Opening OneDrive…</p>
       ) : null}
     </div>
   );
