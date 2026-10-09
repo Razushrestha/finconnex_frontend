@@ -214,6 +214,11 @@ export function normalizeClientPortal(
       raw.primaryContactEmail,
       contact && pickStr(contact.email),
     ),
+    primaryContactPhone: pickStr(
+      raw.primaryContactPhone,
+      contact &&
+        pickStr(contact.mobilePhone, contact.mobile, contact.phone, contact.phoneNumber),
+    ) || undefined,
     primaryContactId: isUuid(contactId) ? contactId : undefined,
     portalUrl: portalUrl || undefined,
     lastLoginAt: pickStr(raw.lastAccessedAt, raw.lastLoginAt) || undefined,

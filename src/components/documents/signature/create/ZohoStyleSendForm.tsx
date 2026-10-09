@@ -66,6 +66,21 @@ const DELIVERY_OPTIONS: { value: DeliveryMethod; label: string }[] = [
   { value: "email_sms", label: "Email + SMS" },
 ];
 
+export const REMINDER_VIA_OPTIONS = [
+  { value: "email", label: "Email" },
+  { value: "sms", label: "SMS" },
+  { value: "email_sms", label: "Email + SMS" },
+] as const;
+
+export type ReminderVia = (typeof REMINDER_VIA_OPTIONS)[number]["value"];
+
+export const REMINDER_STOP_OPTIONS = [
+  { value: "occurrences", label: "after" },
+  { value: "date", label: "on" },
+] as const;
+
+export type ReminderStop = (typeof REMINDER_STOP_OPTIONS)[number]["value"];
+
 const SOURCE_OPTIONS: { value: RecipientSource; label: string }[] = [
   { value: "email", label: "Direct Email" },
   { value: "contact", label: "Contact" },
@@ -82,7 +97,11 @@ export type ZohoSendFormSettings = {
   description: string;
   allowComments: boolean;
   automaticReminders: boolean;
+  reminderVia: ReminderVia;
   reminderEveryDays: number;
+  reminderStop: ReminderStop;
+  reminderStopAfter: number;
+  reminderStopDate: string;
   reminderDay: string;
   reminderTime: string;
 };
@@ -704,7 +723,7 @@ export function ZohoStyleSendForm({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-[#F6F5FA] p-3 sm:p-4">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-white p-3 sm:p-4">
       <form
         className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
         onSubmit={(e) => {
@@ -1186,11 +1205,25 @@ export function ZohoStyleSendForm({
                     </label>
                     {settings.automaticReminders ? (
                       <>
-                        <p className="max-w-xl text-[12px] leading-5 text-slate-400">
-                          Automatic reminders will only be delivered via email
-                          even if the delivery mode is set to &quot;Email +
-                          SMS&quot;.
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
+                          <span>Remind via</span>
+                          <select
+                            value={settings.reminderVia ?? "email"}
+                            onChange={(event) =>
+                              onChangeSettings({
+                                reminderVia: event.target.value as ReminderVia,
+                              })
+                            }
+                            aria-label="Remind via"
+                            className={cn(selectClass, "h-9 w-[148px]")}
+                          >
+                            {REMINDER_VIA_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
                           <span>Send a reminder every</span>
                           <ReminderEveryDaysInput
@@ -1201,6 +1234,50 @@ export function ZohoStyleSendForm({
                             className={cn(fieldClass, "w-[72px]")}
                           />
                           <span>day(s)</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
+                          <span>Stop reminding</span>
+                          <select
+                            value={settings.reminderStop ?? "occurrences"}
+                            onChange={(event) =>
+                              onChangeSettings({
+                                reminderStop: event.target.value as ReminderStop,
+                              })
+                            }
+                            aria-label="Stop reminding"
+                            className={cn(selectClass, "h-9 w-[88px]")}
+                          >
+                            {REMINDER_STOP_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          {(settings.reminderStop ?? "occurrences") === "date" ? (
+                            <input
+                              type="date"
+                              value={settings.reminderStopDate ?? ""}
+                              onChange={(event) =>
+                                onChangeSettings({
+                                  reminderStopDate: event.target.value,
+                                })
+                              }
+                              aria-label="Stop reminder date"
+                              className={cn(fieldClass, "h-9 w-[168px]")}
+                            />
+                          ) : (
+                            <>
+                              <ReminderEveryDaysInput
+                                value={settings.reminderStopAfter ?? 3}
+                                onChange={(reminderStopAfter) =>
+                                  onChangeSettings({ reminderStopAfter })
+                                }
+                                ariaLabel="Stop after occurrences"
+                                className={cn(fieldClass, "w-[72px]")}
+                              />
+                              <span>occurrence(s)</span>
+                            </>
+                          )}
                         </div>
                       </>
                     ) : null}

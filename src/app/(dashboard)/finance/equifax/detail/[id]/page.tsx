@@ -191,7 +191,7 @@ export default function CreditReportDetailPage() {
       ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-white p-6">
       <ReportHeader
         onBack={() => router.back()}
         entityName={applicant}

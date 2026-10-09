@@ -147,21 +147,10 @@ export default function ScheduleMeetingPage({
   );
   const seededKind = initial?.relatedKind;
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">(
-    seededKind === "Lead" || seededKind === "Deal" || seededKind === "Company"
-      ? seededKind
-      : relatedKindParam === "Lead" ||
-          relatedKindParam === "Deal" ||
-          relatedKindParam === "Company"
-        ? relatedKindParam
-        : "",
+    seededKind || relatedKindParam || "",
   );
   const [relatedName, setRelatedName] = useState(
-    initial?.relatedName ||
-      (relatedKindParam === "Lead" ||
-      relatedKindParam === "Deal" ||
-      relatedKindParam === "Company"
-        ? relatedNameParam
-        : ""),
+    initial?.relatedName || (relatedKindParam ? relatedNameParam : ""),
   );
   const [relatedId, setRelatedId] = useState(
     initial?.relatedId || params.get("relatedId") || "",

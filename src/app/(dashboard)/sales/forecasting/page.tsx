@@ -118,7 +118,7 @@ export default function ForecastingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 sm:p-4">
+    <div className="min-h-screen bg-white p-3 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

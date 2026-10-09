@@ -5,11 +5,12 @@ import {
   leadCustomToFactFind,
   mergeFactFind,
 } from "@/lib/leads/fact-find-bridge";
-import type { ClientPortal } from "@/lib/portals/types";
+import { resolvePortalContactFields } from "@/lib/portals/contact-sync";
+import { upsertPortal, type ClientPortal } from "@/lib/portals/types";
 import { ALL_LIVING_EXPENSE_ITEMS } from "@/lib/portals/living-expenses";
 
 export const PORTAL_BRAND = "#5A32A3";
-export const PORTAL_CANVAS = "#F7F6F9";
+export const PORTAL_CANVAS = "#ffffff";
 
 export type JourneyStageId =
   | "fact-find"
@@ -110,6 +111,7 @@ export interface MortgageDocumentFile {
   name: string;
   sizeBytes?: number;
   uploadedAt: string;
+  mime?: string;
 }
 
 export interface MortgageDocument {
@@ -2099,14 +2101,15 @@ function inviteSeed(
   const { firstName, lastName } = splitName(portal.primaryContactName);
   const brokerName =
     portal.createdBy || DEFAULT_BROKER.name;
-  const phone = card?.phone;
+  const phone =
+    card?.phone?.trim() || portal.primaryContactPhone?.trim() || "";
   const fromLead = card ? leadCustomToFactFind(card) : {};
   return {
     client: {
       firstName,
       lastName,
       email: portal.primaryContactEmail,
-      phone: phone?.trim() || "",
+      phone,
       address: "",
       preferredContact: "Email",
     },
@@ -2160,7 +2163,7 @@ function inviteSeed(
         preferredName: firstName,
         firstName,
         lastName,
-        mobile: phone?.trim() || "",
+        mobile: phone,
       },
       fromLead,
     ),
@@ -2182,7 +2185,8 @@ export function ensureMortgageForLeadPortal(
 ) {
   const all = readAll();
   const existing = all[portal.slug];
-  const phone = card?.phone;
+  const phone =
+    card?.phone?.trim() || portal.primaryContactPhone?.trim() || "";
   if (existing) {
     const prev = migrateState(existing);
     const { firstName, lastName } = splitName(portal.primaryContactName);
@@ -2194,12 +2198,84 @@ export function ensureMortgageForLeadPortal(
         firstName,
         lastName,
         email: portal.primaryContactEmail,
-        phone: phone?.trim() || prev.client.phone,
+        phone: phone || prev.client.phone,
       },
-      factFind: mergeFactFind(fromLead, prev.factFind),
+      factFind: mergeFactFind(
+        {
+          ...(phone ? { mobile: phone } : {}),
+          ...fromLead,
+        },
+        prev.factFind,
+      ),
     });
   }
   return saveMortgageState(portal.slug, inviteSeed(portal, card));
+}
+
+/**
+ * Keep portal profile email/phone aligned with the CRM contact record.
+ * CRM values win when present; local edits are kept only when CRM has no value.
+ */
+export function syncMortgageClientFromCrmContact(portal: ClientPortal) {
+  const fields = resolvePortalContactFields(portal);
+  const all = readAll();
+  const existing = all[portal.slug];
+  const base = existing ? migrateState(existing) : inviteSeed(portal);
+  const email = fields.email.trim() || base.client.email;
+  const phone = fields.phone.trim() || base.client.phone;
+  const firstName =
+    fields.firstName?.trim() ||
+    base.client.firstName ||
+    splitName(portal.primaryContactName).firstName;
+  const lastName =
+    fields.lastName?.trim() ||
+    base.client.lastName ||
+    splitName(portal.primaryContactName).lastName;
+
+  if (
+    email !== portal.primaryContactEmail ||
+    (phone && phone !== (portal.primaryContactPhone ?? "")) ||
+    (fields.contactId && fields.contactId !== portal.primaryContactId)
+  ) {
+    upsertPortal({
+      ...portal,
+      primaryContactEmail: email || portal.primaryContactEmail,
+      primaryContactPhone: phone || portal.primaryContactPhone,
+      primaryContactId: fields.contactId ?? portal.primaryContactId,
+      primaryContactName:
+        [firstName, lastName].filter(Boolean).join(" ") ||
+        portal.primaryContactName,
+    });
+  }
+
+  if (
+    email === base.client.email &&
+    phone === base.client.phone &&
+    firstName === base.client.firstName &&
+    lastName === base.client.lastName
+  ) {
+    return base;
+  }
+
+  return saveMortgageState(portal.slug, {
+    ...base,
+    client: {
+      ...base.client,
+      firstName,
+      lastName,
+      email,
+      phone,
+    },
+    factFind: mergeFactFind(
+      {
+        firstName,
+        lastName,
+        preferredName: firstName,
+        ...(phone ? { mobile: phone } : {}),
+      },
+      base.factFind,
+    ),
+  });
 }
 
 function readAll(): Record<string, MortgagePortalState> {

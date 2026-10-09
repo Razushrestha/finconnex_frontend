@@ -170,7 +170,7 @@ export default function CreditNotesPage() {
   }));
 
   return (
-    <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
+    <div className="h-auto min-h-full w-full overflow-y-auto bg-white p-6 pb-16 text-slate-900">
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
       <EntityFilters

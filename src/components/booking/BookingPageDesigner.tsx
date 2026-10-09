@@ -171,7 +171,7 @@ export function BookingPageDesigner({
     // Sized by its own width, not the window's: this sits beside the editor's
     // menu, so a wide screen can still leave the preview narrow. Container
     // queries apply to descendants, hence the inner row.
-    <div className="@container/designer flex min-h-0 flex-1 flex-col bg-[#F3F4F6]">
+    <div className="@container/designer flex min-h-0 flex-1 flex-col bg-white">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto @3xl/designer:flex-row @3xl/designer:overflow-hidden">
         <div className="@container min-w-0 p-3 @md/designer:p-5 @3xl/designer:flex-1 @3xl/designer:overflow-auto">
           <BookingPagePreview page={page} branding={branding} />
@@ -777,7 +777,7 @@ function ClassicThemePreview({
 
   return (
     <div
-      className="relative min-h-full bg-slate-50/60"
+      className="relative min-h-full bg-white/60"
       style={{
         ...brandingBackgroundStyle(branding),
       }}

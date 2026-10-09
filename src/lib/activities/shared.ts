@@ -1,10 +1,10 @@
 export const ACTIVITY_OWNERS: readonly string[] = [];
 
 export const RELATED_ENTITY_KINDS = [
-  "Lead",
   "Contact",
-  "Company",
+  "Lead",
   "Deal",
+  "Company",
 ] as const;
 export type RelatedEntityKind = (typeof RELATED_ENTITY_KINDS)[number];
 

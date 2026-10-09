@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Pencil,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import {
   listSignatureRequests,
@@ -38,6 +39,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PaginationBar } from "@/components/ui/pagination-bar";
+import { HeaderColumnGrip } from "@/components/common/ColumnResizeHandle";
+import { SignatureRelatedToLink } from "@/components/documents/signature/SignatureRelatedToLink";
 import { useDataTable } from "@/hooks/useDataTable";
 
 type ColumnKey =
@@ -106,10 +109,33 @@ function CellText({
 import React from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 
+function sameCalendarDay(value: string | undefined, isoDay: string) {
+  if (!value?.trim() || !isoDay) return false;
+  const au = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (au) {
+    const [, day, month, year] = au;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}` === isoDay;
+  }
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value.slice(0, 10) === isoDay;
+  const date = new Date(parsed);
+  const local = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return local === isoDay;
+}
+
+function matchesDocumentDate(req: SignatureRequest, isoDay: string) {
+  if (!isoDay) return true;
+  const lastAudit = req.audit?.length ? req.audit[req.audit.length - 1]?.at : undefined;
+  return [req.sentAt, req.sentDate, req.signedDate, req.updatedAt, req.expiryDate, lastAudit].some(
+    (value) => sameCalendarDay(value, isoDay),
+  );
+}
+
 export default function DocumentsList() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const crm = useCrmSignatureRequests();
+  const [dateFilter, setDateFilter] = React.useState("");
 
   const {
     isMounted,
@@ -138,18 +164,18 @@ export default function DocumentsList() {
     minWidths: MIN_WIDTHS,
     pageSize: 8,
     searchFilterFn: (req, query) =>
-      req.documentName.toLowerCase().includes(query.toLowerCase()) ||
-      req.signatureRequestId.toLowerCase().includes(query.toLowerCase()) ||
-      req.signers.some(
-        (s) =>
-          s.name.toLowerCase().includes(query.toLowerCase()) ||
-          s.email.toLowerCase().includes(query.toLowerCase()),
-      ) ||
-      // Wrap in Boolean() or use !! to guarantee a boolean return type
-      Boolean(
-        req.relatedTo &&
-        req.relatedTo.toLowerCase().includes(query.toLowerCase()),
-      ),
+      (req.documentName.toLowerCase().includes(query.toLowerCase()) ||
+        req.signatureRequestId.toLowerCase().includes(query.toLowerCase()) ||
+        req.signers.some(
+          (s) =>
+            s.name.toLowerCase().includes(query.toLowerCase()) ||
+            s.email.toLowerCase().includes(query.toLowerCase()),
+        ) ||
+        Boolean(
+          req.relatedTo &&
+            req.relatedTo.toLowerCase().includes(query.toLowerCase()),
+        )) &&
+      matchesDocumentDate(req, dateFilter),
     statusFilterFn: (req, status) => {
       const overall = computeOverallStatus(req);
       if (status === "In Progress") {
@@ -169,6 +195,10 @@ export default function DocumentsList() {
     refresh();
     return onRecordsChange(refresh);
   }, [setItems, crm.source, crm.loading, crm.workspaceId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateFilter, setPage]);
 
   useEffect(() => {
     const raw = searchParams.get("status")?.trim().toLowerCase();
@@ -269,18 +299,30 @@ export default function DocumentsList() {
 
       <hr className="mb-2 border-border" />
 
-      {/* Filters and Search Bar */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <div className="relative w-full max-w-[240px]">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
           <input
             type="text"
-            placeholder="Search by document name, signer, or reference..."
+            placeholder="Search documents..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-xs text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
           />
         </div>
+
+        <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          <Calendar className="h-3.5 w-3.5 text-slate-400 dark:text-zinc-500" />
+          <span>Date</span>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            aria-label="Filter by date"
+            className="bg-transparent text-xs font-medium text-slate-900 outline-none dark:text-white"
+          />
+        </label>
 
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-1 focus:ring-violet-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:w-auto">
@@ -318,7 +360,7 @@ export default function DocumentsList() {
         <div ref={containerRef} className="relative overflow-x-auto">
           {resizeLineX !== null && (
             <div
-              className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-violet-500 dark:bg-violet-400"
+              className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-slate-300"
               style={{ left: resizeLineX }}
             />
           )}
@@ -338,13 +380,9 @@ export default function DocumentsList() {
                     } ${col.align === "right" ? "text-right sm:px-6" : ""}`}
                   >
                     <span className="block truncate">{col.label}</span>
-                    <div
+                    <HeaderColumnGrip
+                      active={activeResizeKey === col.key}
                       onMouseDown={onMouseDown(col.key)}
-                      className={`absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:opacity-100 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                        activeResizeKey === col.key
-                          ? "opacity-100 bg-violet-500/80"
-                          : ""
-                      }`}
                     />
                   </th>
                 ))}
@@ -454,9 +492,12 @@ export default function DocumentsList() {
                         </td>
 
                         <td className="py-2 px-4">
-                          <CellText className="text-xs text-slate-600 dark:text-zinc-400">
-                            {req.relatedTo || "—"}
-                          </CellText>
+                          <Tooltip content={req.relatedTo || "—"} fullWidth>
+                            <SignatureRelatedToLink
+                              relatedTo={req.relatedTo}
+                              className="text-xs font-normal text-slate-600 dark:text-zinc-400"
+                            />
+                          </Tooltip>
                         </td>
 
                         <td className="py-2 px-4">

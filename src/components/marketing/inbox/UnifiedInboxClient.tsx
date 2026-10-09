@@ -1130,7 +1130,7 @@ export function UnifiedInboxClient() {
   );
 
   return (
-    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-[#F7F8FA] p-2 pr-3">
+    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-white p-2 pr-3">
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
         {/* Conversation list */}
         <div className="flex w-[300px] shrink-0 flex-col overflow-hidden border-r border-slate-100 sm:w-[340px]">
@@ -1553,7 +1553,7 @@ export function UnifiedInboxClient() {
 
                 <div
                   ref={feedRef}
-                  className="min-h-0 flex-1 overflow-auto bg-[#F7F8FA] px-4 py-4"
+                  className="min-h-0 flex-1 overflow-auto bg-white px-4 py-4"
                 >
                   {active.messages.map((m, i) => {
                     const day = formatDayHeading(m.at);

@@ -222,7 +222,7 @@ export function CreateReportForm({
     cn(elevatedSelectClass(hasIcon), "!h-9 !text-[12px] !rounded-lg");
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
+    <div className="relative flex min-h-full flex-col overflow-hidden bg-white">
 
       <div className="relative mx-auto flex w-full max-w-[1920px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

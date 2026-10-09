@@ -122,7 +122,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
             }}
           />
         </Suspense>
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-white">
           {children}
         </main>
         <div className={`${BOTTOM_BAR_H} shrink-0`} aria-hidden />

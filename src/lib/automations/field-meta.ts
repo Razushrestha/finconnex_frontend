@@ -441,10 +441,10 @@ export const FIELD_META: Record<string, FieldMeta> = {
     widget: "select",
     helpText: "Leave every relation field empty to attach this to the record that triggered the automation",
     options: [
-      { label: "Lead", value: "LEAD" },
       { label: "Contact", value: "CONTACT" },
-      { label: "Organization", value: "COMPANY" },
+      { label: "Lead", value: "LEAD" },
       { label: "Deal", value: "DEAL" },
+      { label: "Company", value: "COMPANY" },
     ],
   },
   leadId: { label: "Related Lead", widget: "record", target: "LEAD" },

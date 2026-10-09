@@ -631,7 +631,7 @@ export function BookingPageForm({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-50">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       {/* Scrollable body */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative w-full p-2.5 sm:p-3 lg:p-4">

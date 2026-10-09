@@ -19,7 +19,6 @@ import {
 import { useCrmNotes } from "@/lib/notes/use-crm-notes";
 import { NotesListView } from "@/components/activities/notes/NotesListView";
 import { NotesKanbanColumn } from "@/components/activities/notes/NotesKanbanColumn";
-import { NotesTimelineView } from "@/components/activities/notes/NotesTimelineView";
 import {
   EMPTY_NOTE_FILTERS,
   NotesFilterPanel,
@@ -28,7 +27,6 @@ import {
 import { noteMatchesFilters } from "@/lib/filters/records";
 import {
   ActivityToolbar,
-  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
@@ -198,7 +196,6 @@ export default function NotesPage() {
           filterOpen={filterOpen || activeFilters > 0}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
-          extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
           columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
@@ -254,8 +251,6 @@ export default function NotesPage() {
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
             />
-          ) : view === "timeline" ? (
-            <NotesTimelineView notes={filteredNotes} />
           ) : (
             <>
               <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">

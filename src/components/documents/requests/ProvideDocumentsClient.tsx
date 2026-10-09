@@ -63,7 +63,7 @@ export function ProvideDocumentsClient({
 
   if (sent) {
     return (
-      <div className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-10">
+      <div className="mx-auto min-h-screen max-w-lg bg-white px-4 py-10">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
             <CheckCircle2 className="h-4 w-4" />
@@ -86,7 +86,7 @@ export function ProvideDocumentsClient({
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-slate-50 px-4 py-10">
+    <div className="mx-auto min-h-screen max-w-lg bg-white px-4 py-10">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--brand-primary)] uppercase">
           Document request

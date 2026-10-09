@@ -227,7 +227,14 @@ export function listNotesForQueueRow(row: {
   subject: string;
   related?: string;
   contactName?: string;
+  noteKey?: string;
 }): Note[] {
+  const pinned = row.noteKey?.trim().toLowerCase() ?? "";
+  if (pinned) {
+    return listNotes().filter(
+      (note) => note.relatedTo.trim().toLowerCase() === pinned,
+    );
+  }
   const keys = [row.related, row.contactName, row.subject]
     .map((value) => value?.trim().toLowerCase() ?? "")
     .filter(Boolean);
@@ -255,4 +262,30 @@ export function replaceCrmNotes(remote: Note[]) {
   });
   saveNotes([...remote.map(cloneNote), ...extras.map(cloneNote)]);
   emitLeadActivityChange();
+}
+
+/** Point draft notes at the record they were written for. */
+export function relinkNotesRelated(
+  fromRelated: string,
+  to: { relatedTo: string; relatedId?: string; relatedType?: string },
+) {
+  const from = fromRelated.trim();
+  const relatedTo = to.relatedTo.trim();
+  if (!from || !relatedTo) return;
+  const items = listNotes();
+  let changed = false;
+  const next = items.map((note) => {
+    if (note.relatedTo !== from) return note;
+    changed = true;
+    return {
+      ...note,
+      relatedTo,
+      relatedId: to.relatedId ?? note.relatedId,
+      relatedType: to.relatedType ?? note.relatedType,
+    };
+  });
+  if (changed) {
+    saveNotes(next);
+    emitLeadActivityChange();
+  }
 }

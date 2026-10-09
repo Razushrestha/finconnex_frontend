@@ -5,7 +5,7 @@ export default function PublicLayout({
 }) {
   return (
     <div
-      className="min-h-dvh bg-[#F7F6F9] text-slate-900 antialiased"
+      className="min-h-dvh bg-white text-slate-900 antialiased"
       suppressHydrationWarning
     >
       {children}

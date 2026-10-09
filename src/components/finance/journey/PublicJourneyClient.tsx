@@ -31,7 +31,7 @@ export function PublicJourneyClient({ token }: { token: string }) {
 
   if (!ready) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-slate-50 text-sm text-slate-500">
+      <div className="flex min-h-dvh items-center justify-center bg-white text-sm text-slate-500">
         Loading…
       </div>
     );
@@ -39,7 +39,7 @@ export function PublicJourneyClient({ token }: { token: string }) {
 
   if (!journey) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-4 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-white px-4 text-center">
         <h1 className="text-xl font-bold text-slate-900">Link not found</h1>
         <p className="mt-2 text-sm text-slate-500">
           This proposal link is invalid or has expired.
@@ -60,7 +60,7 @@ export function PublicJourneyClient({ token }: { token: string }) {
   const payHref = portalPathForClient(journey.clientId, journey.clientName);
 
   return (
-    <div className="relative min-h-dvh bg-slate-50">
+    <div className="relative min-h-dvh bg-white">
       <div className="relative mx-auto max-w-lg px-4 py-10 sm:px-6">
         <p className="text-[11px] font-semibold tracking-widest text-violet-600 uppercase">
           FinConnex · Your proposal

@@ -32,7 +32,7 @@ export function FolderWorkspace({ folderId }: { folderId: string }) {
   const reports = folder.reportIds.map((id) => reportById(id)).filter(Boolean);
 
   return (
-    <div className="min-h-full bg-[#F4F6F9]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/reports" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800">

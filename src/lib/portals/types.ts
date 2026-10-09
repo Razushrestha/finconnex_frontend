@@ -31,6 +31,8 @@ export interface ClientPortal {
   modules: PortalModule[];
   primaryContactName: string;
   primaryContactEmail: string;
+  /** Snapshot from CRM contact (mobile preferred, else phone). */
+  primaryContactPhone?: string;
   /** CRM lead this portal was created from (Send Client Portal). */
   leadId?: string;
   inviteSentAt?: string;

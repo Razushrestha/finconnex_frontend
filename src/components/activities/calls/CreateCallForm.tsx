@@ -201,7 +201,7 @@ function LogCallForm({
                     update("relatedName", "");
                   }}
                 >
-                  <option value="">Type</option>
+                  <option value="">None</option>
                   {RELATED_ENTITY_KINDS.map((k) => (
                     <option key={k} value={k}>
                       {k}

@@ -36,6 +36,7 @@ function ensurePortalForLead(card: LeadCardData): {
       status: "Active",
       primaryContactName: card.name,
       primaryContactEmail: card.email.trim(),
+      primaryContactPhone: card.phone?.trim() || existing.primaryContactPhone,
       clientName: card.company || card.name,
       createdBy: existing.createdBy || actorName(card),
     };
@@ -60,6 +61,7 @@ function ensurePortalForLead(card: LeadCardData): {
         modules: ["Deals", "Documents", "Tasks", "Tickets", "Invoices", "Reports"],
         primaryContactName: card.name,
         primaryContactEmail: card.email.trim(),
+        primaryContactPhone: card.phone?.trim() || undefined,
         leadId: card.id,
         createdBy: actor,
         createdAt: formatPortalDate(),

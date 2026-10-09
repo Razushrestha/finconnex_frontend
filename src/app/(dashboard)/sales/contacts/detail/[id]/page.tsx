@@ -56,7 +56,7 @@ export default function ContactDetailPage() {
 
   if (loading && !contact) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
+      <div className="flex h-screen items-center justify-center bg-white text-sm text-slate-400">
         Loading contact…
       </div>
     );
@@ -64,7 +64,7 @@ export default function ContactDetailPage() {
 
   if (!contact) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
+      <div className="flex h-screen items-center justify-center bg-white text-sm text-slate-400">
         Contact not found.
       </div>
     );

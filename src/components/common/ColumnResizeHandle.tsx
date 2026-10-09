@@ -1,7 +1,30 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type MouseEvent } from "react";
 import { cn } from "@/lib/utils";
+
+/** Short 1px mark in a column header. The wide hit area stays invisible. */
+export function HeaderColumnGrip({
+  active,
+  onMouseDown,
+}: {
+  active?: boolean;
+  onMouseDown: (event: MouseEvent) => void;
+}) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="group/resize absolute top-1/2 right-0 z-10 flex h-5 w-3 -translate-y-1/2 cursor-col-resize touch-none items-center justify-center"
+    >
+      <span
+        className={cn(
+          "block h-3 w-px rounded-full bg-transparent group-hover/resize:bg-slate-400",
+          active && "bg-[var(--brand-primary)]",
+        )}
+      />
+    </div>
+  );
+}
 
 export function ColumnResizeHandle({
   onDelta,

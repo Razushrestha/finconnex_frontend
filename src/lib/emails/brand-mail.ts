@@ -48,11 +48,13 @@ export function emailBrandFromSettings(settings: {
   catalog?: Record<string, Record<string, string | number | boolean> | undefined> | null;
 } | null | undefined): EmailBrand {
   const page = settings?.catalog?.["organization/branding"];
+  const profile = settings?.catalog?.["organization/company-profile"];
+  const companyName = profile?.companyName;
   return emailBrandFromValues({
     primaryColor: settings?.primaryColor ?? page?.primaryColor,
     secondaryColor: settings?.secondaryColor ?? page?.secondaryColor,
     emailGradient: page?.emailGradient,
-    appName: page?.appName,
+    appName: typeof companyName === "string" ? companyName : undefined,
   });
 }
 
@@ -78,6 +80,10 @@ export function readClientEmailBrand(): EmailBrand {
     typeof window === "undefined"
       ? {}
       : loadSettingsValues("organization/branding");
+  const localProfile =
+    typeof window === "undefined"
+      ? {}
+      : loadSettingsValues("organization/company-profile");
   let cached: CachedBrandSettings | null = null;
   if (typeof window !== "undefined") {
     try {
@@ -91,11 +97,12 @@ export function readClientEmailBrand(): EmailBrand {
     }
   }
   const page = cached?.catalog?.["organization/branding"];
+  const profile = cached?.catalog?.["organization/company-profile"];
   return emailBrandFromValues({
     primaryColor: cached?.primaryColor || page?.primaryColor || local.primaryColor,
     secondaryColor:
       cached?.secondaryColor || page?.secondaryColor || local.secondaryColor,
     emailGradient: page?.emailGradient ?? local.emailGradient,
-    appName: page?.appName || local.appName,
+    appName: profile?.companyName || localProfile.companyName,
   });
 }

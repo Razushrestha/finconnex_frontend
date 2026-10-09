@@ -279,7 +279,7 @@ export function QuotationsPage() {
   const circ = 2 * Math.PI * 38;
 
   return (
-    <div className="min-h-full w-full bg-[#F4F7FB] p-4 sm:p-6 lg:p-8 text-slate-900">
+    <div className="min-h-full w-full bg-white p-4 sm:p-6 lg:p-8 text-slate-900">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div />
         <button

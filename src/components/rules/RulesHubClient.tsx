@@ -59,7 +59,7 @@ export function RulesHubClient() {
   }, [tab, crmBin.source, crmBin.loading]);
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className="relative min-h-full overflow-hidden bg-white">
       <div className="relative mx-auto max-w-[1200px] p-2.5 sm:p-3 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>

@@ -17,7 +17,8 @@ export type SettingsFieldType =
   | "toggle"
   | "file"
   | "number"
-  | "color";
+  | "color"
+  | "address";
 
 export interface SettingsFieldOption {
   label: string;
@@ -34,6 +35,7 @@ export interface SettingsField {
   help?: string;
   /** Text/textarea only: offer "Use current location" to fill in an address. */
   geolocate?: boolean;
+  icon?: "mail" | "phone" | "globe";
 }
 
 export interface SettingsSchema {
@@ -247,6 +249,7 @@ const CURATED: Record<string, SettingsSchema> = {
         type: "text",
         defaultValue: "FinConnex",
         placeholder: "FinConnex",
+        help: "This name is shown in the navigation on every page.",
       },
       {
         id: "legalName",
@@ -278,26 +281,33 @@ const CURATED: Record<string, SettingsSchema> = {
         id: "email",
         label: "Company email",
         type: "text",
+        icon: "mail",
+        placeholder: "hello@company.com",
         defaultValue: "hello@finconnex.example",
       },
       {
         id: "phone",
         label: "Phone",
         type: "text",
+        icon: "phone",
+        placeholder: "+61 4 0000 0000",
         defaultValue: "+61 2 9000 0000",
       },
       {
         id: "website",
         label: "Website",
         type: "text",
+        icon: "globe",
+        placeholder: "https://www.company.com",
         defaultValue: "https://finconnex.example",
       },
       {
         id: "address",
         label: "Registered address",
-        type: "textarea",
-        geolocate: true,
+        type: "address",
+        placeholder: "Search street, suburb, or postcode",
         defaultValue: "Level 12, 100 Pitt Street, Sydney NSW 2000",
+        help: "Search for the address or your current location. If it is not listed, enter the street, suburb, state, postcode, and country.",
       },
       { id: "logo", label: "Company logo", type: "file" },
     ],
@@ -889,10 +899,10 @@ const CURATED: Record<string, SettingsSchema> = {
         id: "primaryColor",
         label: "Primary colour",
         type: "color",
-        defaultValue: "#7C3AED",
-        help: "Buttons, links, and highlights. Click a swatch or the picker.",
+        defaultValue: "#6376B5",
+        help: "Buttons, links, and the start of the brand gradient.",
         options: [
-          { label: "FinConnex", value: "#5A32A3" },
+          { label: "FinConnex", value: "#6376B5" },
           { label: "Violet", value: "#7C3AED" },
           { label: "Indigo", value: "#4F46E5" },
           { label: "Blue", value: "#2563EB" },
@@ -910,13 +920,14 @@ const CURATED: Record<string, SettingsSchema> = {
         id: "secondaryColor",
         label: "Secondary colour",
         type: "color",
-        defaultValue: "#0F172A",
-        help: "Second colour of the site gradient, and the sidebar and footer background.",
+        defaultValue: "#BF83B8",
+        help: "Second stop of the brand gradient on the sidebar and footer.",
         options: [
+          { label: "FinConnex", value: "#BF83B8" },
           { label: "Navy", value: "#0F172A" },
           { label: "Slate", value: "#334155" },
           { label: "Charcoal", value: "#1E293B" },
-          { label: "FinConnex", value: "#5A32A3" },
+          { label: "Plum", value: "#5A32A3" },
           { label: "Violet", value: "#7C3AED" },
           { label: "Indigo", value: "#4F46E5" },
           { label: "Blue", value: "#2563EB" },
@@ -929,12 +940,6 @@ const CURATED: Record<string, SettingsSchema> = {
       },
       { id: "logoLight", label: "Logo (light backgrounds)", type: "file" },
       { id: "logoDark", label: "Logo (dark backgrounds)", type: "file" },
-      {
-        id: "appName",
-        label: "Product name in nav",
-        type: "text",
-        defaultValue: "FinConnex",
-      },
     ],
   },
 

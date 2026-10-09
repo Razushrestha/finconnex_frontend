@@ -478,7 +478,7 @@ export function CompanyDetailView({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-screen flex-col overflow-hidden bg-white">
       <EntityDetailHeader
         avatarFallback={company.initials}
         avatarClassName={company.avatarBgClass}

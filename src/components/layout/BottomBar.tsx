@@ -317,7 +317,7 @@ export function BottomBar() {
     <footer
       ref={barRef}
       className={cn(
-        "relative fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] bg-[var(--brand-secondary)] text-[var(--brand-on-secondary)]",
+        "relative fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] [background-image:var(--brand-gradient)] text-[var(--brand-on-secondary)]",
         BOTTOM_BAR_H,
       )}
     >

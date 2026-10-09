@@ -66,7 +66,8 @@ export function ReminderEveryDaysInput({
   value,
   onChange,
   className,
-}: DaysToCompleteInputProps) {
+  ariaLabel = "Reminder interval in days",
+}: DaysToCompleteInputProps & { ariaLabel?: string }) {
   const [text, setText] = useState(String(value));
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export function ReminderEveryDaysInput({
         setText(String(next));
       }}
       className={cn(className)}
-      aria-label="Reminder interval in days"
+      aria-label={ariaLabel}
     />
   );
 }

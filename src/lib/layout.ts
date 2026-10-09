@@ -28,14 +28,14 @@ export const FIELD_ROW =
   "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
 
 export const BOARD_PAGE =
-  "flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 p-3 pr-4 lg:p-4 lg:pr-5 2xl:p-5 2xl:pr-6";
+  "flex min-h-0 flex-1 flex-col overflow-hidden bg-white p-3 pr-4 lg:p-4 lg:pr-5 2xl:p-5 2xl:pr-6";
 
 /** Record / content cards — always white so boards match Contacts. */
 export const CARD_SURFACE = "bg-white dark:bg-zinc-900";
 
 /** Horizontal strip that holds every kanban stage (Tasks reference). */
 export const KANBAN_BOARD_ROW =
-  "flex h-full w-full min-w-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-slate-50 p-1 pr-3";
+  "flex h-full w-full min-w-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-white p-1 pr-3";
 
 /**
  * Full-height stage scrollbar in the gutter to the right of the well —
@@ -87,7 +87,7 @@ export const KANBAN_DROP_GHOST =
   "h-20 w-full shrink-0 rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all animate-pulse";
 
 /** Page canvas behind cards. */
-export const PAGE_CANVAS = "bg-slate-50";
+export const PAGE_CANVAS = "bg-white";
 
 /** Persistent Zoho-style utility bar at the bottom of the dashboard. */
 export const BOTTOM_BAR_H = "h-10";

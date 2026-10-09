@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   signatureRequests as seed,
@@ -16,14 +16,16 @@ import {
   isCrmSignatureRequestId,
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
-import {
-  deleteCrmSignatureTemplate,
-  isCrmSignatureTemplateId,
-  tryCrmSignatureTemplate,
-} from "@/lib/documents/signature/templates-api";
 import { useCrmSignatureRequests } from "@/lib/documents/signature/use-crm-signature-requests";
-import { useCrmSignatureTemplates } from "@/lib/documents/signature/use-crm-signature-templates";
 import { RecentTabsHeader } from "@/components/documents/signature/overview/RecentTabsHeader";
+import { RecentDocumentsToolbar } from "@/components/documents/signature/overview/RecentDocumentsToolbar";
+import {
+  EMPTY_RECENT_DOC_FILTERS,
+  filterRecentDocuments,
+  type RecentDocFilters,
+  type RecentDocSort,
+  type RecentDocStatus,
+} from "@/lib/documents/signature/recent-filters";
 import SignatureStatsGrid from "@/components/documents/signature/overview/SignatureStatsGrid";
 import {
   FileText,
@@ -31,12 +33,13 @@ import {
   CheckCircle2,
   Clock,
   CalendarX2,
-  FileCode2,
   Pencil,
   Trash2,
 } from "lucide-react";
 import { PaginationBar } from "@/components/ui/pagination-bar";
+import { HeaderColumnGrip } from "@/components/common/ColumnResizeHandle";
 import { ESignatureHeader } from "@/components/documents/signature/ESignatureHeader";
+import { SignatureRelatedToLink } from "@/components/documents/signature/SignatureRelatedToLink";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useDataTable } from "@/hooks/useDataTable";
 import {
@@ -63,22 +66,6 @@ const DOC_MIN_WIDTHS = {
   status: 110,
   sent: 90,
   lastActivity: 100,
-  action: 120,
-};
-
-const TPL_DEFAULT_WIDTHS = {
-  name: 240,
-  description: 300,
-  lastUpdated: 130,
-  createdBy: 160,
-  action: 140,
-};
-
-const TPL_MIN_WIDTHS = {
-  name: 160,
-  description: 180,
-  lastUpdated: 100,
-  createdBy: 120,
   action: 120,
 };
 
@@ -124,8 +111,7 @@ function lastActivityLabel(doc: SignatureRequest): string {
   return formatRelativeTime(parsed);
 }
 
-// Small reusable row-actions dropdown (Edit / Delete) shared by both
-// the documents table and the templates table.
+// Row actions for a recent document.
 function RowActionsMenu({
   onEdit,
   onDelete,
@@ -186,9 +172,10 @@ function RowActionsMenu({
 export default function ESignatureOverviewPage() {
   const router = useRouter();
   const crm = useCrmSignatureRequests();
-  const templatesCrm = useCrmSignatureTemplates();
-  const [activeTab, setActiveTab] = useState<"documents" | "templates">(
-    "documents",
+  const [docQuery, setDocQuery] = useState("");
+  const [docSort, setDocSort] = useState<RecentDocSort>("activity-desc");
+  const [docFilters, setDocFilters] = useState<RecentDocFilters>(
+    EMPTY_RECENT_DOC_FILTERS,
   );
 
   // Source data lives in local state now (instead of being handed to
@@ -197,22 +184,30 @@ export default function ESignatureOverviewPage() {
   const [docsSource, setDocsSource] = useState<SignatureRequest[]>(
     seed.filter((doc) => doc.recordType !== "template"),
   );
-  const [tplsSource, setTplsSource] = useState<SignatureRequest[]>(
-    seed.filter((doc) => doc.recordType === "template"),
+
+  const visibleDocs = useMemo(
+    () =>
+      filterRecentDocuments(docsSource, {
+        query: docQuery,
+        sort: docSort,
+        filters: docFilters,
+      }),
+    [docsSource, docQuery, docSort, docFilters],
   );
+  const docOwners = useMemo(() => {
+    const names = new Set<string>();
+    for (const doc of docsSource) {
+      const name = doc.createdBy?.trim();
+      if (name && name !== "—") names.add(name);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [docsSource]);
+  const docFilterKey = JSON.stringify({ docQuery, docSort, docFilters });
 
   const documentsTable = useDataTable<SignatureRequest>({
-    data: docsSource,
+    data: visibleDocs,
     defaultWidths: DOC_DEFAULT_WIDTHS,
     minWidths: DOC_MIN_WIDTHS,
-    pageSize: 5,
-    searchFilterFn: () => true, // no search on this page — table just lists recent items
-  });
-
-  const templatesTable = useDataTable<SignatureRequest>({
-    data: tplsSource,
-    defaultWidths: TPL_DEFAULT_WIDTHS,
-    minWidths: TPL_MIN_WIDTHS,
     pageSize: 5,
     searchFilterFn: () => true,
   });
@@ -222,28 +217,15 @@ export default function ESignatureOverviewPage() {
     const refresh = () => {
       const all = listSignatureRequests();
       setDocsSource(all.filter((doc) => doc.recordType !== "template"));
-      setTplsSource(all.filter((doc) => doc.recordType === "template"));
     };
     refresh();
     return onRecordsChange(refresh);
-  }, [
-    crm.source,
-    crm.loading,
-    crm.workspaceId,
-    templatesCrm.source,
-    templatesCrm.loading,
-    templatesCrm.workspaceId,
-  ]);
+  }, [crm.source, crm.loading, crm.workspaceId]);
 
   useEffect(() => {
-    documentsTable.setItems(docsSource);
+    documentsTable.setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docsSource]);
-
-  useEffect(() => {
-    templatesTable.setItems(tplsSource);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tplsSource]);
+  }, [docFilterKey]);
 
   function handleEditDocument(doc: SignatureRequest) {
     router.push(`/signature/${doc.id}/edit`);
@@ -268,93 +250,70 @@ export default function ESignatureOverviewPage() {
     );
   }
 
-  function handleEditTemplate(tpl: SignatureRequest) {
-    router.push(`/signature/templates/${tpl.id}/edit`);
-  }
-
-  async function handleDeleteTemplate(tpl: SignatureRequest) {
-    if (
-      !(await confirmDialog({
-        title: "Delete template?",
-        message: `Delete template "${tpl.documentName}"? This action can't be undone.`,
-        confirmText: "Delete",
-        tone: "danger",
-      }))
-    )
-      return;
-    deleteSignatureRequest(tpl.id);
-    if (isCrmSignatureTemplateId(tpl.id)) {
-      void tryCrmSignatureTemplate(() => deleteCrmSignatureTemplate(tpl.id));
-    }
-    setTplsSource((prev) => prev.filter((t) => t.id !== tpl.id));
-  }
-
   const activeDocs = documentsTable;
-  const activeTpls = templatesTable;
+  const totalItems = activeDocs.filteredTotal;
 
-  const totalItems =
-    activeTab === "documents"
-      ? activeDocs.filteredTotal
-      : activeTpls.filteredTotal;
-
-  if (!documentsTable.isMounted || !templatesTable.isMounted) return null;
+  if (!documentsTable.isMounted) return null;
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4 pb-3">
       <div className="shrink-0">
         <ESignatureHeader
           source={crm.source}
-          templatesSource={templatesCrm.source}
           loading={crm.loading}
-          templatesLoading={templatesCrm.loading}
           error={crm.error}
-          templatesError={templatesCrm.error}
         />
       </div>
 
       <div className="mt-4 shrink-0">
-        <SignatureStatsGrid />
+        <SignatureStatsGrid
+          activeStatus={
+            docFilters.statuses.length === 0
+              ? null
+              : docFilters.statuses.length === 1
+                ? docFilters.statuses[0]
+                : undefined
+          }
+          onSelect={(status: RecentDocStatus | null) =>
+            setDocFilters((current) => ({
+              ...current,
+              statuses: status ? [status] : [],
+            }))
+          }
+        />
       </div>
 
       {/* Main Content Table Section */}
       <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950">
         <div className="shrink-0">
         <RecentTabsHeader
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-              documentsTable.setPage(1);
-              templatesTable.setPage(1);
-          }}
+          actions={
+            <RecentDocumentsToolbar
+              query={docQuery}
+              onQueryChange={setDocQuery}
+              sort={docSort}
+              onSortChange={setDocSort}
+              filters={docFilters}
+              onFiltersChange={setDocFilters}
+              owners={docOwners}
+            />
+          }
         />
         </div>
 
         {/* Table View */}
         <div
-          ref={
-            activeTab === "documents"
-              ? activeDocs.containerRef
-              : activeTpls.containerRef
-          }
+          ref={activeDocs.containerRef}
           className="relative min-h-0 flex-1 overflow-auto"
         >
-          {/* Active Resize Indicator Line */}
-          {(activeTab === "documents"
-            ? activeDocs.resizeLineX
-            : activeTpls.resizeLineX) !== null && (
+          {activeDocs.resizeLineX !== null && (
             <div
-              className="absolute top-0 bottom-0 w-[2px] bg-violet-500 z-30 pointer-events-none"
-              style={{
-                left: `${
-                  activeTab === "documents"
-                    ? activeDocs.resizeLineX
-                    : activeTpls.resizeLineX
-                }px`,
-              }}
+              className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-slate-300"
+              style={{ left: `${activeDocs.resizeLineX}px` }}
             />
           )}
 
-          {activeTab === "documents" ? (
-            <table className="w-full text-left border-collapse table-fixed">
+          <table className="w-full text-left border-collapse table-fixed">
               <colgroup>
                 <col style={{ width: activeDocs.widths.name }} />
                 <col style={{ width: activeDocs.widths.recipients }} />
@@ -383,13 +342,9 @@ export default function ESignatureOverviewPage() {
                       className="group relative select-none py-3 px-4"
                     >
                       {label}
-                      <div
+                      <HeaderColumnGrip
+                        active={activeDocs.activeResizeKey === key}
                         onMouseDown={activeDocs.onMouseDown(key)}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeDocs.activeResizeKey === key
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
                       />
                     </th>
                   ))}
@@ -467,9 +422,7 @@ export default function ESignatureOverviewPage() {
                           content={doc.relatedTo || "—"}
                           fullWidth
                         >
-                          <span className="block truncate font-medium text-slate-900 dark:text-white">
-                            {doc.relatedTo || "—"}
-                          </span>
+                          <SignatureRelatedToLink relatedTo={doc.relatedTo} />
                         </Tooltip>
                       </td>
                       <td className="py-3.5 px-4">
@@ -534,132 +487,15 @@ export default function ESignatureOverviewPage() {
                 )}
               </tbody>
             </table>
-          ) : (
-            <table className="w-full text-left border-collapse table-fixed">
-              <colgroup>
-                <col style={{ width: activeTpls.widths.name }} />
-                <col style={{ width: activeTpls.widths.description }} />
-                <col style={{ width: activeTpls.widths.lastUpdated }} />
-                <col style={{ width: activeTpls.widths.createdBy }} />
-                <col style={{ width: activeTpls.widths.action }} />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider dark:border-zinc-800">
-                  {(
-                    [
-                      ["name", "Template Name"],
-                      ["description", "Description"],
-                      ["lastUpdated", "Last Updated"],
-                      ["createdBy", "Created By"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <th
-                      key={key}
-                      className="group relative select-none py-3 px-4"
-                    >
-                      {label}
-                      <div
-                        onMouseDown={activeTpls.onMouseDown(key)}
-                        className={`absolute right-0 top-0 bottom-0 w-2 cursor-col-resize bg-violet-400/60 opacity-0 transition-opacity duration-100 group-hover:opacity-100 hover:bg-violet-500/70 active:bg-violet-500/80 dark:bg-violet-500/50 dark:hover:bg-violet-400/60 ${
-                          activeTpls.activeResizeKey === key
-                            ? "opacity-100 bg-violet-500/80"
-                            : ""
-                        }`}
-                      />
-                    </th>
-                  ))}
-                  <th className="py-3 px-4 text-right select-none">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-zinc-900 text-xs text-slate-700 dark:text-zinc-300">
-                {activeTpls.paginatedItems.length > 0 ? (
-                  activeTpls.paginatedItems.map((tpl) => (
-                    <tr
-                      key={tpl.id}
-                      className="hover:bg-slate-50/60 dark:hover:bg-zinc-900/40 transition-colors"
-                    >
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
-                            <FileCode2 className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <Tooltip content={tpl.documentName} fullWidth>
-                              <div className="truncate font-semibold text-slate-900 dark:text-white">
-                                {tpl.documentName}
-                            </div>
-                            </Tooltip>
-                            <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded dark:bg-zinc-800 dark:text-zinc-400">
-                              {tpl.status}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-500">
-                        <Tooltip content={tpl.documentFile} fullWidth>
-                          <span className="block truncate">
-                            {tpl.documentFile}
-                          </span>
-                        </Tooltip>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-500">
-                        <Tooltip content="—" fullWidth>
-                          <span className="block truncate">—</span>
-                        </Tooltip>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                            {initialsFor(tpl.createdBy)}
-                          </span>
-                          <Tooltip content={tpl.createdBy} fullWidth>
-                            <span className="block truncate font-medium text-slate-900 dark:text-white">
-                              {tpl.createdBy}
-                          </span>
-                          </Tooltip>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() =>
-                              router.push(`/signature/templates/${tpl.id}`)
-                            }
-                            className="h-7 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                          >
-                            Use
-                          </button>
-                          <RowActionsMenu
-                            onEdit={() => handleEditTemplate(tpl)}
-                            onDelete={() => void handleDeleteTemplate(tpl)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
-                      No templates found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
         </div>
 
         <div className="shrink-0">
         <PaginationBar
-            page={activeTab === "documents" ? activeDocs.page : activeTpls.page}
-            pageSize={5}
+          page={activeDocs.page}
+          pageSize={5}
           total={totalItems}
-            onPageChange={(p) =>
-              activeTab === "documents"
-                ? activeDocs.setPage(p)
-                : activeTpls.setPage(p)
-            }
-          entriesLabel={activeTab === "documents" ? "documents" : "templates"}
+          onPageChange={activeDocs.setPage}
+          entriesLabel="documents"
         />
         </div>
       </div>

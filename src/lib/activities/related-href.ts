@@ -5,18 +5,30 @@ import { findContactById, findContactByName } from "@/lib/contacts/store";
 import { findDealById, listAllDeals } from "@/lib/deals/store";
 import { findLeadById, listLeadColumns } from "@/lib/leads/store";
 
+function kindFromLabel(raw: string): RelatedEntityKind | null {
+  const value = raw.trim().toLowerCase();
+  if (
+    value === "org" ||
+    value === "organization" ||
+    value === "organisation" ||
+    value === "company"
+  ) {
+    return "Company";
+  }
+  return (
+    RELATED_ENTITY_KINDS.find((kind) => kind.toLowerCase() === value) ?? null
+  );
+}
+
 export function parseRelatedTo(
   relatedTo?: string,
 ): { kind: RelatedEntityKind; name: string } | null {
   if (!relatedTo?.trim()) return null;
-  const match = relatedTo.trim().match(/^([^:]+):\s*(.+)$/);
+  const match = relatedTo.trim().match(/^([^:·•|]+)\s*[:·•|]\s*(.+)$/);
   if (!match) return null;
-  const rawKind = match[1]!.trim();
   const name = match[2]!.trim();
   if (!name) return null;
-  const kind = RELATED_ENTITY_KINDS.find(
-    (k) => k.toLowerCase() === rawKind.toLowerCase(),
-  );
+  const kind = kindFromLabel(match[1]!.trim());
   if (!kind) return null;
   return { kind, name };
 }

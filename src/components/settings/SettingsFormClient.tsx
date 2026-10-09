@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Upload } from "lucide-react";
+import { ExternalLink, Globe, Mail, Phone, Upload } from "lucide-react";
 import { UseCurrentLocationButton } from "@/components/shared/UseCurrentLocationButton";
 import {
   getSettingsSchema,
@@ -36,6 +36,20 @@ import {
 } from "@/lib/workspace-operations/api";
 import { useCrmWorkspaceMemberPreferences } from "@/lib/workspace-operations/use-crm-workspace-member-preferences";
 import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
+import { BrandLogo } from "@/components/settings/BrandLogo";
+import { LogoFrameEditor } from "@/components/settings/LogoFrameEditor";
+import {
+  RegisteredAddressField,
+  type ManualAddress,
+} from "@/components/settings/RegisteredAddressField";
+import {
+  DEFAULT_LOGO_FRAME,
+  isLogoSlot,
+  logoFrameKeys,
+  readLogoFrame,
+  type LogoFrame,
+  type LogoSlot,
+} from "@/lib/settings/logo-frame";
 import { uploadCrmStorageFile, type CrmStorageObject } from "@/lib/storage/api";
 import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import { loadSignature, saveSignature } from "@/lib/emails/signature";
@@ -70,6 +84,29 @@ export function SettingsFormClient({
   );
   const [saving, setSaving] = useState(false);
   const dirtyRef = useRef(false);
+  const savedCompanyNameRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (savedCompanyNameRef.current !== null || dirtyRef.current) return;
+    if (!crm.settings) return;
+    const stored =
+      crm.settings.catalog?.["organization/company-profile"]?.companyName;
+    savedCompanyNameRef.current = typeof stored === "string" ? stored : "";
+  }, [crm.settings]);
+
+  function publishCompanyName(name: string) {
+    const current = crm.settings;
+    crm.setSettings({
+      ...(current ?? {}),
+      catalog: {
+        ...(current?.catalog ?? {}),
+        "organization/company-profile": {
+          ...(current?.catalog?.["organization/company-profile"] ?? {}),
+          companyName: name,
+        },
+      },
+    });
+  }
 
   useEffect(() => {
     if (dirtyRef.current) return;
@@ -88,6 +125,13 @@ export function SettingsFormClient({
         ...(crm.previewBrand ?? {}),
         [id]: value,
       });
+    }
+    if (
+      schemaKey === "organization/company-profile" &&
+      id === "companyName" &&
+      typeof value === "string"
+    ) {
+      publishCompanyName(value);
     }
     if (
       schemaKey === "organization/branding" &&
@@ -113,10 +157,54 @@ export function SettingsFormClient({
     }
   }
 
+  function setLogoFrame(slot: LogoSlot, frame: LogoFrame) {
+    const keys = logoFrameKeys(slot);
+    dirtyRef.current = true;
+    setValues((current) => ({
+      ...current,
+      [keys.scale]: frame.scale,
+      [keys.x]: frame.x,
+      [keys.y]: frame.y,
+    }));
+    crm.setPreviewLogos({
+      focus: slot,
+      frames: {
+        ...(crm.previewLogos?.frames ?? {}),
+        [slot]: frame,
+      },
+    });
+  }
+
+  function setManualAddress(formatted: string, parts: ManualAddress) {
+    dirtyRef.current = true;
+    setValues((current) => ({
+      ...current,
+      address: formatted,
+      addressLine1: parts.line1,
+      addressLine2: parts.line2,
+      addressSuburb: parts.suburb,
+      addressState: parts.state,
+      addressPostcode: parts.postcode,
+      addressCountry: parts.country,
+    }));
+  }
+
   function onCancel() {
     dirtyRef.current = false;
     crm.setPreviewBrand(null);
-    setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
+    crm.setPreviewLogos(null);
+    const next = hydrateSettingsForm(
+      schema,
+      schemaKey,
+      crm,
+      memberPrefs.preferences,
+    );
+    if (schemaKey === "organization/company-profile") {
+      const saved = savedCompanyNameRef.current ?? "";
+      next.companyName = saved;
+      publishCompanyName(saved);
+    }
+    setValues(next);
     notify("Reverted to last saved");
   }
 
@@ -134,12 +222,16 @@ export function SettingsFormClient({
 
   async function onSave() {
     const nextValues = valuesToSave();
+    if (schemaKey === "organization/branding") delete nextValues.appName;
     setValues(nextValues);
     setSaving(true);
     saveSettingsValues(schemaKey, nextValues, {
       path,
       title: schema.title,
     });
+    if (schemaKey === "organization/company-profile") {
+      savedCompanyNameRef.current = String(nextValues.companyName ?? "");
+    }
     if (schemaKey === "organization/branding") {
       crm.setSettings({
         ...(crm.settings ?? {}),
@@ -155,6 +247,7 @@ export function SettingsFormClient({
         },
       });
       crm.setPreviewBrand(null);
+      crm.setPreviewLogos(null);
     }
     if (schemaKey === "communication/email-signatures" || schemaKey === "my-preferences/signature") {
       const body = String(nextValues.body ?? "");
@@ -243,6 +336,7 @@ export function SettingsFormClient({
             key={field.id}
             className={
               field.type === "textarea" ||
+              field.type === "address" ||
               field.type === "file" ||
               field.type === "color"
                 ? "xl:col-span-2"
@@ -252,6 +346,31 @@ export function SettingsFormClient({
             <FieldRenderer
               field={field}
               value={values[field.id]}
+              logoFrame={
+                isLogoSlot(field.id) ? readLogoFrame(values, field.id) : undefined
+              }
+              onLogoFrame={
+                isLogoSlot(field.id)
+                  ? (frame) => {
+                      if (isLogoSlot(field.id)) setLogoFrame(field.id, frame);
+                    }
+                  : undefined
+              }
+              addressParts={
+                field.type === "address"
+                  ? {
+                      line1: String(values.addressLine1 ?? ""),
+                      line2: String(values.addressLine2 ?? ""),
+                      suburb: String(values.addressSuburb ?? ""),
+                      state: String(values.addressState ?? ""),
+                      postcode: String(values.addressPostcode ?? ""),
+                      country: String(values.addressCountry ?? ""),
+                    }
+                  : undefined
+              }
+              onAddressChange={
+                field.type === "address" ? setManualAddress : undefined
+              }
               onChange={(v) => setField(field.id, v)}
               onAssetUploaded={(stored) => {
                 if (!crm.settings && crm.source !== "api") {
@@ -308,10 +427,13 @@ export function SettingsFormClient({
 }
 
 function EmailGradientPreview({ values }: { values: SettingsValues }) {
+  const crm = useCrmSettings();
+  const companyName =
+    crm.settings?.catalog?.["organization/company-profile"]?.companyName;
   const brand = emailBrandFromValues({
     primaryColor: values.primaryColor,
     secondaryColor: values.secondaryColor,
-    appName: values.appName,
+    appName: typeof companyName === "string" ? companyName : undefined,
   });
   const blended = brand.primary.toLowerCase() !== brand.secondary.toLowerCase();
   return (
@@ -356,6 +478,14 @@ function hydrateSettingsForm(
     next = overlayCatalogValues(next, crm.settings, schemaKey);
     if (crm.settings.logoUrl) next.logoLight = crm.settings.logoUrl;
     if (crm.settings.logoDarkUrl) next.logoDark = crm.settings.logoDarkUrl;
+    if (
+      schemaKey === "organization/branding" &&
+      !String(next.logoLight ?? "").trim() &&
+      typeof next.logo === "string" &&
+      next.logo.trim()
+    ) {
+      next.logoLight = next.logo.trim();
+    }
   }
   if (crm.security) next = overlaySecurityValues(next, crm.security);
   if (memberPreferences) {
@@ -388,11 +518,19 @@ function FieldRenderer({
   value,
   onChange,
   onAssetUploaded,
+  logoFrame,
+  onLogoFrame,
+  addressParts,
+  onAddressChange,
 }: {
   field: SettingsField;
   value: string | boolean | number | undefined;
   onChange: (v: string | boolean | number) => void;
   onAssetUploaded?: (stored: CrmStorageObject) => void;
+  logoFrame?: LogoFrame;
+  onLogoFrame?: (frame: LogoFrame) => void;
+  addressParts?: ManualAddress;
+  onAddressChange?: (formatted: string, parts: ManualAddress) => void;
 }) {
   if (field.type === "toggle") {
     const on = Boolean(value);
@@ -432,6 +570,8 @@ function FieldRenderer({
       <BrandingFileField
         field={field}
         value={String(value ?? "")}
+        frame={logoFrame}
+        onFrameChange={onLogoFrame}
         onChange={onChange}
         onAssetUploaded={onAssetUploaded}
       />
@@ -521,18 +661,52 @@ function FieldRenderer({
     );
   }
 
+  if (field.type === "address") {
+    return (
+      <RegisteredAddressField
+        label={field.label}
+        value={String(value ?? "")}
+        parts={addressParts ?? {
+          line1: "",
+          line2: "",
+          suburb: "",
+          state: "",
+          postcode: "",
+          country: "",
+        }}
+        placeholder={field.placeholder}
+        help={field.help}
+        onChange={(formatted, parts) => onAddressChange?.(formatted, parts)}
+      />
+    );
+  }
+
+  const LeadingIcon =
+    field.icon === "mail" ? Mail : field.icon === "phone" ? Phone : field.icon === "globe" ? Globe : null;
+  const inputType =
+    field.icon === "mail" ? "email" : field.icon === "phone" ? "tel" : field.icon === "globe" ? "url" : "text";
+
   return (
     <label className="block space-y-1.5">
       <span className="text-[12px] font-semibold text-slate-700">
         {field.label}
       </span>
-      <input
-        type="text"
-        value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={field.placeholder}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-      />
+      <span className="relative block">
+        {LeadingIcon ? (
+          <LeadingIcon className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        ) : null}
+        <input
+          type={inputType}
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          className={cn(
+            "h-10 w-full rounded-lg border border-slate-200 bg-white text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100",
+            LeadingIcon ? "pr-3 pl-9" : "px-3",
+          )}
+        />
+      </span>
+      {field.help ? <p className="text-[11px] text-slate-400">{field.help}</p> : null}
     </label>
   );
 }
@@ -550,7 +724,7 @@ function toPickerHex(value: string): string {
 }
 
 const DEFAULT_COLOR_PALETTE: { label: string; value: string }[] = [
-  { label: "FinConnex", value: "#5A32A3" },
+  { label: "FinConnex", value: "#6376B5" },
   { label: "Violet", value: "#7C3AED" },
   { label: "Indigo", value: "#4F46E5" },
   { label: "Blue", value: "#2563EB" },
@@ -654,23 +828,32 @@ function storedFileName(value: string): string {
 function BrandingFileField({
   field,
   value,
+  frame,
+  onFrameChange,
   onChange,
   onAssetUploaded,
 }: {
   field: SettingsField;
   value: string;
+  frame?: LogoFrame;
+  onFrameChange?: (frame: LogoFrame) => void;
   onChange: (v: string) => void;
   onAssetUploaded?: (stored: CrmStorageObject) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const preview = useResolvedImageSrc(value);
+  const logoFrame = frame ?? DEFAULT_LOGO_FRAME;
+  const canEdit = Boolean(value) && isLogoSlot(field.id) && onFrameChange;
 
   return (
-    <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-4 sm:flex-row sm:items-center">
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-4">
+    <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-violet-600">
-          {preview ? (
+          {preview && canEdit ? (
+            <BrandLogo src={value} frame={logoFrame} className="h-full w-full" />
+          ) : preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview} alt="" className="h-full w-full object-contain" />
           ) : (
@@ -716,6 +899,7 @@ function BrandingFileField({
                 try {
                   const stored = await uploadCrmStorageFile(file);
                   onChange(stored.key);
+                  onFrameChange?.(DEFAULT_LOGO_FRAME);
                   onAssetUploaded?.(stored);
                 } catch (err) {
                   setError(
@@ -736,12 +920,17 @@ function BrandingFileField({
           onClick={() => {
             setError("");
             onChange("");
+            onFrameChange?.(DEFAULT_LOGO_FRAME);
           }}
           className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600"
         >
           Remove
         </button>
       </div>
+    </div>
+      {canEdit && onFrameChange ? (
+        <LogoFrameEditor src={value} frame={logoFrame} onChange={onFrameChange} />
+      ) : null}
     </div>
   );
 }

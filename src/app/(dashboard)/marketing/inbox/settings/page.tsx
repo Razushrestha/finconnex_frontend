@@ -40,7 +40,7 @@ export default function InboxSettingsPage() {
   }
 
   return (
-    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-slate-50 p-2 pr-3">
+    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-white p-2 pr-3">
       <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
           <Link

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ChevronDown,
   Crown,
   Maximize2,
   Minimize2,
@@ -385,7 +384,7 @@ export function DashboardWorkspace({
     <div
       ref={rootRef}
       className={cn(
-        "dashboard-workspace flex flex-1 flex-col bg-[#F4F6F9]",
+        "dashboard-workspace flex flex-1 flex-col bg-white",
         fullscreen && "overflow-y-auto",
         fullscreen && "fixed inset-0 z-[80]",
       )}
@@ -439,7 +438,6 @@ export function DashboardWorkspace({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
               </label>
               <DropdownMenu>
                 <DropdownMenuTrigger

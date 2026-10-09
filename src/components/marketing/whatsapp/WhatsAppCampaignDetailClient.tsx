@@ -163,7 +163,7 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
 
   if (!campaign) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 p-8">
+      <div className="flex min-h-full flex-col items-center justify-center bg-white p-8">
         <MessageCircle className="mb-3 h-10 w-10 text-slate-300" />
         <p className="font-bold text-slate-900">Campaign not found</p>
         <Link
@@ -189,7 +189,7 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
   ];
 
   return (
-    <div className="relative flex min-h-full flex-col bg-slate-50">
+    <div className="relative flex min-h-full flex-col bg-white">
       <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <button

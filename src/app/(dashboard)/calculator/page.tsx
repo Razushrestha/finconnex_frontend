@@ -14,7 +14,7 @@ export default function FinancialCalculatorPage() {
   >("repayments");
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-6 font-sans">
+    <div className="min-h-screen bg-white text-slate-900 p-6 font-sans">
       {/* Top Header & Breadcrumb */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-end gap-3">

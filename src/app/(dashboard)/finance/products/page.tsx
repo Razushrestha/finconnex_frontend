@@ -174,7 +174,7 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="min-h-full w-full bg-[#F4F7FB] p-4 sm:p-6 lg:p-8 text-slate-900">
+    <div className="min-h-full w-full bg-white p-4 sm:p-6 lg:p-8 text-slate-900">
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div />
         <div className="flex flex-wrap items-center gap-2">

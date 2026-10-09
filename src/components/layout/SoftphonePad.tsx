@@ -536,7 +536,7 @@ export function SoftphonePad({
         phone: noteFor.number,
         name: noteFor.name,
       })
-    : { leads: [], deals: [], companies: [] };
+    : { contacts: [], leads: [], deals: [], companies: [] };
 
   return createPortal(
     <div
@@ -1281,6 +1281,7 @@ function VoicemailPane({
 }
 
 const SEARCH_TYPE_FOR_KIND: Record<SoftphoneRelatedKind, CrmRecordSearchType> = {
+  Contact: "CONTACT",
   Lead: "LEAD",
   Deal: "DEAL",
   Company: "COMPANY",
@@ -1466,6 +1467,7 @@ function CallNoteComposer({
   relatedKind: "" | SoftphoneRelatedKind;
   relatedPick: SoftphoneRelatedPick | null;
   relatedOptions: {
+    contacts: SoftphoneRelatedPick[];
     leads: SoftphoneRelatedPick[];
     deals: SoftphoneRelatedPick[];
     companies: SoftphoneRelatedPick[];
@@ -1476,17 +1478,21 @@ function CallNoteComposer({
 }) {
   const displayName = record?.name || name || "Unknown";
   const kindOptions =
-    relatedKind === "Deal"
-      ? relatedOptions.deals
-      : relatedKind === "Company"
-        ? relatedOptions.companies
-        : relatedOptions.leads;
+    relatedKind === "Contact"
+      ? relatedOptions.contacts
+      : relatedKind === "Deal"
+        ? relatedOptions.deals
+        : relatedKind === "Company"
+          ? relatedOptions.companies
+          : relatedOptions.leads;
   const kindLabel =
-    relatedKind === "Deal"
-      ? "deal"
-      : relatedKind === "Company"
-        ? "organization"
-        : "lead";
+    relatedKind === "Contact"
+      ? "contact"
+      : relatedKind === "Deal"
+        ? "deal"
+        : relatedKind === "Company"
+          ? "company"
+          : "lead";
 
   return (
     <div className="flex h-full min-h-0 flex-col py-0.5">
@@ -1558,9 +1564,10 @@ function CallNoteComposer({
           className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[var(--brand-primary)]"
         >
           <option value="">None</option>
+          <option value="Contact">Contact</option>
           <option value="Lead">Lead</option>
           <option value="Deal">Deal</option>
-          <option value="Company">Organization</option>
+          <option value="Company">Company</option>
         </select>
         {relatedKind ? (
           <>

@@ -141,7 +141,7 @@ export function AnalyticsPageLayout({
   const liveSlices = data.slices.filter((slice) => slice.value > 0);
 
   return (
-    <div className="min-h-full bg-[#F4F6FB]">
+    <div className="min-h-full bg-white">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-5 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link

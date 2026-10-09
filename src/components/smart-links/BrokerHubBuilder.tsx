@@ -86,7 +86,7 @@ export function BrokerHubBuilder({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-white">
       <div className="mx-auto w-full max-w-[1400px] space-y-5 p-4 sm:p-5 lg:p-6">
         <header className="flex items-center justify-end">
           <div className="flex items-center gap-2">

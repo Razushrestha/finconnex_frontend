@@ -50,7 +50,7 @@ export function SettingsControlShell({
   const results = useMemo(() => searchSettingsNav(query), [query]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--brand-primary-soft)]">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
       <header className="z-20 shrink-0 border-b border-[var(--brand-primary)]/10 bg-white/90 backdrop-blur-md">
         <div className="flex items-center justify-end gap-4 px-4 py-3 sm:px-6">
           <label className="relative hidden min-w-[220px] max-w-sm flex-1 md:block">

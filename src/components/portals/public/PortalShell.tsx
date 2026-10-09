@@ -31,6 +31,7 @@ import {
   formatMessageAt,
   getMortgageState,
   hasPortalConsent,
+  syncMortgageClientFromCrmContact,
   unreadMessages,
   unreadNotifications,
   type MortgagePortalState,
@@ -86,7 +87,7 @@ export function PortalShell({
       router.replace(`/p/${slug}/login`);
       return;
     }
-    setMortgage(getMortgageState(slug, p));
+    setMortgage(syncMortgageClientFromCrmContact(p));
   }, [slug, router]);
 
   useEffect(() => {
@@ -121,7 +122,7 @@ export function PortalShell({
 
   if (!ready) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F7F6F9] text-sm text-slate-500">
+      <div className="flex min-h-dvh items-center justify-center bg-white text-sm text-slate-500">
         Loading…
       </div>
     );
@@ -129,7 +130,7 @@ export function PortalShell({
 
   if (!portal) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F7F6F9] px-4 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-white px-4 text-center">
         <h1 className="text-xl font-bold text-slate-900">Portal not found</h1>
         <p className="mt-2 text-sm text-slate-500">
           This client portal URL is invalid.
@@ -140,7 +141,7 @@ export function PortalShell({
 
   if (portal.status !== "Active") {
     return (
-      <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[#F7F6F9] px-4 text-center">
+      <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-white px-4 text-center">
         <div className="relative max-w-md">
           <p className="text-[11px] font-semibold tracking-widest text-[#5A32A3] uppercase">
             FinConnex
@@ -160,7 +161,7 @@ export function PortalShell({
 
   if (!email) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#F7F6F9] text-sm text-slate-500">
+      <div className="flex min-h-dvh items-center justify-center bg-white text-sm text-slate-500">
         Redirecting to login…
       </div>
     );
@@ -178,7 +179,7 @@ export function PortalShell({
   const noteCount = mortgage ? unreadNotifications(mortgage.notifications) : 0;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[#F7F6F9] text-slate-900">
+    <div className="flex h-dvh overflow-hidden bg-white text-slate-900">
       {sidebarOpen ? (
         <button
           type="button"

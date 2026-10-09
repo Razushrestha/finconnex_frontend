@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Pencil } from "lucide-react";
 import { DocumentThumbnail } from "@/components/documents/signature/create/DocumentThumbnail";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -69,38 +69,57 @@ export function SignatureFileCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
   const inputRef = useRef<HTMLInputElement>(null);
-  const editing = hovered || selected;
+  const skipCommit = useRef(false);
+  const showSelect = hovered || selected;
+
+  useEffect(() => {
+    if (!editing) setDraft(label);
+  }, [editing, label]);
 
   useEffect(() => {
     if (!editing) return;
-    setDraft(label);
     const frame = window.requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [editing, label]);
+  }, [editing]);
 
-  function commit() {
-    const next = draft.trim();
-    if (next && next !== label) onRename(next);
+  function startEdit() {
+    skipCommit.current = false;
+    setDraft(label);
+    setEditing(true);
+    setMenuOpen(false);
   }
 
-  function leaveCard() {
-    if (draft.trim() && draft.trim() !== label) return;
-    setHovered(false);
+  function commit() {
+    if (skipCommit.current) {
+      skipCommit.current = false;
+      return;
+    }
+    const next = draft.trim();
+    if (next && next !== label) onRename(next);
+    skipCommit.current = true;
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    skipCommit.current = true;
+    setDraft(label);
+    setEditing(false);
   }
 
   return (
     <div
       className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={leaveCard}
+      onMouseLeave={() => setHovered(false)}
     >
       <div className="relative h-[280px] bg-white">
-        {editing ? (
+        {showSelect ? (
           <label className="absolute top-2 left-2 z-10 flex h-5 w-5 items-center justify-center rounded border border-slate-300 bg-white">
             <input
               type="checkbox"
@@ -137,10 +156,7 @@ export function SignatureFileCard({
                 <button
                   type="button"
                   className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onSelect();
-                  }}
+                  onClick={startEdit}
                 >
                   Rename
                 </button>
@@ -165,24 +181,34 @@ export function SignatureFileCard({
             ref={inputRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            onBlur={() => {
-              commit();
-              setHovered(false);
-            }}
+            onBlur={commit}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 commit();
-                inputRef.current?.blur();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelEdit();
               }
             }}
             aria-label={`Rename ${label}`}
-            className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-emerald-600"
+            className="h-8 w-full rounded border border-slate-300 bg-white px-2 text-[13px] text-slate-800 outline-none focus:border-[var(--brand-primary)]"
           />
         ) : (
-          <p className="truncate text-center text-[13px] font-semibold text-slate-900">
-            {label}
-          </p>
+          <div className="flex items-center gap-1">
+            <p className="min-w-0 flex-1 truncate text-center text-[13px] font-semibold text-slate-900">
+              {label}
+            </p>
+            <button
+              type="button"
+              onClick={startEdit}
+              aria-label={`Rename ${label}`}
+              className="shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-white hover:text-[var(--brand-primary)]"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -56,7 +56,7 @@ export function FinanceCreateDialog({
             <X className="h-4 w-4" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white">
           <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
             {children}
           </div>

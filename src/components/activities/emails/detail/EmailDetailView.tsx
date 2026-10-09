@@ -149,7 +149,7 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-slate-50">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-white">
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
         <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-100 px-3 py-2">
           <Link href={backHref} className={toolBtn}>

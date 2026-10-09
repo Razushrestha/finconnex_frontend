@@ -219,7 +219,7 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
 
   if (!row) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-slate-50 p-6 text-[13px] text-slate-500">
+      <div className="flex min-h-full items-center justify-center bg-white p-6 text-[13px] text-slate-500">
         Time entry not found.{" "}
         <Link href="/time-tracking" className="ml-1 text-violet-600 underline">
           Back to list
@@ -231,7 +231,7 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
   const locked = row.status === "Invoiced" || row.status === "Running";
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className="relative min-h-full overflow-hidden bg-white">
       <div className="relative mx-auto max-w-4xl p-2.5 sm:p-3 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">

@@ -218,6 +218,7 @@ export function ScheduleCallForm({
 }: ScheduleCallFormProps) {
   const router = useRouter();
   const relatedKindDefault =
+    defaults?.relatedKind === "Contact" ||
     defaults?.relatedKind === "Lead" ||
     defaults?.relatedKind === "Deal" ||
     defaults?.relatedKind === "Company"
@@ -635,7 +636,7 @@ export function ScheduleCallForm({
                   <option value="">None</option>
                   {TASK_RELATED_ENTITY_KINDS.map((k) => (
                     <option key={k} value={k}>
-                      {k === "Company" ? "Organization" : k}
+                      {k}
                     </option>
                   ))}
                 </select>

@@ -33,6 +33,14 @@ import {
   type MortgageDocument,
   type MortgageDocumentFile,
 } from "@/lib/portals/mortgage";
+import {
+  deletePortalDocumentBlob,
+  isImageMime,
+  isPdfMime,
+  loadPortalDocumentBlob,
+  mimeFromFileName,
+  savePortalDocumentBlob,
+} from "@/lib/portals/document-blobs";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
 
@@ -43,12 +51,6 @@ const STEPS = [
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 8;
-
-function completionRank(status: MortgageDocStatus) {
-  if (status === "rejected") return 0;
-  if (status === "pending") return 1;
-  return 2;
-}
 
 function isAllowedFile(file: File) {
   const name = file.name.toLowerCase();
@@ -67,7 +69,10 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   const { portal, mortgage, update, logActivity, canWrite, isReadOnly } =
     useMortgagePortal(slug);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<MortgageDocument | null>(null);
+  const [preview, setPreview] = useState<{
+    doc: MortgageDocument;
+    file: MortgageDocumentFile;
+  } | null>(null);
   const [reasonDoc, setReasonDoc] = useState<MortgageDocument | null>(null);
   const [reasonDraft, setReasonDraft] = useState("");
   const [reasonError, setReasonError] = useState(false);
@@ -94,16 +99,9 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   const overall = Math.round((uploadedPct + ff.percent) / 2);
 
   const toComplete = useMemo(() => {
-    return (mortgage?.documents ?? [])
-      .filter((d) => normalizeDocStatus(d.status) !== "accepted")
-      .sort((a, b) => {
-        const na = Number(Boolean(a.notApplicable)) - Number(Boolean(b.notApplicable));
-        if (na !== 0) return na;
-        return (
-          completionRank(normalizeDocStatus(a.status)) -
-          completionRank(normalizeDocStatus(b.status))
-        );
-      });
+    return (mortgage?.documents ?? []).filter(
+      (d) => normalizeDocStatus(d.status) !== "accepted",
+    );
   }, [mortgage?.documents]);
   const approvedDocs = useMemo(() => {
     return (mortgage?.documents ?? []).filter(
@@ -131,7 +129,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
     inputRef.current?.click();
   }
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     const id = uploadingId;
     e.target.value = "";
@@ -160,12 +158,25 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
       return;
     }
     const stamp = formatPortalStamp();
-    const added: MortgageDocumentFile[] = accepted.map((file, i) => ({
-      id: `${id}-${Date.now()}-${i}`,
-      name: file.name,
-      sizeBytes: file.size,
-      uploadedAt: stamp,
-    }));
+    const added: MortgageDocumentFile[] = [];
+    for (let i = 0; i < accepted.length; i += 1) {
+      const file = accepted[i];
+      const fileId = `${id}-${Date.now()}-${i}`;
+      const mime = file.type || mimeFromFileName(file.name);
+      try {
+        await savePortalDocumentBlob(fileId, file, mime);
+      } catch {
+        flash("Could not store that file for preview. Try again.");
+        return;
+      }
+      added.push({
+        id: fileId,
+        name: file.name,
+        sizeBytes: file.size,
+        uploadedAt: stamp,
+        mime,
+      });
+    }
     const nextFiles = [...existing, ...added];
     update((prev) => ({
       ...prev,
@@ -215,6 +226,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
       return;
     }
     const nextFiles = documentFiles(current).filter((f) => f.id !== fileId);
+    void deletePortalDocumentBlob(fileId);
     const stamp = formatPortalStamp();
     update((prev) => ({
       ...prev,
@@ -390,7 +402,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
                     key={d.id}
                     doc={d}
                     canUpload={canUpload}
-                    onView={setViewing}
+                    onView={(doc, file) => setPreview({ doc, file })}
                     onPick={pickFile}
                     onRemoveFile={removeFile}
                     onToggleNotApplicable={requestNotApplicable}
@@ -407,7 +419,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
                   key={d.id}
                   doc={d}
                   canUpload={canUpload}
-                  onView={setViewing}
+                  onView={(doc, file) => setPreview({ doc, file })}
                   onPick={pickFile}
                   onRemoveFile={removeFile}
                   onToggleNotApplicable={requestNotApplicable}
@@ -462,46 +474,12 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
         </aside>
       </div>
 
-      {viewing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[14px] font-bold text-slate-900">{viewing.name}</div>
-                <div className="text-[11px] text-slate-500">
-                  {viewing.fileName} · {viewing.uploadedAt}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewing(null)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-3 flex h-40 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
-              <div className="text-center">
-                <FileText className="mx-auto h-8 w-8" />
-                <p className="mt-2 text-[12px] font-medium">{viewing.fileName}</p>
-              </div>
-            </div>
-            {normalizeDocStatus(viewing.status) === "accepted" ? (
-              <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-emerald-800">
-                <Lock className="h-3.5 w-3.5" />
-                This document is approved and cannot be changed.
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setViewing(null)}
-              className="mt-3 h-8 w-full rounded-lg bg-[#5A32A3] text-[12px] font-semibold text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {preview ? (
+        <FilePreviewModal
+          doc={preview.doc}
+          file={preview.file}
+          onClose={() => setPreview(null)}
+        />
       ) : null}
 
       {reasonDoc ? (
@@ -574,6 +552,161 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   );
 }
 
+function useFileObjectUrl(file: MortgageDocumentFile) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [mime, setMime] = useState(file.mime || mimeFromFileName(file.name));
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    void loadPortalDocumentBlob(file.id)
+      .then((stored) => {
+        if (!active || !stored) return;
+        objectUrl = URL.createObjectURL(stored.blob);
+        setUrl(objectUrl);
+        setMime(stored.mime || file.mime || mimeFromFileName(file.name));
+      })
+      .catch(() => {
+        if (active) setUrl(null);
+      });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [file.id, file.mime, file.name]);
+
+  return { url, mime };
+}
+
+function FileSquare({
+  file,
+  editable,
+  onOpen,
+  onRemove,
+}: {
+  file: MortgageDocumentFile;
+  editable: boolean;
+  onOpen: () => void;
+  onRemove: () => void;
+}) {
+  const { url, mime } = useFileObjectUrl(file);
+  const image = isImageMime(mime) && url;
+
+  return (
+    <li className="relative h-[92px] w-[92px] shrink-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        title={[file.name, formatFileSize(file.sizeBytes)].filter(Boolean).join(" · ")}
+        className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm hover:ring-2 hover:ring-[#5A32A3]/40"
+      >
+        <span className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-white">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <FileText className="h-7 w-7 text-[#5A32A3]" />
+          )}
+        </span>
+        <span className="truncate px-1.5 py-1 text-[9px] font-medium leading-none text-slate-600">
+          {file.name}
+        </span>
+      </button>
+      {editable ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-400 shadow ring-1 ring-slate-200 hover:text-rose-600"
+          aria-label={`Remove ${file.name}`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+function FilePreviewModal({
+  doc,
+  file,
+  onClose,
+}: {
+  doc: MortgageDocument;
+  file: MortgageDocumentFile;
+  onClose: () => void;
+}) {
+  const { url, mime } = useFileObjectUrl(file);
+  const image = Boolean(url && isImageMime(mime));
+  const pdf = Boolean(url && isPdfMime(mime, file.name));
+  const approved = normalizeDocStatus(doc.status) === "accepted";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-3 sm:p-6">
+      <div className="flex h-[min(92vh,920px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div className="min-w-0">
+            <div className="truncate text-[15px] font-bold text-slate-900">{doc.name}</div>
+            <div className="truncate text-[12px] text-slate-500">
+              {[file.name, formatFileSize(file.sizeBytes), file.uploadedAt]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-semibold text-[#5A32A3] ring-1 ring-[#5A32A3]/30 hover:bg-violet-50"
+              >
+                Open file
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 bg-slate-100">
+          {image && url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={url}
+              alt={file.name}
+              className="h-full w-full object-contain"
+            />
+          ) : pdf && url ? (
+            <iframe
+              title={file.name}
+              src={url}
+              className="h-full w-full bg-white"
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center text-slate-500">
+              <FileText className="h-10 w-10 text-slate-300" />
+              <p className="mt-3 max-w-sm text-[13px] leading-relaxed">
+                This file was attached before previews were saved. Remove it and upload it again to see the pages.
+              </p>
+            </div>
+          )}
+        </div>
+        {approved ? (
+          <p className="flex items-center gap-1.5 border-t border-slate-100 px-4 py-2 text-[12px] font-medium text-emerald-800">
+            <Lock className="h-3.5 w-3.5" />
+            This document is approved and cannot be changed.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function DocumentRow({
   doc,
   canUpload,
@@ -584,7 +717,7 @@ function DocumentRow({
 }: {
   doc: MortgageDocument;
   canUpload: boolean;
-  onView: (doc: MortgageDocument) => void;
+  onView: (doc: MortgageDocument, file: MortgageDocumentFile) => void;
   onPick: (id: string) => void;
   onRemoveFile: (id: string, fileId: string) => void;
   onToggleNotApplicable: (doc: MortgageDocument, checked: boolean) => void;
@@ -632,31 +765,15 @@ function DocumentRow({
             </p>
           ) : null}
           {files.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-1.5">
+            <ul className="mt-3 flex flex-wrap gap-2">
               {files.map((file) => (
-                <li
+                <FileSquare
                   key={file.id}
-                  className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-slate-50 py-0.5 pl-1.5 pr-0.5"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onView(doc)}
-                    className="min-w-0 truncate text-left text-[11px] font-medium text-slate-700"
-                    title={[file.name, formatFileSize(file.sizeBytes)].filter(Boolean).join(" · ")}
-                  >
-                    {file.name}
-                  </button>
-                  {editable ? (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveFile(doc.id, file.id)}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      aria-label={`Remove ${file.name}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </li>
+                  file={file}
+                  editable={editable}
+                  onOpen={() => onView(doc, file)}
+                  onRemove={() => onRemoveFile(doc.id, file.id)}
+                />
               ))}
             </ul>
           ) : null}

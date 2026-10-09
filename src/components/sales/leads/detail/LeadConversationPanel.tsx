@@ -687,7 +687,7 @@ export function LeadConversationPanel({
           </div>
         </div>
 
-        <div ref={threadRef} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-[#F7F8FA] px-2.5 py-2">
+        <div ref={threadRef} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-white px-2.5 py-2">
           {visible.length === 0 ? (
             <p className="py-8 text-center text-[12px] text-slate-400">
               No messages in this view.
@@ -1346,7 +1346,7 @@ function EmailFullPage({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex flex-col bg-[#F7F6F9]">
+    <div className="fixed inset-0 z-[80] flex flex-col bg-white">
       <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
         <button
           type="button"

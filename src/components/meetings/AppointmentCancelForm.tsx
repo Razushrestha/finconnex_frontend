@@ -84,7 +84,7 @@ export function AppointmentCancelForm({ token }: { token: string }) {
   }
 
   return (
-    <div className="flex min-h-dvh items-start justify-center bg-[#f3f4f8] px-3 py-6 sm:items-center sm:px-6">
+    <div className="flex min-h-dvh items-start justify-center bg-white px-3 py-6 sm:items-center sm:px-6">
       <div className="w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-lg">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-4 sm:px-5">
           <h1 className="text-base font-semibold text-slate-800">Confirm Cancellation</h1>
