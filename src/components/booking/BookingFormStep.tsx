@@ -1088,13 +1088,18 @@ export function BookingFormStep({
                           ),
                         );
                       }}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[var(--brand-primary)]"
-                      aria-label={field.hidden ? "Show" : "Hide"}
+                      className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded-md hover:bg-white",
+                        field.hidden
+                          ? "text-slate-300 hover:text-slate-500"
+                          : "text-[var(--brand-primary)]",
+                      )}
+                      aria-label={field.hidden ? "Show field" : "Hide field"}
                     >
                       {field.hidden ? (
-                        <Eye className="h-3.5 w-3.5" />
-                      ) : (
                         <EyeOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
                       )}
                     </button>
                     <button
