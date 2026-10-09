@@ -36,6 +36,7 @@ import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { moreMenuItems, printViewItems } from "../tasks/page";
 import {
   kanbanPrefsFromCatalog,
@@ -144,13 +145,16 @@ export default function NotesPage() {
     );
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} note${count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} note${count === 1 ? "" : "s"}?`,
+        message: "This cannot be undone.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }

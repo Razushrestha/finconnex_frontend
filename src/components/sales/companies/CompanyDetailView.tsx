@@ -42,6 +42,7 @@ import type { Call } from "@/lib/calls/types";
 import type { Task } from "@/lib/tasks/types";
 import type { LibraryDocument } from "@/lib/documents/library/types";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { EditCompanyForm } from "@/components/sales/companies/EditCompanyForm";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
@@ -212,7 +213,7 @@ export function CompanyDetailView({
     window.setTimeout(() => setFlash(null), 2400);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     const gate = softDeleteRecord({
       action: "sales.companies.delete",
       module: "sales.companies",
@@ -225,7 +226,16 @@ export function CompanyDetailView({
       toast.error(gate.message);
       return;
     }
-    if (!window.confirm(`Delete ${company.name}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete company?",
+        message: `Delete ${company.name}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     deleteCompany(company.id);
     emitRulesChange("all");
     router.push(back.href);
@@ -494,7 +504,7 @@ export function CompanyDetailView({
         ]}
         moreMenuItems={[
           { label: "Edit", onClick: () => setEditOpen(true) },
-          { label: "Delete", destructive: true, onClick: handleDelete },
+          { label: "Delete", destructive: true, onClick: () => void handleDelete() },
         ]}
         onBack={() => router.push(back.href)}
         onPrev={

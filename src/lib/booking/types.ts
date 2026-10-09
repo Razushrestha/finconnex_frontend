@@ -11,23 +11,39 @@ export type BookingEventType =
 
 export type BookingPageStatus = "Draft" | "Live";
 
-export const CONSULTANT_PRIORITIES = [
-  "Lowest",
-  "Low",
-  "Medium",
-  "High",
-  "Highest",
-] as const;
+export const CONSULTANT_PRIORITIES = ["Low", "Medium", "High"] as const;
 export type ConsultantPriority = (typeof CONSULTANT_PRIORITIES)[number];
 
-/** Priority-based assignment on Assigned Users (edit). */
-export const ASSIGNMENT_PRIORITIES = [
-  "Highest",
-  "High",
-  "Low",
-  "Lowest",
-] as const;
+/** Priority-based assignment on Assigned Users (edit), highest first. */
+export const ASSIGNMENT_PRIORITIES = ["High", "Medium", "Low"] as const;
 export type AssignmentPriority = (typeof ASSIGNMENT_PRIORITIES)[number];
+
+/**
+ * A saved consultant priority as one of Low, Medium or High. Consultations
+ * saved when there were five levels keep their meaning: Highest reads as
+ * High and Lowest as Low.
+ */
+export function normalizeConsultantPriority(
+  value: unknown,
+  fallback: ConsultantPriority = "High",
+): ConsultantPriority {
+  if (value === "Highest") return "High";
+  if (value === "Lowest") return "Low";
+  return (CONSULTANT_PRIORITIES as readonly unknown[]).includes(value)
+    ? (value as ConsultantPriority)
+    : fallback;
+}
+
+/** Every saved priority in a consultation, normalized. */
+export function normalizeConsultantPriorities(
+  value: Record<string, unknown> | null | undefined,
+): Record<string, ConsultantPriority> {
+  const out: Record<string, ConsultantPriority> = {};
+  for (const [name, priority] of Object.entries(value ?? {})) {
+    out[name] = normalizeConsultantPriority(priority);
+  }
+  return out;
+}
 
 /** Split 100% across assigned users for Load based distribution. */
 export function evenConsultantLoads(names: string[]): Record<string, number> {

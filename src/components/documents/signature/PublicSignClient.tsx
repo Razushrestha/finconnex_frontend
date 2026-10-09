@@ -53,6 +53,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { promptDialog } from "@/lib/notify/dialog";
 
 const SignPageRail = dynamic(
   () => import("./SignPageRail").then((mod) => mod.SignPageRail),
@@ -649,8 +650,12 @@ export function PublicSignClient({ token }: { token: string }) {
               <button
                 type="button"
                 aria-label="Find"
-                onClick={() => {
-                  const term = window.prompt("Find in document");
+                onClick={async () => {
+                  const term = await promptDialog({
+                    title: "Find in document",
+                    label: "Search for",
+                    confirmText: "Find",
+                  });
                   if (!term) return;
                   const finder = (
                     window as Window & { find?: (query: string) => boolean }

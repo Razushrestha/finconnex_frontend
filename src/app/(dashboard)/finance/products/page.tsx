@@ -35,6 +35,7 @@ import {
 import { useCrmProducts } from "@/lib/finance/products/use-crm-products";
 import { PRODUCT_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { cn } from "@/lib/utils";
+import { alertDialog, confirmDialog } from "@/lib/notify/dialog";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import { CreateProductForm } from "@/components/finance/products/CreateProductForm";
 
@@ -139,16 +140,27 @@ export default function ProductsPage() {
 
   async function onDeleteItem(e: React.MouseEvent, p: FinanceProduct) {
     e.stopPropagation();
-    if (!window.confirm(`Delete ${p.name}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete product?",
+        message: `Delete ${p.name}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    )
+      return;
     if (isCrmProductId(p.id)) {
       try {
         await deleteCrmProduct(p.id);
       } catch (err) {
-        window.alert(
-          err instanceof Error
-            ? err.message
-            : "Could not delete this item in the CRM",
-        );
+        void alertDialog({
+          title: "Could not delete product",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Could not delete this item in the CRM",
+          tone: "danger",
+        });
         return;
       }
     }

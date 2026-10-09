@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { softDeleteRecord } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function PaymentDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -158,9 +159,12 @@ export function PaymentDetailClient({ id }: { id: string }) {
               onClick={() => {
                 void (async () => {
                   if (
-                    !window.confirm(
-                      `Refund payment ${row.paymentId}? This cannot be undone.`,
-                    )
+                    !(await confirmDialog({
+                      title: "Refund payment?",
+                      message: `Refund payment ${row.paymentId}? This cannot be undone.`,
+                      confirmText: "Refund",
+                      tone: "danger",
+                    }))
                   ) {
                     return;
                   }

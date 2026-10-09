@@ -51,6 +51,7 @@ import {
 import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   FilterDealsPanel,
   EMPTY_DEAL_FILTERS,
@@ -348,9 +349,17 @@ export default function DealsPage() {
     setSelectedIds([]);
   }
 
-  function deleteSelected() {
+  async function deleteSelected() {
     if (!selectedIds.length) return;
-    if (!window.confirm(`Delete ${selectedIds.length} deal(s)?`)) return;
+    if (
+      !(await confirmDialog({
+        title: `Delete ${selectedIds.length} deal${selectedIds.length === 1 ? "" : "s"}?`,
+        message: `Delete ${selectedIds.length} deal(s)?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    )
+      return;
     void tryCrmDeal(() =>
       bulkCrmDeals({ ids: selectedIds, operation: "SOFT_DELETE" }),
     );
@@ -654,7 +663,7 @@ export default function DealsPage() {
           }
           onChangeOwner={changeOwnerSelected}
           onCloneSelected={cloneSelected}
-          onDelete={deleteSelected}
+          onDelete={() => void deleteSelected()}
           onExportSelectedRecords={exportSelected}
         />
       ) : (

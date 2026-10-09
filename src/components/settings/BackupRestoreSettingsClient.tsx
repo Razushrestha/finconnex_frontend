@@ -9,6 +9,7 @@ import {
   tryCrmWorkspaceBackups,
   type CrmWorkspaceBackup,
 } from "@/lib/backup/api";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 /** Settings → Data Management → Backup and Restore */
 export function BackupRestoreSettingsClient() {
@@ -71,9 +72,12 @@ export function BackupRestoreSettingsClient() {
 
   async function onRestore(id: string) {
     if (
-      !window.confirm(
-        "Restore missing companies, contacts, deals, and leads from this backup? Existing rows are not overwritten.",
-      )
+      !(await confirmDialog({
+        title: "Restore from backup?",
+        message:
+          "Restore missing companies, contacts, deals, and leads from this backup? Existing rows are not overwritten.",
+        confirmText: "Restore",
+      }))
     ) {
       return;
     }

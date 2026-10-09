@@ -35,6 +35,7 @@ import {
 import { MentionPickerMenu } from "@/components/shared/MentionPickerMenu";
 import { useContentEditableMentions } from "@/components/shared/useContentEditableMentions";
 import { cn } from "@/lib/utils";
+import { promptDialog } from "@/lib/notify/dialog";
 import { RichEditorTableResize } from "./RichEditorTableResize";
 
 const FONT_FAMILIES = [
@@ -189,6 +190,11 @@ interface TaskDescriptionEditorProps {
   variant?: "full" | "notes";
   /** Keep primary formatting on the bar; tuck the rest into ⋯ */
   compactToolbar?: boolean;
+  /**
+   * Wrap the toolbar onto more rows instead of scrolling it sideways, for a
+   * narrow column where scrolled-off buttons would be out of sight.
+   */
+  wrapToolbar?: boolean;
 }
 
 function preventFocusLoss(event: React.MouseEvent) {
@@ -1549,6 +1555,7 @@ export function TaskDescriptionEditor({
   fillHeight,
   variant = "full",
   compactToolbar = false,
+  wrapToolbar = false,
 }: TaskDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
@@ -1942,11 +1949,23 @@ export function TaskDescriptionEditor({
     readSelectionStyles();
   }
 
-  function insertLink() {
+  async function insertLink() {
     ensureEditorSelection(editorRef.current, savedRangeRef);
     const selection = window.getSelection();
     const selected = selection?.toString().trim() ?? "";
-    const url = window.prompt("Enter URL", "https://");
+    // The dialog's input takes focus, so keep the editor range and put it
+    // back once the dialog closes, before the link is inserted.
+    const savedRange = savedRangeRef.current?.cloneRange() ?? null;
+    const url = await promptDialog({
+      title: "Insert link",
+      label: "Enter URL",
+      defaultValue: "https://",
+      inputType: "url",
+      confirmText: "Insert",
+    });
+    savedRangeRef.current = savedRange;
+    editorRef.current?.focus();
+    restoreEditorSelection(savedRangeRef);
     if (!url) return;
     if (!selected) {
       runCommand("insertHTML", `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
@@ -2052,8 +2071,13 @@ export function TaskDescriptionEditor({
   return (
     <div className={cn("relative w-full rounded-md border border-border bg-background", fillHeight && "flex h-full min-h-0 flex-col", className)}>
       <div className="flex w-full items-stretch rounded-t-md border-b border-slate-200 bg-slate-50/90">
-        <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
-          <div className="flex h-11 min-w-max items-center gap-0.5 px-1.5">
+        <div className={cn("min-w-0 flex-1", !wrapToolbar && "overflow-x-auto no-scrollbar")}>
+          <div
+            className={cn(
+              "flex items-center gap-0.5 px-1.5",
+              wrapToolbar ? "min-h-11 flex-wrap py-1" : "h-11 min-w-max",
+            )}
+          >
           {variant === "notes" ? (
             <>
               <ToolButton
@@ -2128,7 +2152,7 @@ export function TaskDescriptionEditor({
                 onPick={pickListStyle}
                 onBeforeOpen={rememberSelection}
               />
-              <ToolButton title="Insert link" onClick={insertLink}>
+              <ToolButton title="Insert link" onClick={() => void insertLink()}>
                 <Link2 className="h-4 w-4" />
               </ToolButton>
               <ToolButton title="Undo" onClick={() => runCommand("undo")}>
@@ -2237,7 +2261,7 @@ export function TaskDescriptionEditor({
                 title="Insert link"
                 onClick={() => {
                   rememberSelection();
-                  insertLink();
+                  void insertLink();
                 }}
               >
                 <Link2 className="h-4 w-4" />
@@ -2525,7 +2549,7 @@ export function TaskDescriptionEditor({
             onBeforeOpen={rememberSelection}
             onInsertTable={insertTable}
           />
-          <ToolButton title="Insert link" onClick={insertLink}>
+          <ToolButton title="Insert link" onClick={() => void insertLink()}>
             <Link2 className="h-4 w-4" />
           </ToolButton>
           {toolbarAfterLink ? toolbarAfterLink : null}
@@ -2609,7 +2633,7 @@ export function TaskDescriptionEditor({
           <ToolbarDivider />
           <MoreInsertMenu
             onBeforeOpen={rememberSelection}
-            onInsertLink={insertLink}
+            onInsertLink={() => void insertLink()}
             onInsertTable={insertTable}
             onInsertImage={insertImageFile}
             onInsertEmoji={insertEmoji}

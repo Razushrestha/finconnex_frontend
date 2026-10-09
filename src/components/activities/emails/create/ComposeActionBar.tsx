@@ -126,7 +126,7 @@ export function ComposeActionBar({
     };
   }, []);
 
-  async function useSavedSignature(item: SavedSignature) {
+  async function applySavedSignature(item: SavedSignature) {
     setSigError("");
     setSigBusy(true);
     try {
@@ -171,7 +171,7 @@ export function ComposeActionBar({
         throw new Error(json.error || "Could not save the signature.");
       }
       setSavedSignatures((list) => [json.signature!, ...list]);
-      await useSavedSignature(json.signature);
+      await applySavedSignature(json.signature);
     } catch (err) {
       setSigError(err instanceof Error ? err.message : "Could not save the signature.");
       setSigBusy(false);
@@ -320,7 +320,7 @@ export function ComposeActionBar({
                   key={item.id}
                   type="button"
                   disabled={sigBusy}
-                  onClick={() => void useSavedSignature(item)}
+                  onClick={() => void applySavedSignature(item)}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50"
                 >
                   <Check

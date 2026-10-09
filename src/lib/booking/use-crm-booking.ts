@@ -7,12 +7,14 @@ import {
   appointmentPersonName,
   hostsToConsultants,
   appointmentsFromGuestClocks,
+  guestClockDisplayRange,
   meetingToAppointment,
   resolveConsultantMatch,
   toLocalStart,
   parseAppointmentStart,
   replaceDashboardAppointments,
   replaceDashboardConsultants,
+  type AppointmentStage,
   type AppointmentStatus,
   type DashboardAppointment,
   type DashboardConsultant,
@@ -23,7 +25,6 @@ import { listCrmMeetings } from "@/lib/meetings/api";
 import {
   assignGuestClocks,
   guestAppointmentNotes,
-  guestClockRange,
   type GuestClock,
 } from "@/lib/meetings/appointment-manage";
 import { loadWorkspaceConsultants } from "@/lib/users/assignable";
@@ -48,6 +49,7 @@ import { loadCrmContacts } from "@/lib/contacts/api";
 import { fetchLeadList } from "@/lib/leads/api/client";
 import type { CrmLead } from "@/lib/leads/api/types";
 import { getRulesActor } from "@/lib/rules/actor";
+import { loadSettingsValues } from "@/lib/settings/settings-store";
 
 const BOOKING_CODE_STORE = "booking:list-codes:v1";
 
@@ -236,7 +238,7 @@ function rowsWithGuestClocks(rows: DashboardAppointment[], clocks: GuestClock[])
         (clock.meetingId === row.meetingId || clock.meetingId === row.id);
       return sameId ? [] : [row];
     }
-    const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+    const range = guestClockDisplayRange(clock);
     const notes = guestAppointmentNotes(row.notes, clock.remarks);
     return [
       {
@@ -339,16 +341,24 @@ function bookingToAppointment(
 ): DashboardAppointment | null {
   const statusRaw = row.status.toLowerCase();
   // RESCHEDULED is the superseded booking; its replacement is listed separately.
-  if (statusRaw.includes("complete") || statusRaw.includes("resched")) {
-    return null;
-  }
+  if (statusRaw.includes("resched")) return null;
+  const completed = statusRaw.includes("complete");
+  const noShow =
+    /no[-_ ]?show/.test(statusRaw) || !!textField(row.raw, "noShowAt", "no_show_at");
   const status: AppointmentStatus = statusRaw.includes("cancel")
     ? "Cancelled"
-    : statusRaw.includes("confirm")
+    : statusRaw.includes("confirm") || completed
     ? "Confirmed"
-    : statusRaw.includes("no-show") || statusRaw.includes("noshow")
+    : noShow
       ? "Pending"
       : "Scheduled";
+  const stage: AppointmentStage | undefined = noShow
+    ? "No Show"
+    : completed
+      ? "Completed"
+      : textField(row.raw, "rescheduledFromId", "rescheduled_from_id")
+        ? "Rescheduled"
+        : undefined;
   const relatedKind: RelatedKind = row.leadId
     ? "Lead"
     : row.dealId
@@ -415,11 +425,41 @@ function bookingToAppointment(
     start: toLocalStart(row.startTime),
     type: "Consultation",
     status,
+    stage,
     recordKind: "booking",
     meetingId: row.meetingId,
     ...bookingChannel(row),
     avatarClass: "bg-violet-100 text-violet-800",
   };
+}
+
+/**
+ * The zone the booking screens show times in: the signed-in user's own.
+ * Their host record (by user id or email, then by name), else the time zone
+ * set in My preferences, else the zone every host in the workspace shares.
+ * Null leaves this browser's zone.
+ */
+export function bookingDisplayZoneFor(
+  hosts: { name: string; crmUserId?: string; email?: string; timezone?: string }[],
+  actor: { id?: string; email?: string; name?: string },
+  profileZone: unknown = loadSettingsValues("my-preferences/profile").timezone,
+): { zone: string | null; from: string } {
+  const email = actor.email?.trim().toLowerCase() ?? "";
+  const name = actor.name?.trim().toLowerCase() ?? "";
+  const me =
+    hosts.find(
+      (host) =>
+        (!!actor.id && host.crmUserId === actor.id) ||
+        (!!email && host.email?.trim().toLowerCase() === email),
+    ) ??
+    (name ? hosts.find((host) => host.name.trim().toLowerCase() === name) : undefined);
+  if (me?.timezone) return { zone: me.timezone, from: "your host profile" };
+  if (typeof profileZone === "string" && profileZone.trim()) {
+    return { zone: profileZone.trim(), from: "My preferences" };
+  }
+  const zones = [...new Set(hosts.map((host) => host.timezone).filter(Boolean))];
+  if (zones.length === 1) return { zone: zones[0]!, from: "the workspace's hosts" };
+  return { zone: null, from: "no host or preference zone found" };
 }
 
 export function useCrmBooking() {
@@ -459,12 +499,11 @@ export function useCrmBooking() {
       );
       // The signed-in host's own zone is the clock these screens read times
       // on; set before any booking below is converted.
-      const me = (crmHosts ?? []).find(
-        (host) =>
-          (actor.id && host.crmUserId === actor.id) ||
-          (actor.email && host.email?.toLowerCase() === actor.email.toLowerCase()),
-      );
-      setBookingDisplayZone(me?.timezone);
+      const zone = bookingDisplayZoneFor(crmHosts ?? [], actor);
+      setBookingDisplayZone(zone.zone);
+      if (process.env.NODE_ENV !== "production") {
+        console.info(`[booking] showing times in ${zone.zone ?? "this browser's zone"} (${zone.from})`);
+      }
       const people = [
         ...(actor.id || actor.name || actor.email
           ? [
@@ -516,31 +555,22 @@ export function useCrmBooking() {
         .filter(
           (row, index, list) => list.findIndex((item) => item.id === row.id) === index,
         );
-      const memberPeople = owners.map((owner) => ({
-        id: owner.id,
-        name: owner.name,
-        role: "Consultant",
-      }));
-      const hostPeople =
-        hosts.length
-          ? [
-              ...memberPeople,
-              ...hosts
-                .filter(
-                  (host) =>
-                    !memberPeople.some(
-                      (person) =>
-                        person.id === (host.crmUserId || host.id) ||
-                        person.name === host.name,
-                    ),
-                )
-                .map((host) => ({
-                  id: host.crmUserId || host.id,
-                  name: host.name,
-                  role: host.isHomeConsultant ? "Home consultant" : "Consultant",
-                })),
-            ]
-          : memberPeople;
+      // `owners` already holds every activated consultant, hosts included;
+      // a host who is not among them (invited, deactivated, or never signed
+      // in) is not listed.
+      const hostPeople = owners.map((owner) => {
+        const email = owner.email.trim().toLowerCase();
+        const host = hosts.find(
+          (row) =>
+            (row.crmUserId || row.id) === owner.id ||
+            (!!email && row.email?.trim().toLowerCase() === email),
+        );
+        return {
+          id: owner.id,
+          name: owner.name,
+          role: host?.isHomeConsultant ? "Home consultant" : "Consultant",
+        };
+      });
       const eventPages = mergeCrmEventTypePages(
         listBookingPages().filter((page) => page.eventType === "Consultation"),
         crmPages ?? [],
@@ -569,7 +599,10 @@ export function useCrmBooking() {
           credentials: "include",
         }).catch(() => undefined);
       }
-      const consultantRows = hostsToConsultants(hostPeople, listed);
+      const consultantRows = hostsToConsultants(
+        hostPeople,
+        listed.filter((row) => row.stage !== "Completed"),
+      );
       replaceDashboardAppointments(listed);
       replaceDashboardConsultants(consultantRows);
       setAppointments(listed);

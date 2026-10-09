@@ -42,6 +42,7 @@ import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 const STATUS_STYLE: Record<EmailCampaignStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -215,9 +216,17 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
     );
   }
 
-  function remove() {
+  async function remove() {
     if (!campaign) return;
-    if (!window.confirm(`Delete ${campaign.campaignId}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete campaign?",
+        message: `Delete ${campaign.campaignId}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    )
+      return;
     const gate = softDeleteRecord({
       action: "marketing.email.delete",
       module: "marketing.email",

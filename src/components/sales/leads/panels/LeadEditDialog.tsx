@@ -3,18 +3,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import type { Priority } from "@/lib/tasks/types";
 import { listTaskColumns } from "@/lib/tasks/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { listMeetings } from "@/lib/meetings/store";
+import {
+  listRelatedCrmMeetings,
+  persistRemoteMeeting,
+  tryCrmMeeting,
+} from "@/lib/meetings/api";
 import { findLeadById, listLeadColumns, updateLead } from "@/lib/leads/store";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import type { LeadCardData } from "@/lib/leads/types";
@@ -786,6 +791,29 @@ function AppointmentSection({
     setPrevAppointmentsLeadName(leadName);
     setAppointments(loadLeadAppointments(leadName));
   }
+
+  // The local store only holds CRM meetings someone already loaded (Meetings
+  // page, lead detail page). Pull this lead's meetings so the tab is complete
+  // when opened from the board or work queue.
+  useEffect(() => {
+    if (!leadId || !isUuid(leadId)) return;
+    let cancelled = false;
+    void tryCrmMeeting(() => listRelatedCrmMeetings("LEAD", leadId)).then(
+      (rows) => {
+        if (cancelled || !rows?.length) return;
+        for (const meeting of rows) {
+          persistRemoteMeeting({
+            ...meeting,
+            relatedTo: meeting.relatedTo?.trim() || `Lead: ${leadName}`,
+          });
+        }
+        setAppointments(loadLeadAppointments(leadName));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [leadId, leadName]);
 
   const upcoming = appointments.filter((a) => !a.previous);
   const previous = appointments.filter((a) => a.previous);

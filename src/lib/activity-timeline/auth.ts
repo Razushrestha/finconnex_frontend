@@ -37,9 +37,11 @@ export type CrmSession = {
 function readStorage(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
+    // Shared across tabs, so it holds the latest rotation; see
+    // readStoredCrmTokens.
     return (
-      window.sessionStorage.getItem(key) ||
       window.localStorage.getItem(key) ||
+      window.sessionStorage.getItem(key) ||
       null
     );
   } catch {
@@ -354,7 +356,7 @@ async function resolveWorkspaceId(
     "/v1/workspaces/mine",
     accessToken,
   );
-  let first = firstWorkspace(mine);
+  const first = firstWorkspace(mine);
   if (!first?.id) {
     throw new Error("No workspace available for this user");
   }

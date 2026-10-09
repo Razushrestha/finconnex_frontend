@@ -9,7 +9,7 @@ import {
 import { partyName, relatedActivityLabel } from "@/lib/activities/party";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
-import { upsertMeeting } from "@/lib/meetings/store";
+import { createMeeting, upsertMeeting } from "@/lib/meetings/store";
 import { joinUrlFromRecord } from "@/lib/booking/meeting-link";
 import { meetingRelatedApiFields } from "@/lib/meetings/invite-related";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
@@ -128,6 +128,14 @@ export function mapMeetingStatus(raw: string): MeetingStatus {
   if (value.includes("cancel")) return "Cancelled";
   if (value.includes("reschedul")) return "Rescheduled";
   return "Scheduled";
+}
+
+/** A CRM timestamp kept as an ISO instant, so screens can show it on any clock. */
+function isoInstant(raw: unknown): string | undefined {
+  const value = pickStr(raw);
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
 }
 
 function formatWhen(raw: unknown): string {
@@ -288,6 +296,8 @@ export function normalizeMeeting(
     startDateTime: formatWhen(
       raw.startAt ?? raw.startDateTime ?? raw.scheduledAt ?? raw.startsAt,
     ),
+    startAt: isoInstant(raw.startAt ?? raw.startDateTime ?? raw.scheduledAt ?? raw.startsAt),
+    endAt: isoInstant(raw.endAt ?? raw.endDateTime ?? raw.endsAt ?? raw.scheduledEndAt),
     endDateTime: formatWhen(
       raw.endAt ?? raw.endDateTime ?? raw.endsAt ?? raw.scheduledEndAt,
     ),
@@ -706,6 +716,27 @@ export async function tryCrmMeeting<T>(run: () => Promise<T>): Promise<T | null>
 export function persistRemoteMeeting(row: Meeting | null) {
   if (row) upsertMeeting(row);
   return row;
+}
+
+/**
+ * Create in the CRM and mirror the row locally. Falls back to a local-only row
+ * only when there is no CRM session ("sign in" errors); any other CRM error is
+ * thrown so the form can show it. Local-only rows are wiped by the next
+ * replaceCrmMeetings sync, so saving locally when the CRM is reachable would
+ * silently lose the meeting.
+ */
+export async function createMeetingPreferCrm(
+  input: Parameters<typeof toCreateMeetingBody>[0] &
+    { attendees?: Meeting["attendees"] },
+): Promise<Meeting> {
+  try {
+    const created = persistRemoteMeeting(await createCrmMeeting(input));
+    if (created) return created;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err ?? "");
+    if (!/sign in/i.test(message)) throw err;
+  }
+  return createMeeting(input);
 }
 
 export function isCrmMeetingId(id: string): boolean {

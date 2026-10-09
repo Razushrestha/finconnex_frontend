@@ -16,6 +16,7 @@ const labels = (options: Array<{ label: string }>) => options.map((o) => o.label
 describe("Email Configurations options", () => {
   it("offers the Send from choices, with the super admin's address in the label", () => {
     expect(labels(sendFromOptions("contact@nepatronix.org"))).toEqual([
+      "No-reply email address",
       "Default FinConnex email address",
       "Super admin's email address (contact@nepatronix.org)",
       "Allocated staff member's email address",
@@ -31,7 +32,7 @@ describe("Email Configurations options", () => {
     expect(labels(replyToOptions("user", "a@b.co"))).toEqual([
       "Super admin's email address (a@b.co)",
       "Allocated staff member's email address",
-      "Customer's Email address",
+      "Client's Email address",
       "Select Reply To",
     ]);
     expect(labels(replyToOptions("customer", "a@b.co"))).toEqual([
@@ -67,17 +68,22 @@ describe("Email Configurations options", () => {
 });
 
 describe("saved routing", () => {
-  it("defaults to the default sender with no Reply To or Cc", () => {
+  it("defaults to the no-reply sender, customers replying to the allocated staff member", () => {
     expect(routingFor(undefined, "user")).toEqual({
-      sendFrom: "default",
+      sendFrom: "no_reply",
       replyTo: "",
       cc: "",
     });
     expect(routingFor(undefined, "customer")).toEqual({
-      sendFrom: "default",
-      replyTo: "",
+      sendFrom: "no_reply",
+      replyTo: "staff",
       cc: "",
     });
+  });
+
+  it("keeps a To Customer Reply To that was deliberately cleared", () => {
+    const cleared = updateEmailConfig(undefined, "customer", { replyTo: "" }, "");
+    expect(routingFor(cleared, "customer").replyTo).toBe("");
   });
 
   it("reads older saves that stored a raw address", () => {
@@ -98,22 +104,22 @@ describe("saved routing", () => {
     // 'customer' is only a Reply To for the To User tab.
     expect(
       normalizeEmailRouting({ sendFrom: "customer", replyTo: "customer", cc: "customer" }, "customer"),
-    ).toEqual({ sendFrom: "default", replyTo: "", cc: "" });
+    ).toEqual({ sendFrom: "no_reply", replyTo: "", cc: "" });
     expect(
       normalizeEmailRouting({ sendFrom: "x", replyTo: "customer", cc: "staff" }, "user"),
-    ).toEqual({ sendFrom: "default", replyTo: "customer", cc: "staff" });
+    ).toEqual({ sendFrom: "no_reply", replyTo: "customer", cc: "staff" });
   });
 
   it("keeps To Customer and To User separate", () => {
     const first = updateEmailConfig(undefined, "user", { replyTo: "customer", cc: "staff" }, "a@b.co");
     expect(routingFor(first, "user")).toEqual({
-      sendFrom: "default",
+      sendFrom: "no_reply",
       replyTo: "customer",
       cc: "staff",
     });
     expect(routingFor(first, "customer")).toEqual({
-      sendFrom: "default",
-      replyTo: "",
+      sendFrom: "no_reply",
+      replyTo: "staff",
       cc: "",
     });
 
@@ -121,7 +127,7 @@ describe("saved routing", () => {
     expect(routingFor(second, "customer").cc).toBe("super_admin");
     // The To User choices survive a To Customer edit.
     expect(routingFor(second, "user")).toEqual({
-      sendFrom: "default",
+      sendFrom: "no_reply",
       replyTo: "customer",
       cc: "staff",
     });
@@ -142,8 +148,8 @@ describe("saved routing", () => {
 
   it("keeps the To Customer fields at the top level of the saved object", () => {
     const next = updateEmailConfig(undefined, "customer", { replyTo: "staff" }, "");
-    expect(next).toMatchObject({ sendFrom: "default", replyTo: "staff", cc: "" });
-    expect(next.user).toEqual({ sendFrom: "default", replyTo: "", cc: "" });
+    expect(next).toMatchObject({ sendFrom: "no_reply", replyTo: "staff", cc: "" });
+    expect(next.user).toEqual({ sendFrom: "no_reply", replyTo: "", cc: "" });
   });
 });
 

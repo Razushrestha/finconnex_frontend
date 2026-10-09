@@ -24,6 +24,14 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // The browser's alert / confirm / prompt boxes are unbranded and block
+    // the page: use alertDialog / confirmDialog / promptDialog from
+    // "@/lib/notify/dialog" instead.
+    rules: {
+      "no-alert": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

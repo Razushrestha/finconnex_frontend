@@ -15,6 +15,7 @@ import {
   UserRound,
   Search,
   type LucideIcon,
+  Puzzle,
 } from "lucide-react";
 import {
   SETTINGS_CONTROL_PANEL,
@@ -30,6 +31,7 @@ const ICONS: Record<SettingsNavIcon, LucideIcon> = {
   pipeline: Kanban,
   automation: GitBranch,
   channels: Mail,
+  integrations: Puzzle,
   data: Database,
   documents: FolderOpen,
   billing: CreditCard,
@@ -150,7 +152,9 @@ export function SettingsControlShell({
                   <span
                     className={cn(
                       "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                      active ? "bg-[var(--brand-primary)] text-white" : "bg-slate-100 text-slate-500",
+                      active
+                        ? "bg-[var(--brand-primary)] text-white"
+                        : "bg-slate-100 text-slate-500",
                     )}
                   >
                     <Icon className="h-4 w-4" />

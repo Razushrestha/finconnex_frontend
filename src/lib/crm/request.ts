@@ -129,6 +129,10 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Calendly OAuth is not configured on the CRM server. Use a personal access token, or set Calendly client id/secret on that API.",
   "calendar.error.notConfigured":
     "Google/Outlook calendar OAuth is not configured on the CRM server.",
+  "calendarSync.error.notConfigured":
+    "Google/Outlook calendar OAuth is not configured on the CRM server. Set the calendar client ID, secret and redirect URI on that API.",
+  "Calendar sync is not configured":
+    "Google/Outlook calendar OAuth is not configured on the CRM server. Set the calendar client ID, secret and redirect URI on that API.",
   "booking.error.slotUnavailable":
     "That time is no longer available. Pick another slot and try again.",
   "booking.error.noHostsAvailable":
@@ -487,6 +491,16 @@ function isFormDataBody(body: unknown): body is FormData {
   return typeof FormData !== "undefined" && body instanceof FormData;
 }
 
+/** Headers from `new Headers()` do not spread into a plain object. */
+function plainHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!headers) return out;
+  new Headers(headers).forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
 async function sendCrm(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
@@ -499,7 +513,7 @@ async function sendCrm(
       Accept: "application/json",
       Authorization: `Bearer ${session.accessToken}`,
       ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
+      ...plainHeaders(init?.headers),
     },
   });
   const text = await res.text();
@@ -619,7 +633,7 @@ async function crmBffFetchUncached<T>(
       headers: {
         Accept: "application/json",
         ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
+        ...plainHeaders(init?.headers),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     });

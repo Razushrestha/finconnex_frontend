@@ -1,6 +1,16 @@
 /** Shared browser polyfill for Lead Card smokes / Vitest. */
 
 export function installSmokePolyfill() {
+  // Independent of the storage check: Node 26+ ships a native sessionStorage,
+  // and returning early there left `window` undefined, so every
+  // `typeof window` guard silently skipped storage writes.
+  if (typeof globalThis.window === "undefined") {
+    Object.defineProperty(globalThis, "window", {
+      value: globalThis,
+      configurable: true,
+    });
+  }
+
   if (typeof globalThis.sessionStorage !== "undefined") return;
 
   const map = new Map<string, string>();
@@ -23,13 +33,6 @@ export function installSmokePolyfill() {
     value: storage,
     configurable: true,
   });
-
-  if (typeof globalThis.window === "undefined") {
-    Object.defineProperty(globalThis, "window", {
-      value: globalThis,
-      configurable: true,
-    });
-  }
 }
 
 export function smokeFail(msg: string): never {

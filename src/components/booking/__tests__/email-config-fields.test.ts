@@ -13,7 +13,7 @@ function render(
   return renderToStaticMarkup(
     createElement(EmailConfigFields, {
       audience,
-      value: { sendFrom: "default", replyTo: "", cc: "", ...value },
+      value: { sendFrom: "no_reply", replyTo: "", cc: "", ...value },
       superAdminEmail,
       onChange: () => {},
     }),
@@ -69,14 +69,14 @@ describe("EmailConfigFields", () => {
       cc: "super_admin",
     });
     expect(trigger(html, "Send from")).toContain("Allocated staff member&#x27;s email address");
-    expect(trigger(html, "Reply To")).toContain("Customer&#x27;s Email address");
+    expect(trigger(html, "Reply To")).toContain("Client&#x27;s Email address");
     expect(trigger(html, "Copy (Cc)")).toContain(
       "Super admin&#x27;s email address (contact@nepatronix.org)",
     );
   });
 
-  it("shows the default sender when nothing else is chosen", () => {
-    expect(trigger(render("user"), "Send from")).toContain("Default FinConnex email address");
+  it("shows the no-reply sender when nothing else is chosen", () => {
+    expect(trigger(render("user"), "Send from")).toContain("No-reply email address");
   });
 
   it("shows the empty 'Select …' prompts muted, not as a chosen value", () => {

@@ -44,6 +44,7 @@ import { ExtendExpiryModal } from "./documents/detail/ExtendExpiryModal";
 import type { DocumentSummaryData } from "./documents/detail/DocumentSummaryCard";
 import type { RecipientStatusData } from "./documents/detail/RecipientStatusRow";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 function formatDetailStamp(value?: string) {
   if (!value) return "N/A";
@@ -417,8 +418,16 @@ export function SignatureDetailClient({ id }: { id: string }) {
           void navigator.clipboard?.writeText(req.id);
           flash("Request id copied");
         }}
-        onDelete={() => {
-          if (!window.confirm(`Delete "${req.documentName}"?`)) return;
+        onDelete={async () => {
+          if (
+            !(await confirmDialog({
+              title: "Delete signature request?",
+              message: `Delete "${req.documentName}"?`,
+              confirmText: "Delete",
+              tone: "danger",
+            }))
+          )
+            return;
           deleteSignatureRequest(req.id);
           if (isCrmSignatureRequestId(req.id)) {
             void tryCrmSignatureRequest(() => deleteCrmSignatureRequest(req.id));

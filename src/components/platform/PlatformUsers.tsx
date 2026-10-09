@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Loader2, Search } from "lucide-react";
 import { deleteAdminUser } from "@/lib/admin/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   listPlatformUsers,
   setPlatformUserGlobalRole,
@@ -70,9 +71,11 @@ export function PlatformUsers() {
     const next = (roleDraft[user.id] ?? user.globalRole).toUpperCase();
     if (next === user.globalRole.toUpperCase()) return;
     if (
-      !window.confirm(
-        `Set ${user.email || user.userName} globalRole to ${next}?`,
-      )
+      !(await confirmDialog({
+        title: "Change global role?",
+        message: `Set ${user.email || user.userName} globalRole to ${next}?`,
+        confirmText: "Change role",
+      }))
     ) {
       setRoleDraft((prev) => ({ ...prev, [user.id]: user.globalRole }));
       return;

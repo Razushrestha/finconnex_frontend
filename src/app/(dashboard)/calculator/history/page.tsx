@@ -14,6 +14,7 @@ import {
   isCrmCalculationId,
   tryCrmCalculation,
 } from "@/lib/calculator/api";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export default function CalculatorHistoryPage() {
   const [history, setHistory] = useState<CalculationRecord[]>([]);
@@ -33,7 +34,14 @@ export default function CalculatorHistoryPage() {
   }, []);
 
   const handleClearHistory = async () => {
-    if (!confirm("Are you sure you want to clear all calculation history?")) {
+    if (
+      !(await confirmDialog({
+        title: "Clear calculation history?",
+        message: "Are you sure you want to clear all calculation history?",
+        confirmText: "Clear",
+        tone: "danger",
+      }))
+    ) {
       return;
     }
     await clearCalculatorHistory(history.map((row) => row.id));

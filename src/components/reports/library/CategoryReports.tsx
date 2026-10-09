@@ -36,6 +36,7 @@ import {
 } from "@/lib/reports/api";
 import { labelForDataSource } from "@/lib/reports/catalog";
 import { useCrmReports } from "@/lib/reports/use-crm-reports";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   REPORT_TYPE_STYLE,
   deleteReport,
@@ -136,7 +137,16 @@ export function CategoryReports({ categoryId }: { categoryId: string }) {
   }
 
   async function onDelete(row: SavedReport) {
-    if (!window.confirm(`Delete ${row.name}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete report?",
+        message: `Delete ${row.name}?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusyId(row.id);
     setNotice(null);
     try {

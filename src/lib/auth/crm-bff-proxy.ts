@@ -78,6 +78,8 @@ const ALLOWED_ROOTS = new Set([
   "booking",
   "calendly",
   "calendar-sync",
+  "equifax",
+  "messaging-credentials",
   "integrations",
   "documents",
   "document-requests",

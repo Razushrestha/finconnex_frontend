@@ -32,6 +32,8 @@ export interface SettingsField {
   defaultValue?: string | boolean | number;
   options?: SettingsFieldOption[];
   help?: string;
+  /** Text/textarea only: offer "Use current location" to fill in an address. */
+  geolocate?: boolean;
 }
 
 export interface SettingsSchema {
@@ -294,6 +296,7 @@ const CURATED: Record<string, SettingsSchema> = {
         id: "address",
         label: "Registered address",
         type: "textarea",
+        geolocate: true,
         defaultValue: "Level 12, 100 Pitt Street, Sydney NSW 2000",
       },
       { id: "logo", label: "Company logo", type: "file" },

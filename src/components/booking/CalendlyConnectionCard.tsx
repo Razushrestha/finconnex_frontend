@@ -20,6 +20,7 @@ import {
 import { listCalendlyHosts } from "@/lib/booking/calendly-api";
 import { cn } from "@/lib/utils";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import { openIntegrationTab } from "@/lib/integrations/open-tab";
 
 export function CalendlyConnectionCard({
   compact = false,
@@ -58,7 +59,9 @@ export function CalendlyConnectionCard({
         status: "disconnected",
         raw: {},
       });
-      setError(err instanceof Error ? err.message : "Could not load Calendly status.");
+      setError(
+        err instanceof Error ? err.message : "Could not load Calendly status.",
+      );
     }
     if (showCalendarSync) {
       try {
@@ -90,15 +93,17 @@ export function CalendlyConnectionCard({
 
   async function startOAuth() {
     await run("oauth", async () => {
-      const authorizationUrl = await startCalendlyOAuth();
-      window.location.assign(authorizationUrl);
+      // Calendly's sign-in opens in a new tab.
+      await openIntegrationTab(() => startCalendlyOAuth());
     });
   }
 
   async function connectWithToken() {
     const personalAccessToken = token.trim();
     if (!personalAccessToken) {
-      setError("Paste a Calendly personal access token, or use Connect with Calendly.");
+      setError(
+        "Paste a Calendly personal access token, or use Connect with Calendly.",
+      );
       return;
     }
     await run("pat", async () => {
@@ -129,7 +134,9 @@ export function CalendlyConnectionCard({
           <p className="mt-0.5 text-[12px] text-slate-500">
             {connected
               ? `Connected${connection?.user ? ` as ${connection.user}` : ""}${
-                  connection?.organization ? ` · ${connection.organization}` : ""
+                  connection?.organization
+                    ? ` · ${connection.organization}`
+                    : ""
                 }`
               : "Calendly OAuth is not enabled on the CRM server. Paste a personal access token from Calendly → Integrations → API & webhooks."}
           </p>
@@ -156,7 +163,7 @@ export function CalendlyConnectionCard({
                 void run("sync", async () => {
                   await syncCalendlyCatalog();
                   await registerCalendlyWebhook().catch(() => undefined);
-                  setNote("Calendly hosts and event types synced.");
+                  setNote("Calendly hosts and consultations synced.");
                 })
               }
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -260,7 +267,9 @@ export function CalendlyConnectionCard({
               disabled={Boolean(busy)}
               onClick={() =>
                 void run("outlook", async () => {
-                  window.location.assign(await authorizeCalendarSync("outlook"));
+                  window.location.assign(
+                    await authorizeCalendarSync("outlook"),
+                  );
                 })
               }
               className="h-8 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -315,7 +324,9 @@ export function CalendlyConnectionCard({
         </div>
       ) : null}
 
-      {note ? <p className="mt-2 text-[12px] text-emerald-700">{note}</p> : null}
+      {note ? (
+        <p className="mt-2 text-[12px] text-emerald-700">{note}</p>
+      ) : null}
       {error ? <p className="mt-2 text-[12px] text-rose-600">{error}</p> : null}
     </section>
   );

@@ -579,7 +579,7 @@ export function AvailabilityLimitsStep({
                   <Check
                     checked={values.userSpecificHours}
                     onChange={(userSpecificHours) => patch({ userSpecificHours })}
-                    label="User-specific Hours"
+                    label="Consultant-specific Hours"
                   />
                   <div>
                     <p className="text-[14px] font-semibold text-slate-900">
@@ -610,7 +610,7 @@ export function AvailabilityLimitsStep({
                   ) : (
                     <>
                       <ListboxSelect
-                        label="User"
+                        label="Consultant"
                         value={activeUser ?? ""}
                         options={consultants.map((name) => ({
                           value: name,
@@ -648,7 +648,7 @@ export function AvailabilityLimitsStep({
               <h1 className="text-[16px] font-bold text-slate-900">
                 Appointment Limits
               </h1>
-              <Tip text="Cap how often this event type can be booked." />
+              <Tip text="Cap how often this consultation can be booked." />
             </div>
 
             <div>
@@ -664,7 +664,7 @@ export function AvailabilityLimitsStep({
               <div className="mt-3">
                 <SlotLimitField
                   kind="event"
-                  label="Slots per Event Type"
+                  label="Slots per Consultation"
                   value={values.slotsPerEvent}
                   onChange={(slotsPerEvent) => patch({ slotsPerEvent })}
                 />
@@ -676,7 +676,7 @@ export function AvailabilityLimitsStep({
                 <p className="text-[14px] font-bold text-slate-900">
                   Slots per Customer
                 </p>
-                <Tip text="How often the same customer can book before the previous appointment is finished." />
+                <Tip text="How often the same client can book before the previous appointment is finished." />
               </div>
               <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-slate-500">
                 Set how often a Customer can book this event type or prevent the
@@ -686,7 +686,7 @@ export function AvailabilityLimitsStep({
               <div className="mt-3">
                 <SlotLimitField
                   kind="customer"
-                  label="Slots per Customer"
+                  label="Slots per Client"
                   value={values.slotsPerCustomer}
                   onChange={(slotsPerCustomer) => patch({ slotsPerCustomer })}
                 />
@@ -763,7 +763,7 @@ export function AvailabilityLimitsStep({
                     </p>
                     <SlotLimitField
                       kind="event"
-                      label="Custom slots per event type"
+                      label="Custom slots per consultation"
                       value={draftEvent}
                       onChange={setDraftEvent}
                     />
@@ -774,7 +774,7 @@ export function AvailabilityLimitsStep({
                     </p>
                     <SlotLimitField
                       kind="customer"
-                      label="Custom slots per customer"
+                      label="Custom slots per client"
                       value={draftCustomer}
                       onChange={setDraftCustomer}
                     />

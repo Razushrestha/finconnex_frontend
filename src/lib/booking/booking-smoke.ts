@@ -219,14 +219,19 @@ export function smokeBookingWiring() {
     fail("New Appointment must open the Schedule Meeting form");
   }
 
-  const leadMeetings = readSrc(
+  // Lead meetings are CRM meetings: the schedule modal creates them and the
+  // Meetings tab lists the lead's related meetings.
+  const leadMeetingsCreate = readSrc(
+    "src/components/sales/leads/detail/LeadScheduleMeetingModal.tsx",
+  );
+  const leadMeetingsList = readSrc(
     "src/components/sales/leads/panels/LeadEditDialog.tsx",
   );
   if (
-    !leadMeetings.includes("createCrmBooking") ||
-    !leadMeetings.includes("listCrmBookings")
+    !leadMeetingsCreate.includes("createMeetingPreferCrm") ||
+    !leadMeetingsList.includes("listRelatedCrmMeetings")
   ) {
-    fail("Lead Meetings tab is not wired to CRM booking create + list");
+    fail("Lead Meetings tab is not wired to CRM meeting create + list");
   }
 
   const availability = readSrc(

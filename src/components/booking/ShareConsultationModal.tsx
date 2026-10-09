@@ -1,14 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Download, Pencil, RefreshCw, X } from "lucide-react";
-import { publicBookUrl, getBookingPageBySlug, slotsForDate } from "@/lib/booking/types";
+import {
+  Check,
+  ChevronDown,
+  Download,
+  Pencil,
+  RefreshCw,
+  X,
+} from "lucide-react";
+import {
+  publicBookUrl,
+  getBookingPageBySlug,
+  slotsForDate,
+} from "@/lib/booking/types";
 import {
   publishBookingOnceLink,
   publishBookingShortLink,
 } from "@/lib/booking/short-links";
 import { publishPublicBookingPage } from "@/lib/booking/publish-public-page";
 import { cn } from "@/lib/utils";
+import { WorkspacePortal } from "@/components/shared/WorkspacePortal";
 
 const BRAND = "var(--brand-primary)";
 
@@ -24,8 +36,9 @@ const TABS: { id: ShareTab; label: string }[] = [
 
 function randomCode(len = 7) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  return Array.from({ length: len }, () =>
-    chars[Math.floor(Math.random() * chars.length)],
+  return Array.from(
+    { length: len },
+    () => chars[Math.floor(Math.random() * chars.length)],
   ).join("");
 }
 
@@ -91,8 +104,7 @@ export function ShareConsultationModal({
   const [onceCopied, setOnceCopied] = useState(false);
   const [linkError, setLinkError] = useState("");
 
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const bookPath = publicBookUrl(path.trim() || slug);
   const bookUrl = `${origin}${bookPath}`;
   const shortUrl = shortCode ? `${origin}/s/${shortCode}` : null;
@@ -240,7 +252,9 @@ export function ShareConsultationModal({
     } catch (err) {
       setOneTime(null);
       setLinkError(
-        err instanceof Error ? err.message : "Could not create the one-time link",
+        err instanceof Error
+          ? err.message
+          : "Could not create the one-time link",
       );
     }
   }
@@ -261,297 +275,302 @@ export function ShareConsultationModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center overflow-y-auto bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
-      onClick={onClose}
-    >
+    <WorkspacePortal>
       <div
-        role="dialog"
-        aria-labelledby="share-consultation-title"
-        className="my-auto max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[80] flex items-end justify-center overflow-y-auto bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
+        onClick={onClose}
       >
-        <div className="relative px-5 pt-5 pb-1 sm:px-6 sm:pt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <h2
-            id="share-consultation-title"
-            className="pr-10 text-[18px] font-bold tracking-tight text-slate-800"
-          >
-            Share - {title}
-          </h2>
-          {linkError ? (
-            <p className="mt-2 text-[12px] text-rose-600">{linkError}</p>
-          ) : null}
-        </div>
-
-        <div className="space-y-4 px-5 py-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[var(--brand-primary-soft)] py-1.5 pr-1.5 pl-3">
-              {editing ? (
-                <input
-                  autoFocus
-                  value={path}
-                  onChange={(e) => {
-                    setPath(e.target.value.replace(/^\//, ""));
-                    setShortCode(null);
-                    setOneTime(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") setEditing(false);
-                  }}
-                  className="h-8 min-w-0 flex-1 rounded-md bg-white px-2 text-[12px] font-medium text-[var(--brand-primary)] outline-none"
-                />
-              ) : (
-                <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--brand-primary)]">
-                  {displayUrl}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className={cn(
-                  "shrink-0 text-slate-400 transition-opacity hover:text-slate-600",
-                  editing
-                    ? "opacity-100"
-                    : "opacity-0 group-hover/url:opacity-100 focus-visible:opacity-100",
-                )}
-                aria-label="Edit link"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="flex h-6 w-6 shrink-0 items-center justify-center"
-                aria-label="Confirm link"
-              >
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
-                  <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => copyText(displayUrl, setCopied)}
-                className="h-8 shrink-0 rounded-md px-3.5 text-[12px] font-semibold text-white"
-                style={{ backgroundColor: BRAND }}
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
+        <div
+          role="dialog"
+          aria-labelledby="share-consultation-title"
+          className="my-auto max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative px-5 pt-5 pb-1 sm:px-6 sm:pt-6">
             <button
               type="button"
-              onClick={() => {
-                setShortCode(null);
-                setOneTime(null);
-                setPath(slug);
-                setEditing(false);
-              }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[var(--brand-primary)] hover:bg-slate-50"
-              aria-label="Reset link"
+              onClick={onClose}
+              className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+              aria-label="Close"
             >
-              <RefreshCw className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </button>
+            <h2
+              id="share-consultation-title"
+              className="pr-10 text-[18px] font-bold tracking-tight text-slate-800"
+            >
+              Share - {title}
+            </h2>
+            {linkError ? (
+              <p className="mt-2 text-[12px] text-rose-600">{linkError}</p>
+            ) : null}
           </div>
 
-          <div className="flex items-center gap-4 rounded-xl bg-slate-50 px-4 py-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={qrSrc}
-              alt="Booking page QR code"
-              width={88}
-              height={88}
-              className="h-[88px] w-[88px] shrink-0 rounded-md bg-white"
-            />
-            <div className="min-w-0">
-              <p className="text-[13px] leading-relaxed text-slate-500">
-                Share this QR code to open the booking page instantly on any
-                device.
-              </p>
+          <div className="space-y-4 px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-2">
+              <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[var(--brand-primary-soft)] py-1.5 pr-1.5 pl-3">
+                {editing ? (
+                  <input
+                    autoFocus
+                    value={path}
+                    onChange={(e) => {
+                      setPath(e.target.value.replace(/^\//, ""));
+                      setShortCode(null);
+                      setOneTime(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setEditing(false);
+                    }}
+                    className="h-8 min-w-0 flex-1 rounded-md bg-white px-2 text-[12px] font-medium text-[var(--brand-primary)] outline-none"
+                  />
+                ) : (
+                  <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--brand-primary)]">
+                    {displayUrl}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className={cn(
+                    "shrink-0 text-slate-400 transition-opacity hover:text-slate-600",
+                    editing
+                      ? "opacity-100"
+                      : "opacity-0 group-hover/url:opacity-100 focus-visible:opacity-100",
+                  )}
+                  aria-label="Edit link"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center"
+                  aria-label="Confirm link"
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText(displayUrl, setCopied)}
+                  className="h-8 shrink-0 rounded-md px-3.5 text-[12px] font-semibold text-white"
+                  style={{ backgroundColor: BRAND }}
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={downloadQr}
-                className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
+                onClick={() => {
+                  setShortCode(null);
+                  setOneTime(null);
+                  setPath(slug);
+                  setEditing(false);
+                }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[var(--brand-primary)] hover:bg-slate-50"
+                aria-label="Reset link"
               >
-                <Download className="h-3.5 w-3.5" />
-                Download QR
+                <RefreshCw className="h-4 w-4" />
               </button>
             </div>
-          </div>
 
-          <div className="border-b border-[#E5E7EB]">
-            <div className="-mb-px flex gap-5 overflow-x-auto">
-              {TABS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={cn(
-                    "shrink-0 border-b-2 pb-2.5 text-[13px] font-medium whitespace-nowrap",
-                    tab === item.id
-                      ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
-                      : "border-transparent text-slate-500 hover:text-slate-700",
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {tab === "shorten" ? (
-            <div className="space-y-3 pt-1 pb-2">
-              <div className="flex justify-center">
+            <div className="flex items-center gap-4 rounded-xl bg-slate-50 px-4 py-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrSrc}
+                alt="Booking page QR code"
+                width={88}
+                height={88}
+                className="h-[88px] w-[88px] shrink-0 rounded-md bg-white"
+              />
+              <div className="min-w-0">
+                <p className="text-[13px] leading-relaxed text-slate-500">
+                  Share this QR code to open the booking page instantly on any
+                  device.
+                </p>
                 <button
                   type="button"
-                  onClick={() => void generateShort()}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
-                  style={{ borderColor: BRAND }}
+                  onClick={downloadQr}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary)] hover:underline"
                 >
-                  Generate Shortened URL
+                  <Download className="h-3.5 w-3.5" />
+                  Download QR
                 </button>
               </div>
-              {shortUrl ? (
-                <CopyBlock
-                  label="Shortened URL"
-                  value={shortUrl}
-                  copied={shortCopied}
-                  onCopy={() => copyText(shortUrl, setShortCopied)}
-                />
-              ) : (
-                <p className="text-center text-[12px] text-slate-400">
-                  Click Generate Shortened URL to create a shareable short link.
-                </p>
-              )}
             </div>
-          ) : null}
 
-          {tab === "onetime" ? (
-            <div className="space-y-3 pt-1 pb-2">
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => void generateOnce()}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
-                  style={{ borderColor: BRAND }}
-                >
-                  Generate One Time Link
-                </button>
-              </div>
-              {onceUrl ? (
-                <CopyBlock
-                  label="One time link"
-                  value={onceUrl}
-                  copied={onceCopied}
-                  onCopy={() => copyText(onceUrl, setOnceCopied)}
-                />
-              ) : (
-                <p className="text-center text-[12px] text-slate-400">
-                  Click Generate One Time Link to create a single-use URL.
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {tab === "embed" ? (
-            <div className="space-y-3 pb-2">
-              {embedOptions.map((option) => {
-                const open = openEmbed === option.id;
-                return (
-                  <div
-                    key={option.id}
+            <div className="border-b border-[#E5E7EB]">
+              <div className="-mb-px flex gap-5 overflow-x-auto">
+                {TABS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
                     className={cn(
-                      "rounded-xl border bg-white",
-                      open
-                        ? "border-[var(--brand-primary)]/50"
-                        : "border-[#E5E7EB] hover:border-[var(--brand-primary)]/30",
+                      "shrink-0 border-b-2 pb-2.5 text-[13px] font-medium whitespace-nowrap",
+                      tab === item.id
+                        ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+                        : "border-transparent text-slate-500 hover:text-slate-700",
                     )}
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenEmbed((prev) =>
-                          prev === option.id ? null : option.id,
-                        )
-                      }
-                      className="flex w-full items-center gap-5 px-5 py-4 text-left"
-                    >
-                      {option.preview}
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[15px] font-bold text-slate-800">
-                          {option.title}
-                        </span>
-                        <span className="mt-1 block text-[13px] leading-relaxed text-slate-500">
-                          {option.body}
-                        </span>
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 shrink-0 text-slate-400 transition-transform",
-                          open && "rotate-180 text-[var(--brand-primary)]",
-                        )}
-                      />
-                    </button>
-                    {open ? (
-                      <div className="px-4 pb-4">
-                        <CopyBlock
-                          label="Embed code"
-                          value={option.snippet}
-                          copied={embedCopied === option.id}
-                          onCopy={() =>
-                            copyText(option.snippet, (v) =>
-                              setEmbedCopied(v ? option.id : null),
-                            )
-                          }
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {tab === "slots" ? (
-            <div className="space-y-3 pb-2">
-              {slotsLoading ? (
-                <p className="text-[13px] text-slate-400">Loading available times…</p>
-              ) : null}
-              {slotsError ? (
-                <p className="text-[13px] text-rose-600">{slotsError}</p>
-              ) : null}
-              {!slotsLoading && !slotsError && slots.length === 0 ? (
-                <p className="text-[13px] text-slate-400">
-                  No available times in the next 14 days.
-                </p>
-              ) : null}
-              <ul className="space-y-1.5 text-[13px] text-slate-600">
-                {slots.map((slot) => (
-                  <li key={slot}>{slot}</li>
+                    {item.label}
+                  </button>
                 ))}
-              </ul>
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  disabled={slots.length === 0}
-                  onClick={() => copyText(slots.join("\n"), setSlotsCopied)}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-40"
-                  style={{ borderColor: BRAND }}
-                >
-                  {slotsCopied ? "Copied" : "Copy Time Slots"}
-                </button>
               </div>
             </div>
-          ) : null}
+
+            {tab === "shorten" ? (
+              <div className="space-y-3 pt-1 pb-2">
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void generateShort()}
+                    className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
+                    style={{ borderColor: BRAND }}
+                  >
+                    Generate Shortened URL
+                  </button>
+                </div>
+                {shortUrl ? (
+                  <CopyBlock
+                    label="Shortened URL"
+                    value={shortUrl}
+                    copied={shortCopied}
+                    onCopy={() => copyText(shortUrl, setShortCopied)}
+                  />
+                ) : (
+                  <p className="text-center text-[12px] text-slate-400">
+                    Click Generate Shortened URL to create a shareable short
+                    link.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {tab === "onetime" ? (
+              <div className="space-y-3 pt-1 pb-2">
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => void generateOnce()}
+                    className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)]"
+                    style={{ borderColor: BRAND }}
+                  >
+                    Generate One Time Link
+                  </button>
+                </div>
+                {onceUrl ? (
+                  <CopyBlock
+                    label="One time link"
+                    value={onceUrl}
+                    copied={onceCopied}
+                    onCopy={() => copyText(onceUrl, setOnceCopied)}
+                  />
+                ) : (
+                  <p className="text-center text-[12px] text-slate-400">
+                    Click Generate One Time Link to create a single-use URL.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {tab === "embed" ? (
+              <div className="space-y-3 pb-2">
+                {embedOptions.map((option) => {
+                  const open = openEmbed === option.id;
+                  return (
+                    <div
+                      key={option.id}
+                      className={cn(
+                        "rounded-xl border bg-white",
+                        open
+                          ? "border-[var(--brand-primary)]/50"
+                          : "border-[#E5E7EB] hover:border-[var(--brand-primary)]/30",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenEmbed((prev) =>
+                            prev === option.id ? null : option.id,
+                          )
+                        }
+                        className="flex w-full items-center gap-5 px-5 py-4 text-left"
+                      >
+                        {option.preview}
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] font-bold text-slate-800">
+                            {option.title}
+                          </span>
+                          <span className="mt-1 block text-[13px] leading-relaxed text-slate-500">
+                            {option.body}
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                            open && "rotate-180 text-[var(--brand-primary)]",
+                          )}
+                        />
+                      </button>
+                      {open ? (
+                        <div className="px-4 pb-4">
+                          <CopyBlock
+                            label="Embed code"
+                            value={option.snippet}
+                            copied={embedCopied === option.id}
+                            onCopy={() =>
+                              copyText(option.snippet, (v) =>
+                                setEmbedCopied(v ? option.id : null),
+                              )
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {tab === "slots" ? (
+              <div className="space-y-3 pb-2">
+                {slotsLoading ? (
+                  <p className="text-[13px] text-slate-400">
+                    Loading available times…
+                  </p>
+                ) : null}
+                {slotsError ? (
+                  <p className="text-[13px] text-rose-600">{slotsError}</p>
+                ) : null}
+                {!slotsLoading && !slotsError && slots.length === 0 ? (
+                  <p className="text-[13px] text-slate-400">
+                    No available times in the next 14 days.
+                  </p>
+                ) : null}
+                <ul className="space-y-1.5 text-[13px] text-slate-600">
+                  {slots.map((slot) => (
+                    <li key={slot}>{slot}</li>
+                  ))}
+                </ul>
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    disabled={slots.length === 0}
+                    onClick={() => copyText(slots.join("\n"), setSlotsCopied)}
+                    className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[var(--brand-primary)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-40"
+                    style={{ borderColor: BRAND }}
+                  >
+                    {slotsCopied ? "Copied" : "Copy Time Slots"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
-    </div>
+    </WorkspacePortal>
   );
 }
 

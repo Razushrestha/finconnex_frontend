@@ -12,6 +12,8 @@ interface MentionNotesTextareaProps
   onMentionSelect?: (person: MentionPerson) => void;
   people?: MentionPerson[];
   error?: boolean;
+  /** See TaskDescriptionEditor: wrap the toolbar in a narrow column. */
+  wrapToolbar?: boolean;
 }
 
 export function MentionNotesTextarea({
@@ -21,6 +23,7 @@ export function MentionNotesTextarea({
   error,
   className,
   placeholder = "Internal notes… Type @ to assign someone.",
+  wrapToolbar,
 }: MentionNotesTextareaProps) {
   return (
     <TaskDescriptionEditor
@@ -29,6 +32,7 @@ export function MentionNotesTextarea({
       onChange={onChange}
       onMentionSelect={onMentionSelect}
       placeholder={placeholder}
+      wrapToolbar={wrapToolbar}
       className={cn(error && "border-rose-300", className)}
     />
   );

@@ -56,7 +56,7 @@ describe("loadWorkspaceConsultants", () => {
     listCrmWorkspaceMembersAdmin.mockResolvedValue({ items: [] });
   });
 
-  it("lists every workspace member as a consultant, even without a user UUID", async () => {
+  it("lists only activated members: invited and not-yet-signed-in users are left out", async () => {
     listCrmWorkspaceMembers.mockResolvedValue([
       {
         id: "local-1",
@@ -76,12 +76,41 @@ describe("loadWorkspaceConsultants", () => {
         status: "Invited",
         isOwner: false,
       },
+      {
+        // Added by an admin: Active in the workspace, but has never signed in.
+        id: "local-3",
+        userId: "local-3",
+        name: "Alan Turing",
+        email: "alan@team.com",
+        role: "User",
+        status: "Active",
+        isOwner: false,
+        mustChangePassword: true,
+      },
     ]);
 
     const rows = await loadWorkspaceConsultants();
-    expect(rows.map((row) => row.name).sort()).toEqual([
-      "Ada Lovelace",
-      "Grace Hopper",
+    expect(rows.map((row) => row.name)).toEqual(["Ada Lovelace"]);
+  });
+
+  it("keeps a not-yet-activated user out even when the browser's directory lists them", async () => {
+    listCrmWorkspaceMembers.mockResolvedValue([
+      {
+        id: "m-3",
+        userId: "local-3",
+        name: "Alan Turing",
+        email: "alan@team.com",
+        role: "User",
+        status: "Active",
+        isOwner: false,
+        mustChangePassword: true,
+      },
     ]);
+    listCrmUsers.mockReturnValue([
+      { id: "u-3", name: "Alan Turing", email: "ALAN@team.com", status: "Active" },
+    ] as never);
+
+    const rows = await loadWorkspaceConsultants();
+    expect(rows.map((row) => row.name)).toEqual([]);
   });
 });

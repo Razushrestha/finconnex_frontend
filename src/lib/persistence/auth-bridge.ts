@@ -26,8 +26,8 @@ function readStoredAccessToken() {
   if (typeof window === "undefined") return null;
   try {
     return (
-      window.sessionStorage.getItem("fc.crm.accessToken") ||
-      window.localStorage.getItem("fc.crm.accessToken")
+      window.localStorage.getItem("fc.crm.accessToken") ||
+      window.sessionStorage.getItem("fc.crm.accessToken")
     );
   } catch {
     return null;

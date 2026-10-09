@@ -69,6 +69,7 @@ import {
   updateCrmEventType,
 } from "@/lib/booking/api";
 import { toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { toCrmQuestions } from "@/lib/booking/crm-questions";
 import {
   OfflineLocationFields,
@@ -80,7 +81,9 @@ import {
 import { SELECT_BG, SELECT_CLASS } from "@/components/booking/select-styles";
 import {
   defaultOfficeAddress,
-  selectableOnlinePlatforms,
+  isOnlineLocationKind,
+  type MeetingLocationKind,
+  type OnlineMeetingPlatform,
 } from "@/lib/booking/meeting-platforms";
 import {
   APPOINTMENT_DISTRIBUTIONS,
@@ -98,6 +101,7 @@ import {
   type BookingCurrency,
   type BookingPage,
   type PaymentType,
+  normalizeConsultantPriority,
   type ConsultantPriority,
   type MeetingVia,
 } from "@/lib/booking/types";
@@ -108,6 +112,7 @@ import {
 } from "@/lib/users/assignable";
 import { cn } from "@/lib/utils";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
+import { useMeetingPlatforms } from "@/lib/booking/conference-providers";
 
 const BRAND = "var(--brand-primary)";
 
@@ -125,20 +130,20 @@ function consultationInitials(title: string) {
 const SECTIONS = [
   {
     id: "details",
-    title: "Event Type Details",
+    title: "Consultation Details",
     hint: "Set the duration, payment type, and meeting mode.",
     icon: ClipboardList,
   },
   {
     id: "consultants",
-    title: "Assigned Users",
-    hint: "View Users who offer this event type.",
+    title: "Assigned Consultants",
+    hint: "View consultants who offer this consultation.",
     icon: Users,
   },
   {
     id: "availability",
     title: "Availability and Limits",
-    hint: "Set the date and time for this Event Type.",
+    hint: "Set the date and time for this Consultation.",
     icon: Clock,
   },
   {
@@ -156,7 +161,7 @@ const SECTIONS = [
   {
     id: "form",
     title: "Booking Form",
-    hint: "Collect Customer information during booking.",
+    hint: "Collect Client information during booking.",
     icon: FileCheck,
   },
   {
@@ -488,7 +493,19 @@ export function EventTypeEditForm({
   const [description, setDescription] = useState(page.description || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const platforms = useMemo(() => ["None", ...selectableOnlinePlatforms(), "Phone"], []);
+  // Only integrated video platforms (CRM-reported). A platform this
+  // consultation already uses stays listed, marked, so it isn't silently lost.
+  const meetingPlatforms = useMeetingPlatforms();
+  const platformNotConnected =
+    !meetingPlatforms.loading &&
+    isOnlineLocationKind(platform as MeetingLocationKind) &&
+    !meetingPlatforms.platforms.includes(platform as OnlineMeetingPlatform);
+  const platforms = [
+    "None",
+    ...meetingPlatforms.platforms,
+    ...(platformNotConnected ? [platform] : []),
+    "Phone",
+  ];
   const minuteChoices = MINUTE_OPTIONS.includes(minutes)
     ? MINUTE_OPTIONS
     : [...MINUTE_OPTIONS, minutes].sort((a, b) => a - b);
@@ -499,10 +516,16 @@ export function EventTypeEditForm({
       setError("Event type name is required");
       return;
     }
+    if (platformNotConnected) {
+      setError(
+        `${platform} is not integrated. Connect it in Settings → Integrations or choose another platform.`,
+      );
+      return;
+    }
     const durationMinutes = Math.max(5, hours * 60 + minutes);
     const paidAmount = Number(priceDraft);
     if (!isFree && (!Number.isFinite(paidAmount) || paidAmount <= 0)) {
-      setError("Enter a price for paid event types");
+      setError("Enter a price for paid consultations");
       return;
     }
     const meetingPlace =
@@ -755,11 +778,27 @@ export function EventTypeEditForm({
               >
                 {platforms.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {platformNotConnected && item === platform
+                      ? `${item} (not connected)`
+                      : item}
                   </option>
                 ))}
               </select>
             )}
+            {!meetingPlatforms.loading &&
+            meetingPlatforms.platforms.length === 0 ? (
+              <p role="alert" className="text-[12px] font-medium text-rose-600">
+                No meeting platform integrated.{" "}
+                <a
+                  href="/settings/integrations"
+                  target="_blank"
+                  rel="noopener"
+                  className="underline"
+                >
+                  Connect one
+                </a>
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -816,7 +855,7 @@ function AssignedUsersEditForm({
     () =>
       people.reduce(
         (acc, name) => {
-          acc[name] = page.consultantPriorities?.[name] ?? "Highest";
+          acc[name] = normalizeConsultantPriority(page.consultantPriorities?.[name]);
           return acc;
         },
         {} as Record<string, ConsultantPriority>,
@@ -871,7 +910,7 @@ function AssignedUsersEditForm({
       setPriorities((current) => {
         const nextPriorities = { ...current };
         for (const name of people) {
-          if (!nextPriorities[name]) nextPriorities[name] = "Highest";
+          if (!nextPriorities[name]) nextPriorities[name] = "High";
         }
         return nextPriorities;
       });
@@ -1058,7 +1097,7 @@ function AssignedUsersEditForm({
             ) : null}
             {priorityBased ? (
               <select
-                value={priorities[row.name] ?? "Highest"}
+                value={normalizeConsultantPriority(priorities[row.name])}
                 onChange={(e) =>
                   setPriorities((current) => ({
                     ...current,
@@ -1309,17 +1348,29 @@ export function ConsultationOverview({
                 <HeaderMenuRow
                   icon={FolderInput}
                   label="Move"
-                  onClick={() => {
-                    const next =
-                      page.status === "Live"
-                        ? window.confirm("Move this consultation to Draft?")
-                          ? "Draft"
-                          : null
-                        : window.confirm("Move this consultation to Active?")
-                          ? "Live"
-                          : null;
-                    if (!next) return;
+                  onClick={async () => {
                     setMenuOpen(false);
+                    let next: "Draft" | "Live" | null = null;
+                    if (page.status === "Live") {
+                      if (
+                        await confirmDialog({
+                          title: "Move to Draft?",
+                          message: "Move this consultation to Draft?",
+                          confirmText: "Move to Draft",
+                        })
+                      ) {
+                        next = "Draft";
+                      }
+                    } else if (
+                      await confirmDialog({
+                        title: "Make active?",
+                        message: "Move this consultation to Active?",
+                        confirmText: "Make active",
+                      })
+                    ) {
+                      next = "Live";
+                    }
+                    if (!next) return;
                     onSaved({ ...page, status: next });
                   }}
                 />
@@ -1328,11 +1379,19 @@ export function ConsultationOverview({
                   label="Delete"
                   danger
                   onClick={() => {
-                    if (!window.confirm(`Delete “${page.title}”?`)) return;
+                    setMenuOpen(false);
                     void (async () => {
+                      if (
+                        !(await confirmDialog({
+                          title: "Delete consultation?",
+                          message: `Delete “${page.title}”?`,
+                          confirmText: "Delete",
+                          tone: "danger",
+                        }))
+                      )
+                        return;
                       try {
                         await removeConsultationPage(page);
-                        setMenuOpen(false);
                         onRefresh?.();
                         onClose();
                       } catch (err) {
@@ -1517,7 +1576,7 @@ export function ConsultationOverview({
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-x-12 gap-y-6 sm:grid-cols-2">
-                <Field label="Event Type Name">{page.title}</Field>
+                <Field label="Consultation Name">{page.title}</Field>
                 <Field label="Duration">
                   {formatDuration(page.durationMinutes || 30)}
                 </Field>
@@ -1606,7 +1665,7 @@ export function ConsultationOverview({
                       ) : null}
                       {page.appointmentDistribution === "Priority-based" ? (
                         <p className="shrink-0 text-[13px] text-slate-600">
-                          {page.consultantPriorities?.[name] ?? "Highest"}
+                          {normalizeConsultantPriority(page.consultantPriorities?.[name])}
                         </p>
                       ) : null}
                     </div>

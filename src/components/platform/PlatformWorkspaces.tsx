@@ -11,6 +11,7 @@ import {
   suspendPlatformWorkspace,
   type PlatformWorkspace,
 } from "@/lib/platform/api";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 function formatWhen(iso: string) {
   const date = new Date(iso);
@@ -78,7 +79,30 @@ export function PlatformWorkspaces() {
       restore: `Restore soft-deleted ${row.name} and its records?`,
       delete: `Soft-delete ${row.name}? You can restore it later from this directory.`,
     };
-    if (!window.confirm(labels[action])) return;
+    const titles = {
+      enter: "Enter workspace?",
+      suspend: "Suspend workspace?",
+      activate: "Activate workspace?",
+      restore: "Restore workspace?",
+      delete: "Soft-delete workspace?",
+    };
+    const confirmTexts = {
+      enter: "Enter",
+      suspend: "Suspend",
+      activate: "Activate",
+      restore: "Restore",
+      delete: "Soft-delete",
+    };
+    if (
+      !(await confirmDialog({
+        title: titles[action],
+        message: labels[action],
+        confirmText: confirmTexts[action],
+        tone: action === "suspend" || action === "delete" ? "danger" : "default",
+      }))
+    ) {
+      return;
+    }
 
     setBusyId(row.id);
     setError(null);

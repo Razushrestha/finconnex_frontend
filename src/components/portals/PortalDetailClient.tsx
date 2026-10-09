@@ -63,6 +63,7 @@ import {
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function PortalDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -337,8 +338,17 @@ export function PortalDetailClient({ id }: { id: string }) {
           )}
           <button
             type="button"
-            onClick={() => {
-              if (!window.confirm(`Delete ${row.portalId}?`)) return;
+            onClick={async () => {
+              if (
+                !(await confirmDialog({
+                  title: "Delete portal?",
+                  message: `Delete ${row.portalId}?`,
+                  confirmText: "Delete",
+                  tone: "danger",
+                }))
+              ) {
+                return;
+              }
               const gate = softDeleteRecord({
                 action: "portals.delete",
                 module: "portals",

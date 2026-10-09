@@ -1188,6 +1188,72 @@ export function listCrmHostSchedules(
   );
 }
 
+function errorText(err: unknown) {
+  return err instanceof Error ? err.message : String(err ?? "");
+}
+
+/** The CRM rejected a missing or non-string `date` (`@IsISO8601` + `@IsString`). */
+function isDateValueError(err: unknown) {
+  const message = errorText(err);
+  return /date/i.test(message) && /iso-?8601|must be a string/i.test(message);
+}
+
+function isUnknownDateProperty(err: unknown) {
+  const message = errorText(err);
+  return /date/i.test(message) && /not allowed|should not exist/i.test(message);
+}
+
+/**
+ * Calendar day or any parseable date, as a full ISO-8601 string.
+ * Date-only values fail the CRM's date check.
+ */
+export function toCrmIsoDate(value: string): string {
+  const trimmed = value.trim();
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      trimmed,
+    )
+  ) {
+    return trimmed;
+  }
+  const day = trimmed.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return `${day}T00:00:00.000Z`;
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return trimmed;
+  return new Date(parsed).toISOString();
+}
+
+/**
+ * Working-hours save. The CRM requires `date` as an ISO-8601 string; a body
+ * without one fails both "must be a valid ISO-8601 value" and "must be a
+ * string". Send it when the server asks, on the schedule or on each rule.
+ */
+async function writeHostSchedule(
+  path: string,
+  method: "POST" | "PATCH",
+  body: {
+    name: string;
+    timezone: string;
+    isDefault: boolean;
+    rules: CrmAvailabilityWindow[];
+  },
+) {
+  try {
+    return await bookingCall(path, jsonInit(method, body));
+  } catch (err) {
+    if (!isDateValueError(err)) throw err;
+  }
+  const date = new Date().toISOString();
+  try {
+    return await bookingCall(path, jsonInit(method, { ...body, date }));
+  } catch (err) {
+    if (!isDateValueError(err) && !isUnknownDateProperty(err)) throw err;
+    const rules = body.rules.map((rule) => ({ ...rule, date }));
+    const next = isUnknownDateProperty(err) ? { ...body, rules } : { ...body, date, rules };
+    return await bookingCall(path, jsonInit(method, next));
+  }
+}
+
 export function saveCrmHostSchedule(
   hostId: string,
   input: {
@@ -1207,13 +1273,11 @@ export function saveCrmHostSchedule(
   const path = input.scheduleId
     ? `/hosts/schedules/${input.scheduleId}`
     : `/hosts/${hostId}/schedules`;
-  return bookingCall(
-    path,
-    jsonInit(input.scheduleId ? "PATCH" : "POST", body),
-  ).then((data) =>
-    normalizeCrmAvailabilitySchedule(
-      asRecord(data) ?? extractRecords(data)[0] ?? {},
-    ),
+  return writeHostSchedule(path, input.scheduleId ? "PATCH" : "POST", body).then(
+    (data) =>
+      normalizeCrmAvailabilitySchedule(
+        asRecord(data) ?? extractRecords(data)[0] ?? {},
+      ),
   );
 }
 
@@ -1230,7 +1294,7 @@ export function addCrmScheduleOverride(
 ): Promise<unknown> {
   return bookingCall(
     `/hosts/schedules/${scheduleId}/overrides`,
-    jsonInit("POST", input, silent),
+    jsonInit("POST", { ...input, date: toCrmIsoDate(input.date) }, silent),
   );
 }
 
@@ -1249,9 +1313,16 @@ export function updateCrmBookingHost(
   hostId: string,
   body: { dailyBookingLimit?: number | null; isConsultant?: boolean },
 ): Promise<CrmBookingHost> {
-  return bookingCall(`/hosts/${hostId}`, jsonInit("PATCH", body)).then((data) =>
-    normalizeCrmBookingHost(asRecord(data) ?? extractRecords(data)[0] ?? {}),
-  );
+  const path = `/hosts/${hostId}`;
+  const send = (payload: object) => bookingCall(path, jsonInit("PATCH", payload));
+  return send(body)
+    .catch((err) => {
+      if (!isDateValueError(err)) throw err;
+      return send({ ...body, date: new Date().toISOString() });
+    })
+    .then((data) =>
+      normalizeCrmBookingHost(asRecord(data) ?? extractRecords(data)[0] ?? {}),
+    );
 }
 
 export async function resolveCrmBookingHosts(
@@ -1610,6 +1681,70 @@ export function cancelCrmBooking(bookingId: string, reason?: string): Promise<un
 
 export function markCrmBookingNoShow(bookingId: string): Promise<unknown> {
   return bookingCall(`/bookings/${bookingId}/no-show`, jsonInit("POST", {}));
+}
+
+export function clearCrmBookingNoShow(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/no-show`, { method: "DELETE" });
+}
+
+export function completeCrmBooking(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/complete`, jsonInit("POST", {}));
+}
+
+/** Puts a completed booking back to confirmed. */
+export function reopenCrmBooking(bookingId: string): Promise<unknown> {
+  return bookingCall(`/bookings/${bookingId}/complete`, { method: "DELETE" });
+}
+
+/** A consultation still being set up, saved on the server as the wizard goes. */
+export type ConsultationDraftRecord = {
+  id: string;
+  name: string;
+  data: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function toConsultationDraft(row: unknown): ConsultationDraftRecord | null {
+  const rec = asRecord(row);
+  if (!rec) return null;
+  const id = pickStr(rec.id);
+  if (!id) return null;
+  return {
+    id,
+    name: pickStr(rec.name),
+    data: asRecord(rec.data) ?? {},
+    createdAt: pickStr(rec.createdAt, rec.created_at),
+    updatedAt: pickStr(rec.updatedAt, rec.updated_at),
+  };
+}
+
+/** The signed-in user's consultation drafts, most recently edited first. */
+export async function listConsultationDrafts(): Promise<ConsultationDraftRecord[]> {
+  const data = await bookingCall("/drafts", silentRequest());
+  return extractRecords(data)
+    .map(toConsultationDraft)
+    .filter((row): row is ConsultationDraftRecord => !!row);
+}
+
+/** Creates the draft when `id` is empty, otherwise saves over it. */
+export async function saveConsultationDraft(
+  id: string | null,
+  name: string,
+  draft: Record<string, unknown>,
+): Promise<ConsultationDraftRecord | null> {
+  const body = { name, data: draft };
+  // Autosaved as the user types: the wizard shows its own save status, so
+  // no toast for each save.
+  const data = id
+    ? await bookingCall(`/drafts/${id}`, jsonInit("PUT", body, true))
+    : await bookingCall("/drafts", jsonInit("POST", body, true));
+  return toConsultationDraft(data);
+}
+
+export async function deleteConsultationDraft(id: string): Promise<void> {
+  // The board shows its own "Draft discarded" message.
+  await bookingCall(`/drafts/${id}`, silentRequest({ method: "DELETE" }));
 }
 
 export function getCrmBookingSummary(): Promise<Record<string, unknown>> {

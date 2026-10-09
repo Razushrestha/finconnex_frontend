@@ -38,6 +38,7 @@ import {
   type EmailRouting,
 } from "@/lib/booking/email-config";
 import { cn } from "@/lib/utils";
+import { promptDialog } from "@/lib/notify/dialog";
 
 const SELECT_CLASS =
   "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_10px_center] bg-no-repeat px-3 pr-8 text-[13px] text-slate-700 outline-none focus:border-[var(--brand-primary)]/40";
@@ -89,19 +90,19 @@ function headingFor(panel: NotifyPanelId) {
 
 const CALENDAR_VARS = [
   { token: "%servicename%", label: "Service Name" },
-  { token: "%customername%", label: "Customer Name" },
+  { token: "%customername%", label: "Client Name" },
   { token: "%serviceid%", label: "Booking ID" },
   { token: "%staffname%", label: "Staff Name" },
   { token: "%scheduledate%", label: "Schedule Date" },
   { token: "%scheduletime%", label: "Schedule Time" },
   { token: "%duration%", label: "Duration" },
   { token: "%location%", label: "Location" },
-  { token: "%customeremail%", label: "Customer Email" },
+  { token: "%customeremail%", label: "Client Email" },
 ];
 
 const DEFAULT_CAL_TITLE = "%servicename% with %customername%";
 const DEFAULT_CAL_DESC = [
-  "Customer Info",
+  "Client Info",
   "Name  %customername%",
   "Booking ID  %serviceid%",
   "",
@@ -236,10 +237,34 @@ function CalendarInvitesEditor({
     save({ eventDescription: next });
   }
 
-  function runFormat(command: string) {
+  async function runFormat(command: string) {
     descRef.current?.focus();
     if (command === "createLink") {
-      const href = window.prompt("Link URL")?.trim();
+      // The dialog takes focus, so keep the editor's selection to link it.
+      const selection = window.getSelection();
+      const saved =
+        selection && selection.rangeCount > 0
+          ? selection.getRangeAt(0).cloneRange()
+          : null;
+      const range =
+        saved && descRef.current?.contains(saved.commonAncestorContainer)
+          ? saved
+          : null;
+      const href = (
+        await promptDialog({
+          title: "Insert link",
+          label: "Link URL",
+          placeholder: "https://",
+          inputType: "url",
+          confirmText: "Insert link",
+        })
+      )?.trim();
+      descRef.current?.focus();
+      if (range) {
+        const current = window.getSelection();
+        current?.removeAllRanges();
+        current?.addRange(range);
+      }
       if (!href) return;
       document.execCommand("createLink", false, href);
     } else {
@@ -337,7 +362,7 @@ function CalendarInvitesEditor({
                   aria-label={item.cmd}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    runFormat(item.cmd);
+                    void runFormat(item.cmd);
                   }}
                   className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100"
                 >
@@ -351,7 +376,7 @@ function CalendarInvitesEditor({
             ref={descRef}
             contentEditable
             suppressContentEditableWarning
-            className="min-h-[180px] whitespace-pre-wrap px-3 py-3 text-[13px] leading-6 text-slate-800 outline-none"
+            className="min-h-[320px] whitespace-pre-wrap px-3 py-3 text-[13px] leading-6 text-slate-800 outline-none"
             onInput={() => {
               const next = (descRef.current?.innerText ?? "").slice(0, 1200);
               setDescription(next);
@@ -457,7 +482,7 @@ export function ConsultationNotifyPanel({
     [page.notifyPrefs],
   );
   const channel = channelForPanel(panel);
-  const who = audience === "customer" ? "Customer" : "User";
+  const who = audience === "customer" ? "Client" : "Consultant";
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -543,7 +568,7 @@ export function ConsultationNotifyPanel({
                     : "border-transparent text-slate-500",
                 )}
               >
-                {item === "customer" ? "To Customer" : "To User"}
+                {item === "customer" ? "To Client" : "To Consultant"}
               </button>
             ))}
           </div>
@@ -561,9 +586,17 @@ export function ConsultationNotifyPanel({
                 const on = tileOn(tile.id);
                 return (
                   <div key={tile.id} className="relative">
+                    {/* A click opens the options; enabling or disabling is
+                        always chosen there, never a side effect of a click. */}
                     <button
                       type="button"
-                      onClick={() => toggleTile(tile.id)}
+                      aria-haspopup="menu"
+                      aria-expanded={menuId === tile.id}
+                      onClick={() =>
+                        setMenuId((current) =>
+                          current === tile.id ? null : tile.id,
+                        )
+                      }
                       className={cn(
                         "flex h-[92px] w-[112px] flex-col items-center justify-center gap-2 rounded-xl border text-[12px] font-medium",
                         on
@@ -606,17 +639,19 @@ export function ConsultationNotifyPanel({
                         >
                           {on ? "Disable" : "Enable"}
                         </button>
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
-                          onClick={() => {
-                            const row = rows.find((item) => item.id === tile.id);
-                            if (row) setEditing(row);
-                            setMenuId(null);
-                          }}
-                        >
-                          Edit
-                        </button>
+                        {panel !== "whatsapp" ? (
+                          <button
+                            type="button"
+                            className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[var(--brand-primary-soft)]"
+                            onClick={() => {
+                              const row = rows.find((item) => item.id === tile.id);
+                              if (row) setEditing(row);
+                              setMenuId(null);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

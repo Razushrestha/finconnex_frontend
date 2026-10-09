@@ -21,6 +21,7 @@ import { CrmProfileCard } from "@/components/activities/emails/detail/CrmProfile
 import { ActivityTimeline } from "@/components/activities/emails/detail/ActivityTimeline";
 import { onRulesChange } from "@/lib/rules";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function EmailDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -144,8 +145,16 @@ export function EmailDetailClient({ id }: { id: string }) {
               type="button"
               disabled={busy}
               onClick={() => {
-                if (!window.confirm(`Delete ${email.subject || "this email"}?`)) return;
                 void (async () => {
+                  if (
+                    !(await confirmDialog({
+                      title: "Delete email?",
+                      message: `Delete ${email.subject || "this email"}?`,
+                      confirmText: "Delete",
+                      tone: "danger",
+                    }))
+                  )
+                    return;
                   setBusy(true);
                   await tryCrmEmail(() => deleteCrmEmail(email.id));
                   deleteEmail(email.id);

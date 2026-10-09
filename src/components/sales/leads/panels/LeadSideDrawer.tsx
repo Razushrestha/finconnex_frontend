@@ -1,7 +1,9 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+
+const noopSubscribe = () => () => {};
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,11 +31,13 @@ export function LeadSideDrawer({
   /** When true, only chrome + close button — caller supplies its own header. */
   hideHeader?: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // True once in the browser (the portal needs document.body); false on
+  // the server render.
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     if (!open) return;

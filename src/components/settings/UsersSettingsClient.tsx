@@ -40,6 +40,7 @@ import {
 } from "@/lib/workspace-members/api";
 import { sendMemberWelcomeEmail } from "@/lib/workspace-members/welcome-email";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   activateCrmWorkspaceMember,
   deactivateCrmWorkspaceMember,
@@ -360,7 +361,16 @@ export function UsersSettingsClient() {
   }
 
   async function removeMember(row: WorkspaceMember) {
-    if (!window.confirm(`Remove ${row.name} from this workspace?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Remove member?",
+        message: `Remove ${row.name} from this workspace?`,
+        confirmText: "Remove",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       await deleteCrmWorkspaceMember(row.id);
@@ -376,9 +386,12 @@ export function UsersSettingsClient() {
 
   async function onReissue(row: WorkspaceMember) {
     if (
-      !window.confirm(
-        `Email ${row.name} new sign-in details? Their current password stops working and they're signed out everywhere.`,
-      )
+      !(await confirmDialog({
+        title: "Reissue sign-in details?",
+        message: `Email ${row.name} new sign-in details? Their current password stops working and they're signed out everywhere.`,
+        confirmText: "Send new details",
+        tone: "danger",
+      }))
     ) {
       return;
     }
@@ -441,7 +454,16 @@ export function UsersSettingsClient() {
   }
 
   async function onTransfer(row: WorkspaceMember) {
-    if (!window.confirm(`Transfer workspace ownership to ${row.name}?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Transfer ownership?",
+        message: `Transfer workspace ownership to ${row.name}?`,
+        confirmText: "Transfer ownership",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       persistRemoteWorkspaceMember(
@@ -694,10 +716,11 @@ export function UsersSettingsClient() {
         </div>
       </div>
 
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {inviteOpen ? (
         <div
           ref={inviteRef}
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="border-b border-slate-100 p-5"
         >
           <div className="mb-4 flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-violet-600" />
@@ -839,7 +862,6 @@ export function UsersSettingsClient() {
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <h3 className="text-[14px] font-semibold text-slate-900">
             All Users ({filtered.length})

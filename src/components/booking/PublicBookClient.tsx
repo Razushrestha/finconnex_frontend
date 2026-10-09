@@ -79,6 +79,7 @@ import {
   normalizeBookingPageBranding,
   readLocalBookingPageBranding,
   type BookingPageBranding,
+  brandingBackgroundStyle,
 } from "@/lib/booking/page-branding";
 import {
   PHONE_COUNTRIES,
@@ -93,6 +94,11 @@ import {
 } from "@/lib/booking/all-timezones";
 import { TimeZonePicker } from "@/components/booking/TimeZonePicker";
 import { cn } from "@/lib/utils";
+import { BackgroundCredit } from "@/components/booking/BackgroundCredit";
+import {
+  BrandFooter,
+  BrandSocialFollow,
+} from "@/components/booking/BrandSocialLinks";
 
 type Step = "date" | "details" | "done";
 
@@ -105,7 +111,10 @@ export function PublicBookClient({ slug }: { slug: string }) {
     let alive = true;
     void (async () => {
       const adopt = (found: BookingPage) => {
-        const live = found.status === "Live" ? found : { ...found, status: "Live" as const };
+        const live =
+          found.status === "Live"
+            ? found
+            : { ...found, status: "Live" as const };
         upsertBookingPage(live, { publish: false });
         if (live.status === "Live") recordBookingPageView(live.id);
         setPage(getBookingPageBySlug(slug) ?? live);
@@ -115,7 +124,9 @@ export function PublicBookClient({ slug }: { slug: string }) {
       if (local) {
         // A copy saved here before the host connected the page to the CRM has
         // no address to book through; ask the server before showing it.
-        const crmPublic = local.crmPublic ? null : await fetchPublishedCrmRef(slug);
+        const crmPublic = local.crmPublic
+          ? null
+          : await fetchPublishedCrmRef(slug);
         if (!alive) return;
         adopt(crmPublic ? { ...local, crmPublic } : local);
         return;
@@ -123,7 +134,9 @@ export function PublicBookClient({ slug }: { slug: string }) {
 
       const crmPages = await tryCrmBooking(() => listCrmEventTypePages());
       if (!alive) return;
-      const matched = crmPages?.find((page) => bookingPageMatchesSlug(page, slug));
+      const matched = crmPages?.find((page) =>
+        bookingPageMatchesSlug(page, slug),
+      );
       if (matched) {
         adopt(matched);
         return;
@@ -135,7 +148,11 @@ export function PublicBookClient({ slug }: { slug: string }) {
         let res = await fetch(`/api/book/${encodeURIComponent(slug)}`, {
           credentials: "same-origin",
         });
-        for (let attempt = 1; res.status === 404 && attempt <= 3 && alive; attempt += 1) {
+        for (
+          let attempt = 1;
+          res.status === 404 && attempt <= 3 && alive;
+          attempt += 1
+        ) {
           await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
           res = await fetch(`/api/book/${encodeURIComponent(slug)}`, {
             credentials: "same-origin",
@@ -231,7 +248,9 @@ function BookFlow({
   // on the left that fills in as the guest goes.
   const basic = pageBranding.layout === "basic";
   // A /book/:slug link names one event, so the guest starts on its calendar.
-  const [basicStage, setBasicStage] = useState<"service" | "schedule">("schedule");
+  const [basicStage, setBasicStage] = useState<"service" | "schedule">(
+    "schedule",
+  );
   const [siteServices, setSiteServices] = useState<PublicSiteService[]>([]);
   // Both page through days a week at a time instead of showing a month.
   const weekly = fresh || basic;
@@ -261,13 +280,21 @@ function BookFlow({
   // the public API, which needs no login. `publicRefresh` re-reads them after a
   // clash; the result is keyed so a stale month/timezone is never shown.
   const publicSlug = page.crmPublic ? page.slug || page.title : "";
-  const monthFrom = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
-  const monthTo = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0));
+  const monthFrom = toLocalDateStr(
+    new Date(anchor.getFullYear(), anchor.getMonth(), 1),
+  );
+  const monthTo = toLocalDateStr(
+    new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0),
+  );
   // A week can run into the next month; load its days too.
   const rangeFrom =
-    weekly && toLocalDateStr(weekStart) < monthFrom ? toLocalDateStr(weekStart) : monthFrom;
+    weekly && toLocalDateStr(weekStart) < monthFrom
+      ? toLocalDateStr(weekStart)
+      : monthFrom;
   const rangeTo =
-    weekly && toLocalDateStr(weekEnd) > monthTo ? toLocalDateStr(weekEnd) : monthTo;
+    weekly && toLocalDateStr(weekEnd) > monthTo
+      ? toLocalDateStr(weekEnd)
+      : monthTo;
   const [publicRefresh, setPublicRefresh] = useState(0);
   const [slotNotice, setSlotNotice] = useState<string | null>(null);
   const [publicResult, setPublicResult] = useState<{
@@ -286,7 +313,8 @@ function BookFlow({
     let alive = true;
     void fetchPublicSite(publicSlug).then((site) => {
       if (!alive || !site) return;
-      if (site.branding) setPageBranding(normalizeBookingPageBranding(site.branding));
+      if (site.branding)
+        setPageBranding(normalizeBookingPageBranding(site.branding));
       setSiteServices(site.services);
     });
     return () => {
@@ -319,10 +347,12 @@ function BookFlow({
   const publicCurrent = publicResult?.key === publicKey ? publicResult : null;
   const loadedDays = publicCurrent?.days;
   // The guest's calendar days and clock, worked out here — no round trip.
-  const publicDays = useMemo(() => slotDaysInZone(loadedDays, guestTz), [loadedDays, guestTz]);
+  const publicDays = useMemo(
+    () => slotDaysInZone(loadedDays, guestTz),
+    [loadedDays, guestTz],
+  );
   const publicLoading = !!publicKey && !publicCurrent;
   const publicError = publicCurrent?.error;
-
 
   useEffect(() => {
     const eventTypeId = crmEventTypeIdOf(page);
@@ -332,7 +362,14 @@ function BookFlow({
       return;
     }
     const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    const monthEnd = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59);
+    const monthEnd = new Date(
+      anchor.getFullYear(),
+      anchor.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
     const weekLast = new Date(
       weekStart.getFullYear(),
       weekStart.getMonth(),
@@ -356,7 +393,9 @@ function BookFlow({
         setCrmSlotDays(new Set());
         return;
       }
-      const days = new Set(rows.map((row) => slotDateKey(row.startTime)).filter(Boolean));
+      const days = new Set(
+        rows.map((row) => slotDateKey(row.startTime)).filter(Boolean),
+      );
       setCrmSlotDays(days);
       if (!selectedDate) {
         setCrmSlots([]);
@@ -369,7 +408,16 @@ function BookFlow({
           .map((row) => localHHmmFromIso(row.startTime)),
       );
     });
-  }, [page.crmEventTypeId, page.crmPublic, page.id, page.timezone, anchor, selectedDate, weekly, weekStart]);
+  }, [
+    page.crmEventTypeId,
+    page.crmPublic,
+    page.id,
+    page.timezone,
+    anchor,
+    selectedDate,
+    weekly,
+    weekStart,
+  ]);
 
   const monthDays = useMemo(() => {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -440,7 +488,11 @@ function BookFlow({
         }))
       : (crmSlots.length ? crmSlots : localSlots).map((item) => {
           const start = typeof item === "string" ? item : item.start;
-          return { start, label: formatPublicSlotLabel(start), startAt: undefined as string | undefined };
+          return {
+            start,
+            label: formatPublicSlotLabel(start),
+            startAt: undefined as string | undefined,
+          };
         })
   ).filter((item) => {
     if (!selectedDate) return false;
@@ -518,9 +570,15 @@ function BookFlow({
 
   const weekDays = Array.from(
     { length: 7 },
-    (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
+    (_, i) =>
+      new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() + i,
+      ),
   );
-  const canPrevWeek = toLocalDateStr(weekStart) > todayIsoInTimezone(guestTz || page.timezone);
+  const canPrevWeek =
+    toLocalDateStr(weekStart) > todayIsoInTimezone(guestTz || page.timezone);
 
   /** The chosen time clashed (or went stale): back to the times, freshly loaded. */
   function chooseAnotherTime(message: string) {
@@ -535,7 +593,8 @@ function BookFlow({
   async function confirm() {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Required";
-    if (!email.trim() || !email.includes("@")) next.email = "Valid email required";
+    if (!email.trim() || !email.includes("@"))
+      next.email = "Valid email required";
     if (!phone.trim()) next.phone = "Required";
     const today = toLocalDateStr(new Date());
     const submittedAnswers = { ...answers };
@@ -594,7 +653,9 @@ function BookFlow({
       return;
     }
     if (page.crmPublic && !chosen) {
-      chooseAnotherTime("That time is no longer available. Please choose another time.");
+      chooseAnotherTime(
+        "That time is no longer available. Please choose another time.",
+      );
       return;
     }
 
@@ -645,8 +706,8 @@ function BookFlow({
         })} ${selectedDate.getFullYear()}`
       : "";
   const confirmTimeLabel = selectedSlot
-    ? slots.find((s) => s.start === selectedSlot)?.label ??
-      formatPublicSlotLabel(selectedSlot)
+    ? (slots.find((s) => s.start === selectedSlot)?.label ??
+      formatPublicSlotLabel(selectedSlot))
     : "";
   const timezoneGmtLabel = publicTimezoneGmt(guestTz);
   const whenLabel =
@@ -663,7 +724,9 @@ function BookFlow({
     () =>
       [
         page.timezone,
-        typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
+        typeof Intl !== "undefined"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : "",
       ].filter(Boolean),
     [page.timezone],
   );
@@ -673,11 +736,15 @@ function BookFlow({
   // Match the page's own event by slug; a name is only a fallback, since two
   // services can share one ("Test" and "Test").
   const slugMatch = (service: PublicSiteService) =>
-    service.slug === page.slug || service.slug === page.crmPublic?.eventTypeSlug;
+    service.slug === page.slug ||
+    service.slug === page.crmPublic?.eventTypeSlug;
   const matchedService =
-    siteServices.find(slugMatch) ?? siteServices.find((service) => service.name === page.title);
+    siteServices.find(slugMatch) ??
+    siteServices.find((service) => service.name === page.title);
   const isThisService = (service: PublicSiteService) =>
-    matchedService ? service.id === matchedService.id : service.slug === page.slug;
+    matchedService
+      ? service.id === matchedService.id
+      : service.slug === page.slug;
   const thisService: PublicSiteService = matchedService ?? {
     id: page.id,
     name: page.title,
@@ -690,14 +757,16 @@ function BookFlow({
   const basicSteps = [
     {
       id: "service",
-      label: "Event Type",
+      label: "Consultation",
       icon: Briefcase,
       active: step === "date" && basicStage === "service",
       reachable: true,
       summary:
         step !== "date" || basicStage !== "service" ? (
           <>
-            <span className="block text-[14px] text-slate-800">{page.title}</span>
+            <span className="block text-[14px] text-slate-800">
+              {page.title}
+            </span>
             <span className="block text-[12px] text-slate-500">
               {formatServiceDuration(page.durationMinutes)}
             </span>
@@ -710,14 +779,16 @@ function BookFlow({
     },
     {
       id: "schedule",
-      label: "Date, Time & User",
+      label: "Date, Time & Consultant",
       icon: Calendar,
       active: step === "date" && basicStage === "schedule",
       reachable: basicStage === "schedule" || step === "details",
       summary:
         step === "details" ? (
           <>
-            <span className="block text-[14px] text-slate-800">{whenLabel}</span>
+            <span className="block text-[14px] text-slate-800">
+              {whenLabel}
+            </span>
             <span className="block text-[12px] text-slate-500">
               {publicTimezoneLabel(guestTz)} · {hostNames.join(", ") || "Host"}
             </span>
@@ -866,9 +937,9 @@ function BookFlow({
         onClick={confirm}
         disabled={submitting}
         className={cn(
-        "mt-2 h-12 w-full rounded-lg text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-40",
-        branded ? "bg-[var(--booking-brand)]" : "bg-[#5B4BDB]",
-      )}
+          "mt-2 h-12 w-full rounded-lg text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-40",
+          branded ? "bg-[var(--booking-brand)]" : "bg-[#5B4BDB]",
+        )}
       >
         {submitting ? "Scheduling…" : "Schedule Appointment"}
       </button>
@@ -877,15 +948,13 @@ function BookFlow({
 
   return (
     <div
-      className="flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
+      className="relative flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
       style={{
         backgroundColor: "#F3F4F6",
-        backgroundImage: pageBranding.backgroundImageUrl
-          ? `url(${pageBranding.backgroundImageUrl})`
-          : undefined,
-        backgroundSize: "cover",
+        ...brandingBackgroundStyle(pageBranding),
       }}
     >
+      <BackgroundCredit branding={pageBranding} />
       {pageBranding.header.titleVisible ||
       (pageBranding.header.logoVisible && pageBranding.header.logoUrl) ? (
         <div className="mb-4 flex w-full max-w-[980px] items-center gap-2 px-1">
@@ -917,7 +986,8 @@ function BookFlow({
                 </h1>
                 <p className="mx-auto mt-1 max-w-2xl text-[14px] text-slate-600">
                   Book your appointment in a few simple steps: choose a service,
-                  pick your date and time, and fill in your details. See you soon!
+                  pick your date and time, and fill in your details. See you
+                  soon!
                 </p>
               </div>
             ) : null}
@@ -983,10 +1053,13 @@ function BookFlow({
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--booking-brand)] text-[var(--booking-brand)]">
                     <Calendar className="h-5 w-5" />
                   </span>
-                  <h2 className="text-[17px] text-slate-800">Date, Time & User</h2>
+                  <h2 className="text-[17px] text-slate-800">
+                    Date, Time & Consultant
+                  </h2>
                 </div>
                 <p className="text-[14px] text-slate-600">
-                  Your appointment will be booked with {hostNames.join(", ") || "our team"}
+                  Your appointment will be booked with{" "}
+                  {hostNames.join(", ") || "our team"}
                 </p>
               </div>
               {rescheduleToken ? (
@@ -1001,7 +1074,13 @@ function BookFlow({
                       type="button"
                       disabled={!canPrevMonth}
                       onClick={() =>
-                        setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1))
+                        setAnchor(
+                          new Date(
+                            anchor.getFullYear(),
+                            anchor.getMonth() - 1,
+                            1,
+                          ),
+                        )
                       }
                       className="rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
                       aria-label="Previous month"
@@ -1009,12 +1088,21 @@ function BookFlow({
                       <ChevronLeft className="h-5 w-5" />
                     </button>
                     <p className="min-w-[130px] text-center text-[15px] text-slate-700">
-                      {anchor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                      {anchor.toLocaleDateString("en-US", {
+                        month: "long",
+                        year: "numeric",
+                      })}
                     </p>
                     <button
                       type="button"
                       onClick={() =>
-                        setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1))
+                        setAnchor(
+                          new Date(
+                            anchor.getFullYear(),
+                            anchor.getMonth() + 1,
+                            1,
+                          ),
+                        )
                       }
                       className="rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50"
                       aria-label="Next month"
@@ -1029,12 +1117,15 @@ function BookFlow({
                   </div>
                   <div className="mt-2 grid grid-cols-7">
                     {monthDays.map((d, i) => {
-                      if (!d) return <span key={`e-${i}`} className="h-11 sm:h-12" />;
+                      if (!d)
+                        return <span key={`e-${i}`} className="h-11 sm:h-12" />;
                       const dayKey = toLocalDateStr(d);
                       const bookable =
-                        dayHasSlots(d) && !isPastBookingDate(dayKey, guestTz || page.timezone);
+                        dayHasSlots(d) &&
+                        !isPastBookingDate(dayKey, guestTz || page.timezone);
                       const selected =
-                        !!selectedDate && d.toDateString() === selectedDate.toDateString();
+                        !!selectedDate &&
+                        d.toDateString() === selectedDate.toDateString();
                       return (
                         <button
                           key={d.toISOString()}
@@ -1063,7 +1154,9 @@ function BookFlow({
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-[16px] font-semibold text-slate-800">Slot Availability</h3>
+                  <h3 className="text-[16px] font-semibold text-slate-800">
+                    Slot Availability
+                  </h3>
                   <TimeZonePicker
                     value={guestTz}
                     onChange={changeGuestTz}
@@ -1080,7 +1173,9 @@ function BookFlow({
                   ) : null}
                   {publicError ? (
                     <div role="alert" className="mt-6 text-center">
-                      <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                      <p className="text-[12px] leading-5 text-slate-500">
+                        {publicError}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setPublicRefresh((n) => n + 1)}
@@ -1091,11 +1186,15 @@ function BookFlow({
                     </div>
                   ) : null}
                   {publicLoading ? (
-                    <p className="py-10 text-center text-[12px] text-slate-400">Loading times…</p>
+                    <p className="py-10 text-center text-[12px] text-slate-400">
+                      Loading times…
+                    </p>
                   ) : null}
                   {!publicLoading && !publicError && slots.length === 0 ? (
                     <p className="py-10 text-center text-[12px] text-slate-400">
-                      {selectedDate ? "No times this day" : "Pick a date to see times"}
+                      {selectedDate
+                        ? "No times this day"
+                        : "Pick a date to see times"}
                     </p>
                   ) : null}
                   {slotPeriods(slots).map((period) => (
@@ -1134,7 +1233,9 @@ function BookFlow({
 
             {step === "details" ? (
               <section
-                ref={(node) => node?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                ref={(node) =>
+                  node?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
                 className="rounded-xl bg-white px-5 py-5 shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 sm:px-8"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
@@ -1148,7 +1249,9 @@ function BookFlow({
                     {whenLabel} · {publicTimezoneLabel(guestTz)}
                   </p>
                 </div>
-                <div className="mx-auto mt-6 max-w-[460px] space-y-4">{guestFormFields}</div>
+                <div className="mx-auto mt-6 max-w-[460px] space-y-4">
+                  {guestFormFields}
+                </div>
               </section>
             ) : null}
           </div>
@@ -1163,7 +1266,8 @@ function BookFlow({
                 </h1>
                 <p className="mt-2 max-w-3xl text-[15px] text-slate-700">
                   Book your appointment in a few simple steps: choose a service,
-                  pick your date and time, and fill in your details. See you soon!
+                  pick your date and time, and fill in your details. See you
+                  soon!
                 </p>
               </div>
             ) : null}
@@ -1182,7 +1286,9 @@ function BookFlow({
             ) : null}
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
               <ModernTile icon={Briefcase}>
-                <span className="block text-[15px] font-medium text-slate-800">{page.title}</span>
+                <span className="block text-[15px] font-medium text-slate-800">
+                  {page.title}
+                </span>
                 <span className="block text-[13px] text-slate-500">
                   ( {formatServiceDuration(page.durationMinutes)} )
                 </span>
@@ -1215,14 +1321,21 @@ function BookFlow({
                   }}
                   className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
                 >
-                  {!selectedDate ? <option value="">Choose a date</option> : null}
-                  {canPrevMonth ? <option value="prev">‹ Earlier dates</option> : null}
+                  {!selectedDate ? (
+                    <option value="">Choose a date</option>
+                  ) : null}
+                  {canPrevMonth ? (
+                    <option value="prev">‹ Earlier dates</option>
+                  ) : null}
                   {monthDays
                     .filter(
                       (d): d is Date =>
                         !!d &&
                         dayHasSlots(d) &&
-                        !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone),
+                        !isPastBookingDate(
+                          toLocalDateStr(d),
+                          guestTz || page.timezone,
+                        ),
                     )
                     .map((d) => (
                       <option key={toLocalDateStr(d)} value={toLocalDateStr(d)}>
@@ -1264,7 +1377,9 @@ function BookFlow({
                   </select>
                 ) : (
                   <span className="text-[14px] text-slate-400">
-                    {publicLoading ? "Loading times…" : publicError ?? "No times this day"}
+                    {publicLoading
+                      ? "Loading times…"
+                      : (publicError ?? "No times this day")}
                   </span>
                 )}
               </ModernTile>
@@ -1281,7 +1396,12 @@ function BookFlow({
         ) : null}
 
         {modern && step === "details" ? (
-          <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Booking Summary">
+          <div
+            className="fixed inset-0 z-50 flex justify-end"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Booking Summary"
+          >
             <button
               type="button"
               aria-label="Close booking summary"
@@ -1306,9 +1426,12 @@ function BookFlow({
                     {page.title.slice(0, 1).toUpperCase()}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[16px] text-slate-800">{page.title}</span>
+                    <span className="block text-[16px] text-slate-800">
+                      {page.title}
+                    </span>
                     <span className="block text-[12px] text-slate-500">
-                      ( {formatServiceDuration(page.durationMinutes)} | {page.eventType} )
+                      ( {formatServiceDuration(page.durationMinutes)} |{" "}
+                      {page.eventType} )
                     </span>
                   </span>
                 </div>
@@ -1323,7 +1446,9 @@ function BookFlow({
                   </span>
                 </div>
                 <div className="bg-white p-5 shadow-[0_1px_4px_rgba(15,23,42,0.06)] sm:p-6">
-                  <h3 className="mb-5 text-[16px] text-slate-800">Please enter your details</h3>
+                  <h3 className="mb-5 text-[16px] text-slate-800">
+                    Please enter your details
+                  </h3>
                   <div className="space-y-4">{guestFormFields}</div>
                 </div>
               </div>
@@ -1340,7 +1465,8 @@ function BookFlow({
                 </h1>
                 <p className="mx-auto mt-2 max-w-2xl text-[14px] text-slate-600">
                   Book your appointment in a few simple steps: choose a service,
-                  pick your date and time, and fill in your details. See you soon!
+                  pick your date and time, and fill in your details. See you
+                  soon!
                 </p>
               </div>
             ) : null}
@@ -1360,13 +1486,17 @@ function BookFlow({
                       aria-current={item.active ? "step" : undefined}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-lg px-4 py-4 text-left transition disabled:cursor-default",
-                        item.active ? "bg-slate-50" : item.reachable && "hover:bg-slate-50",
+                        item.active
+                          ? "bg-slate-50"
+                          : item.reachable && "hover:bg-slate-50",
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-5 w-5 shrink-0",
-                          item.active ? "text-[var(--booking-brand)]" : "text-slate-400",
+                          item.active
+                            ? "text-[var(--booking-brand)]"
+                            : "text-slate-400",
                         )}
                       />
                       <span className="min-w-0 flex-1">
@@ -1389,6 +1519,10 @@ function BookFlow({
                     </button>
                   );
                 })}
+                <BrandSocialFollow
+                  branding={pageBranding}
+                  className="mx-4 mt-3 pt-4 pb-2"
+                />
               </nav>
 
               <section className="min-w-0 px-5 py-6 sm:px-8">
@@ -1482,7 +1616,10 @@ function BookFlow({
                         {weekDays.map((d) => {
                           const bookable =
                             dayHasSlots(d) &&
-                            !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone);
+                            !isPastBookingDate(
+                              toLocalDateStr(d),
+                              guestTz || page.timezone,
+                            );
                           const selected =
                             bookable &&
                             !!selectedDate &&
@@ -1507,9 +1644,13 @@ function BookFlow({
                                     : "bg-white text-slate-300 ring-slate-100",
                               )}
                             >
-                              <span className="text-[15px] sm:text-[19px]">{d.getDate()}</span>
+                              <span className="text-[15px] sm:text-[19px]">
+                                {d.getDate()}
+                              </span>
                               <span className="text-[9px] uppercase sm:text-[12px]">
-                                {d.toLocaleDateString("en-US", { weekday: "short" })}
+                                {d.toLocaleDateString("en-US", {
+                                  weekday: "short",
+                                })}
                               </span>
                             </button>
                           );
@@ -1542,7 +1683,9 @@ function BookFlow({
                     ) : null}
                     {publicError ? (
                       <div role="alert" className="mt-6 text-center">
-                        <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                        <p className="text-[12px] leading-5 text-slate-500">
+                          {publicError}
+                        </p>
                         <button
                           type="button"
                           onClick={() => setPublicRefresh((n) => n + 1)}
@@ -1559,7 +1702,9 @@ function BookFlow({
                     ) : null}
                     {!publicLoading && !publicError && slots.length === 0 ? (
                       <p className="py-10 text-center text-[12px] text-slate-400">
-                        {selectedDate ? "No times this day" : "Pick a day to see times"}
+                        {selectedDate
+                          ? "No times this day"
+                          : "Pick a day to see times"}
                       </p>
                     ) : null}
                     {slotPeriods(slots).map((period) => (
@@ -1660,7 +1805,10 @@ function BookFlow({
                 {weekDays.map((d) => {
                   const bookable =
                     dayHasSlots(d) &&
-                    !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone);
+                    !isPastBookingDate(
+                      toLocalDateStr(d),
+                      guestTz || page.timezone,
+                    );
                   const selected =
                     bookable &&
                     !!selectedDate &&
@@ -1725,7 +1873,9 @@ function BookFlow({
             ) : null}
             {publicError ? (
               <div role="alert" className="mt-6 text-center">
-                <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                <p className="text-[12px] leading-5 text-slate-500">
+                  {publicError}
+                </p>
                 <button
                   type="button"
                   onClick={() => setPublicRefresh((n) => n + 1)}
@@ -1750,7 +1900,9 @@ function BookFlow({
                 <ChevronLeft className="mt-0.5 h-6 w-6 shrink-0 text-slate-500" />
                 <span>
                   <span className="block text-[17px] text-slate-700">
-                    {selectedDate?.toLocaleDateString("en-US", { weekday: "long" })}
+                    {selectedDate?.toLocaleDateString("en-US", {
+                      weekday: "long",
+                    })}
                   </span>
                   <span className="block text-[13px] text-slate-500">
                     {selectedDate?.toLocaleDateString("en-US", {
@@ -1982,7 +2134,9 @@ function BookFlow({
                 ) : null}
                 {publicError ? (
                   <div role="alert" className="py-8 text-center">
-                    <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                    <p className="text-[12px] leading-5 text-slate-500">
+                      {publicError}
+                    </p>
                     <button
                       type="button"
                       onClick={() => setPublicRefresh((n) => n + 1)}
@@ -2002,7 +2156,10 @@ function BookFlow({
                     Pick a date to see times
                   </p>
                 ) : null}
-                {selectedDate && slots.length === 0 && !publicLoading && !publicError ? (
+                {selectedDate &&
+                slots.length === 0 &&
+                !publicLoading &&
+                !publicError ? (
                   <p className="py-10 text-center text-[12px] text-slate-400">
                     No times this day
                   </p>
@@ -2136,9 +2293,7 @@ function BookFlow({
               <h2 className="mb-6 text-[22px] font-semibold text-slate-900">
                 Please enter your details
               </h2>
-              <div className="max-w-[420px] space-y-4">
-                {guestFormFields}
-              </div>
+              <div className="max-w-[420px] space-y-4">{guestFormFields}</div>
             </div>
           </div>
         ) : null}
@@ -2162,7 +2317,9 @@ function BookFlow({
                   <p className="text-[16px] font-semibold text-[#5B4BDB]">
                     {confirmDateLabel} | {confirmTimeLabel}
                   </p>
-                  <p className="mt-1 text-[14px] text-slate-700">{page.title}</p>
+                  <p className="mt-1 text-[14px] text-slate-700">
+                    {page.title}
+                  </p>
                   <p className="mt-0.5 text-[13px] text-slate-500">
                     {guestTz} {timezoneGmtLabel}
                   </p>
@@ -2184,7 +2341,9 @@ function BookFlow({
                         title: page.title,
                         details: [
                           page.description,
-                          confirmed.joinUrl ? `Join meeting: ${confirmed.joinUrl}` : "",
+                          confirmed.joinUrl
+                            ? `Join meeting: ${confirmed.joinUrl}`
+                            : "",
                         ]
                           .filter(Boolean)
                           .join("\n"),
@@ -2208,7 +2367,9 @@ function BookFlow({
                             title: page.title,
                             description: [
                               page.description,
-                              confirmed.joinUrl ? `Join meeting: ${confirmed.joinUrl}` : "",
+                              confirmed.joinUrl
+                                ? `Join meeting: ${confirmed.joinUrl}`
+                                : "",
                             ]
                               .filter(Boolean)
                               .join("\n"),
@@ -2252,7 +2413,11 @@ function BookFlow({
           </div>
         ) : null}
       </div>
-      <PublicBrandFooter branding={pageBranding} />
+      {/* Basic shows the socials under its step list instead. */}
+      <PublicBrandFooter
+        branding={pageBranding}
+        socials={pageBranding.layout !== "basic"}
+      />
     </div>
   );
 }
@@ -2275,7 +2440,10 @@ function ModernTile({
       <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
         <div className="min-w-0 flex-1">{children}</div>
         {label ? (
-          <ChevronsUpDown className="h-4 w-4 shrink-0 text-[var(--booking-brand)]" aria-hidden />
+          <ChevronsUpDown
+            className="h-4 w-4 shrink-0 text-[var(--booking-brand)]"
+            aria-hidden
+          />
         ) : null}
       </div>
     </div>
@@ -2305,22 +2473,19 @@ function slotPeriods<T extends { start: string }>(slots: T[]) {
   return periods.filter((period) => period.slots.length);
 }
 
-function PublicBrandFooter({ branding }: { branding: BookingPageBranding }) {
-  const items = [
-    branding.footer.contactVisible && branding.footer.contact,
-    branding.footer.emailVisible && branding.footer.email,
-    branding.footer.addressVisible && branding.footer.address,
-    branding.footer.facebookVisible && branding.footer.facebook,
-    branding.footer.instagramVisible && branding.footer.instagram,
-    branding.footer.xVisible && branding.footer.x,
-    branding.footer.linkedinVisible && branding.footer.linkedin,
-  ].filter(Boolean);
-  if (!items.length) return null;
+function PublicBrandFooter({
+  branding,
+  socials,
+}: {
+  branding: BookingPageBranding;
+  socials: boolean;
+}) {
   return (
-    <div className="mt-4 flex w-full max-w-[980px] flex-wrap gap-x-4 gap-y-1 px-1 text-[12px] text-slate-500">
-      {items.map((item) => (
-        <span key={String(item)}>{item}</span>
-      ))}
+    <div
+      className="mt-4 w-full max-w-[980px] px-1"
+      style={{ ["--booking-brand" as string]: branding.primaryColor }}
+    >
+      <BrandFooter branding={branding} socials={socials} />
     </div>
   );
 }
@@ -2335,8 +2500,7 @@ function publicTimezoneGmt(tz: string) {
       timeZone: tz,
       timeZoneName: "longOffset",
     }).formatToParts(new Date());
-    const raw =
-      parts.find((part) => part.type === "timeZoneName")?.value ?? "";
+    const raw = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
     const offset = raw.replace(/^GMT/i, "").trim();
     if (!offset) return "GMT";
     return offset.startsWith("+") || offset.startsWith("-")
@@ -2487,7 +2651,11 @@ function InviteGuestEmailsField({
           disabled={full}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === "," || event.key === "Tab") {
+            if (
+              event.key === "Enter" ||
+              event.key === "," ||
+              event.key === "Tab"
+            ) {
               if (!draft.trim()) return;
               event.preventDefault();
               onAdd(draft);
@@ -2535,7 +2703,9 @@ function PhoneNumberField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   // Codes are shared (+1 is the US, Canada and more), so remember the country.
-  const [iso, setIso] = useState(() => phoneCountryForCode(dialCode)?.iso ?? "");
+  const [iso, setIso] = useState(
+    () => phoneCountryForCode(dialCode)?.iso ?? "",
+  );
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The menu is portalled to <body> with fixed coordinates: the booking card
@@ -2570,7 +2740,12 @@ function PhoneNumberField({
     const left = Math.min(rect.left, window.innerWidth - width - 8);
     // Open downwards unless there is clearly more room above.
     if (below >= 240 || below >= above) {
-      setMenuAt({ left, width, top: rect.bottom + gap, maxHeight: Math.max(160, below) });
+      setMenuAt({
+        left,
+        width,
+        top: rect.bottom + gap,
+        maxHeight: Math.max(160, below),
+      });
     } else {
       setMenuAt({
         left,
@@ -2660,73 +2835,83 @@ function PhoneNumberField({
           className="h-full min-w-0 flex-1 border-0 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
         />
       </div>
-      {open && menuAt && typeof document !== "undefined" ? createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: "fixed",
-            left: menuAt.left,
-            width: menuAt.width,
-            top: menuAt.top,
-            bottom: menuAt.bottom,
-            maxHeight: menuAt.maxHeight,
-          }}
-          className="z-[1000] flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
-        >
-          <div className="relative border-b border-slate-100 p-2">
-            <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  close();
-                } else if (event.key === "Enter") {
-                  event.preventDefault();
-                  if (matches[0]) pick(matches[0]);
-                }
+      {open && menuAt && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                left: menuAt.left,
+                width: menuAt.width,
+                top: menuAt.top,
+                bottom: menuAt.bottom,
+                maxHeight: menuAt.maxHeight,
               }}
-              placeholder="Search country or code"
-              aria-label="Search country or code"
-              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 outline-none focus:border-slate-300"
-            />
-          </div>
-          <ul
-            role="listbox"
-            aria-label="Countries"
-            className="max-h-64 min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
-          >
-            {matches.map((row) => (
-              <li key={row.iso} role="option" aria-selected={row.iso === selected.iso}>
-                <button
-                  type="button"
-                  onClick={() => pick(row)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
-                    row.iso === selected.iso
-                      ? "bg-slate-50 font-medium text-slate-900"
-                      : "text-slate-700",
-                  )}
-                >
-                  <span aria-hidden className="text-[15px] leading-none">
-                    {row.flag}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                  <span className="shrink-0 tabular-nums text-slate-500">{row.code}</span>
-                </button>
-              </li>
-            ))}
-            {matches.length === 0 ? (
-              <li className="px-3 py-4 text-[12px] text-slate-400">
-                No country matches “{query}”
-              </li>
-            ) : null}
-          </ul>
-        </div>,
-        document.body,
-      ) : null}
+              className="z-[1000] flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+            >
+              <div className="relative border-b border-slate-100 p-2">
+                <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      close();
+                    } else if (event.key === "Enter") {
+                      event.preventDefault();
+                      if (matches[0]) pick(matches[0]);
+                    }
+                  }}
+                  placeholder="Search country or code"
+                  aria-label="Search country or code"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pr-3 pl-8 text-[13px] text-slate-800 outline-none focus:border-slate-300"
+                />
+              </div>
+              <ul
+                role="listbox"
+                aria-label="Countries"
+                className="max-h-64 min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
+              >
+                {matches.map((row) => (
+                  <li
+                    key={row.iso}
+                    role="option"
+                    aria-selected={row.iso === selected.iso}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => pick(row)}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
+                        row.iso === selected.iso
+                          ? "bg-slate-50 font-medium text-slate-900"
+                          : "text-slate-700",
+                      )}
+                    >
+                      <span aria-hidden className="text-[15px] leading-none">
+                        {row.flag}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {row.name}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-slate-500">
+                        {row.code}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {matches.length === 0 ? (
+                  <li className="px-3 py-4 text-[12px] text-slate-400">
+                    No country matches “{query}”
+                  </li>
+                ) : null}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
       {error ? (
         <p className="mt-0.5 text-[10px] font-medium text-rose-500">{error}</p>
       ) : null}
@@ -2794,7 +2979,10 @@ function GuestQuestion({
   const inputClass =
     "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 hover:border-violet-300 focus:border-[#5B4BDB] focus:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]";
 
-  if (question.fieldType === "dropdown" && question.options?.some((option) => option.trim())) {
+  if (
+    question.fieldType === "dropdown" &&
+    question.options?.some((option) => option.trim())
+  ) {
     return (
       <label className="block">
         {label}
@@ -2804,37 +2992,44 @@ function GuestQuestion({
           className={inputClass}
         >
           <option value="">Select</option>
-          {question.options.filter((option) => option.trim()).map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
+          {question.options
+            .filter((option) => option.trim())
+            .map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
         </select>
         {error ? <FieldError message={error} /> : null}
       </label>
     );
   }
 
-  if (question.fieldType === "radio" && question.options?.some((option) => option.trim())) {
+  if (
+    question.fieldType === "radio" &&
+    question.options?.some((option) => option.trim())
+  ) {
     return (
       <div>
         {label}
         <div className="space-y-2">
-          {question.options.filter((option) => option.trim()).map((option) => (
-            <label
-              key={option}
-              className="flex items-center gap-2 text-[13px] text-slate-700"
-            >
-              <input
-                type="radio"
-                name={question.id}
-                checked={value === option}
-                onChange={() => onChange(option)}
-                className="h-4 w-4"
-              />
-              {option}
-            </label>
-          ))}
+          {question.options
+            .filter((option) => option.trim())
+            .map((option) => (
+              <label
+                key={option}
+                className="flex items-center gap-2 text-[13px] text-slate-700"
+              >
+                <input
+                  type="radio"
+                  name={question.id}
+                  checked={value === option}
+                  onChange={() => onChange(option)}
+                  className="h-4 w-4"
+                />
+                {option}
+              </label>
+            ))}
         </div>
         {error ? <FieldError message={error} /> : null}
       </div>
@@ -2986,7 +3181,9 @@ function GuestQuestion({
 }
 
 function FieldError({ message }: { message: string }) {
-  return <p className="mt-1 text-[12px] font-medium text-rose-600">{message}</p>;
+  return (
+    <p className="mt-1 text-[12px] font-medium text-rose-600">{message}</p>
+  );
 }
 
 /** `YYYY-MM-DD` moved by whole days. */

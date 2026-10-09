@@ -75,6 +75,7 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { onRulesChange } from "@/lib/rules/storage";
 import { loadAssignableOwners } from "@/lib/users/assignable";
 import { toast } from "@/lib/notify/toast";
+import { promptDialog } from "@/lib/notify/dialog";
 import { menuEnter } from "@/lib/motion";
 import {
   listNotifications,
@@ -813,8 +814,13 @@ export default function TeamChatPage() {
                     <button
                       type="button"
                       className="text-[11px] font-semibold text-violet-600 hover:text-violet-800"
-                      onClick={() => {
-                        const name = window.prompt("New group name");
+                      onClick={async () => {
+                        const name = await promptDialog({
+                          title: "New group",
+                          label: "Group name",
+                          placeholder: "e.g. Sales team",
+                          confirmText: "Create",
+                        });
                         if (!name?.trim()) return;
                         void startConversation({
                           name: name.trim(),
@@ -962,8 +968,13 @@ export default function TeamChatPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => {
-                    const name = window.prompt("New group name");
+                  onClick={async () => {
+                    const name = await promptDialog({
+                      title: "New group",
+                      label: "Group name",
+                      placeholder: "e.g. Sales team",
+                      confirmText: "Create",
+                    });
                     if (!name?.trim()) return;
                     void startConversation({
                       name: name.trim(),

@@ -516,11 +516,11 @@ export function appointmentProblem(input: {
   customer: AppointmentCustomer | null;
   needsEmail: boolean;
 }): string | null {
-  if (!input.hasEventType) return "Select an event type.";
+  if (!input.hasEventType) return "Select a consultation.";
   if (!input.hasSlot) return "Select a date and time.";
-  if (!input.customer) return "Select a customer.";
+  if (!input.customer) return "Select a client.";
   if (input.needsEmail && !input.customer.email.trim()) {
-    return `${input.customer.name} has no email address. Pick a customer with an email, or add a new one.`;
+    return `${input.customer.name} has no email address. Pick a client with an email, or add a new one.`;
   }
   return null;
 }

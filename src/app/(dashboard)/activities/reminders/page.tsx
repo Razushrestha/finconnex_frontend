@@ -48,6 +48,7 @@ import {
   tryCrmReminder,
 } from "@/lib/reminders/api";
 import { useCrmReminders } from "@/lib/reminders/use-crm-reminders";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   CardInitialsAvatar,
   CardOwnerRow,
@@ -333,13 +334,16 @@ export default function RemindersPage() {
     );
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
-      !window.confirm(
-        `Delete ${count} reminder${count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
+      !(await confirmDialog({
+        title: `Delete ${count} reminder${count === 1 ? "" : "s"}?`,
+        message: "This cannot be undone.",
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     ) {
       return;
     }

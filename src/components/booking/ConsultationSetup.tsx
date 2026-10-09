@@ -26,6 +26,7 @@ import {
   consultantsAllowMultiple,
   type BookingCurrency,
   type ConsultationMode,
+  normalizeConsultantPriority,
   type ConsultantPriority,
   type MeetingMode,
   type MeetingVia,
@@ -452,7 +453,7 @@ export function ConsultationSetup({
                     {filteredConsultants.map((c) => {
                       const selected = value.consultants.includes(c.name);
                       const priority =
-                        value.consultantPriorities[c.name] ?? "Low";
+                        normalizeConsultantPriority(value.consultantPriorities[c.name], "Low");
                       return (
                         <li
                           key={c.id}

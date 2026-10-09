@@ -237,7 +237,7 @@ export function evaluateCustomExpression(
   if (!/^[0-9abc+\-*/().\s]+$/.test(raw)) {
     return { ok: false, error: "Formula can only use a, b, c and + − * / ( )" };
   }
-  let replaced = raw.replace(/\b([abc])\b/g, (_, key: "a" | "b" | "c") => {
+  const replaced = raw.replace(/\b([abc])\b/g, (_, key: "a" | "b" | "c") => {
     const n = vars[key];
     return Number.isFinite(n) ? `(${n})` : "NaN";
   });

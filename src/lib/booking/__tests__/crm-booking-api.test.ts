@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bindCrmSession } from "@/lib/activity-timeline";
 import {
+  addCrmScheduleOverride,
   BookingSlotUnavailableError,
   createCrmBooking,
   crmBookingFromResponse,
   dropBookingMeetings,
   normalizeCrmBooking,
+  saveCrmHostSchedule,
+  toCrmIsoDate,
 } from "@/lib/booking/api";
 
 const SESSION = {
@@ -151,6 +154,79 @@ describe("booking and meeting rows", () => {
     const meetings = [{ id: "m-1" }, { id: "m-2" }];
     expect(dropBookingMeetings(meetings, [{}, {}])).toEqual(meetings);
     expect(dropBookingMeetings(meetings, [])).toEqual(meetings);
+  });
+
+  it("sends a full ISO date when the CRM rejects a schedule that has none", async () => {
+    bindCrmSession(SESSION);
+    const bodies: Array<Record<string, unknown>> = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      if (bodies.length === 1) {
+        return new Response(
+          JSON.stringify({
+            statusCode: 400,
+            message: [
+              "date must be a valid ISO-8601 value",
+              "date must be a string",
+            ],
+            error: "Bad Request",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: "44444444-4444-4444-8444-444444444444",
+            rules: [],
+            overrides: [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+    try {
+      const saved = await saveCrmHostSchedule(HOST, {
+        name: "Working hours",
+        timezone: "Asia/Kathmandu",
+        rules: [{ dayOfWeek: 1, startMinute: 540, endMinute: 1020 }],
+      });
+      expect(saved.id).toBe("44444444-4444-4444-8444-444444444444");
+      expect(bodies[0]).not.toHaveProperty("date");
+      expect(bodies[1]?.date).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    } finally {
+      globalThis.fetch = original;
+      bindCrmSession(null);
+    }
+  });
+
+  it("posts a date-only override as an ISO-8601 timestamp", async () => {
+    bindCrmSession(SESSION);
+    let body: Record<string, unknown> = {};
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return new Response(JSON.stringify({ data: { id: "ov-1" } }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await addCrmScheduleOverride("55555555-5555-4555-8555-555555555555", {
+        date: "2026-10-09",
+        isUnavailable: false,
+        startMinute: 540,
+        endMinute: 1020,
+      });
+      expect(body.date).toBe("2026-10-09T00:00:00.000Z");
+      expect(toCrmIsoDate("2026-10-09T05:45:00+05:45")).toBe(
+        "2026-10-09T05:45:00+05:45",
+      );
+    } finally {
+      globalThis.fetch = original;
+      bindCrmSession(null);
+    }
   });
 
   it("only trusts a create/reschedule response that carries an id", () => {

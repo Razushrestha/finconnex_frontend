@@ -25,6 +25,7 @@ import { getCrmChatUnreadCount, tryCrmChat } from "@/lib/chat/api";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getModuleTitle } from "@/lib/module-title";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
 import {
   isPlatformAdminRole,
@@ -153,6 +154,9 @@ export function Navbar({
 
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
   const moduleTitle = getModuleTitle(pathname, searchParams.toString());
+  const crm = useCrmSettings();
+  const crmLive = crm.source === "api";
+  const showCrmDot = crmLive || !crm.loading;
   const isTeamChat = pathname.startsWith("/activities/team-chat");
   const isCalendar = pathname.startsWith("/activities/calendar");
   const isWorkQueue = pathname.startsWith("/work-queue");
@@ -169,9 +173,21 @@ export function Navbar({
         <Menu className="h-5 w-5" />
       </button>
 
-      <h1 className="min-w-0 truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-slate-100">
-        {moduleTitle}
-      </h1>
+      <div className="flex min-w-0 items-center gap-2">
+        <h1 className="min-w-0 truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-slate-100">
+          {moduleTitle}
+        </h1>
+        {showCrmDot ? (
+          <span
+            title={crmLive ? "CRM live" : "CRM offline"}
+            aria-label={crmLive ? "CRM live" : "CRM offline"}
+            className={cn(
+              "inline-flex h-2.5 w-2.5 shrink-0 rounded-full",
+              crmLive ? "bg-emerald-500" : "bg-rose-500",
+            )}
+          />
+        ) : null}
+      </div>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
 

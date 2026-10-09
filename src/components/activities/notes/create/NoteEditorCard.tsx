@@ -31,6 +31,15 @@ interface NoteEditorCardProps {
   onTogglePin: () => void;
   submitted: boolean;
   errors: { body?: string; relatedName?: string };
+  /**
+   * Shown in place of the Related Entity / Related Record pickers, for a
+   * caller that already knows the record (an automation step's trigger).
+   */
+  relatedSlot?: React.ReactNode;
+  /** Hides Created By, for a caller where the author is not chosen here. */
+  hideCreatedBy?: boolean;
+  /** Wrap the body editor's toolbar, for a narrow column. */
+  wrapToolbar?: boolean;
 }
 
 export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
@@ -53,6 +62,9 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
   onTogglePin,
   submitted,
   errors,
+  relatedSlot,
+  hideCreatedBy = false,
+  wrapToolbar = false,
 }) => {
   const extra =
     relatedKind && relatedName
@@ -75,58 +87,71 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-              Related Entity
-            </label>
-            <select
-              value={relatedKind}
-              onChange={(e) => {
-                onRelatedKindChange(e.target.value as RelatedEntityKind | "");
-                onRelatedNameChange("");
-                onRelatedIdChange?.("");
-              }}
-              className="w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border border-border text-foreground focus:outline-none cursor-pointer"
-            >
-              <option value="" className="bg-popover text-popover-foreground">
-                Select entity
-              </option>
-              {RELATED_ENTITY_KINDS.map((k) => (
-                <option
-                  key={k}
-                  value={k}
-                  className="bg-popover text-popover-foreground"
+          {relatedSlot ? (
+            <div className="sm:col-span-2">{relatedSlot}</div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                  Related Entity
+                </label>
+                <select
+                  value={relatedKind}
+                  onChange={(e) => {
+                    onRelatedKindChange(
+                      e.target.value as RelatedEntityKind | "",
+                    );
+                    onRelatedNameChange("");
+                    onRelatedIdChange?.("");
+                  }}
+                  className="w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border border-border text-foreground focus:outline-none cursor-pointer"
                 >
-                  {k}
-                </option>
-              ))}
-            </select>
-          </div>
+                  <option
+                    value=""
+                    className="bg-popover text-popover-foreground"
+                  >
+                    Select entity
+                  </option>
+                  {RELATED_ENTITY_KINDS.map((k) => (
+                    <option
+                      key={k}
+                      value={k}
+                      className="bg-popover text-popover-foreground"
+                    >
+                      {k}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-              Related Record <span className="text-destructive">*</span>
-            </label>
-            <RelatedRecordCombobox
-              value={relatedName}
-              onChange={onRelatedNameChange}
-              onSelectOption={(option) => onRelatedIdChange?.(option?.id ?? "")}
-              options={relatedOptions}
-              disabled={!relatedKind}
-              placeholder={
-                loading
-                  ? "Loading CRM records…"
-                  : relatedKind
-                    ? "Search record…"
-                    : "Select related entity first"
-              }
-            />
-            {submitted && errors.relatedName ? (
-              <span className="text-[10px] text-destructive mt-0.5 block">
-                {errors.relatedName}
-              </span>
-            ) : null}
-          </div>
+              <div>
+                <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                  Related Record <span className="text-destructive">*</span>
+                </label>
+                <RelatedRecordCombobox
+                  value={relatedName}
+                  onChange={onRelatedNameChange}
+                  onSelectOption={(option) =>
+                    onRelatedIdChange?.(option?.id ?? "")
+                  }
+                  options={relatedOptions}
+                  disabled={!relatedKind}
+                  placeholder={
+                    loading
+                      ? "Loading CRM records…"
+                      : relatedKind
+                        ? "Search record…"
+                        : "Select related entity first"
+                  }
+                />
+                {submitted && errors.relatedName ? (
+                  <span className="text-[10px] text-destructive mt-0.5 block">
+                    {errors.relatedName}
+                  </span>
+                ) : null}
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-[11px] font-medium text-muted-foreground mb-1">
@@ -149,26 +174,28 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">
-              Created By
-            </label>
-            <select
-              value={createdBy}
-              onChange={(e) => onCreatedByChange(e.target.value)}
-              className="w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border border-border text-foreground focus:outline-none cursor-pointer"
-            >
-              {ACTIVITY_OWNERS.map((o) => (
-                <option
-                  key={o}
-                  value={o}
-                  className="bg-popover text-popover-foreground"
-                >
-                  {o}
-                </option>
-              ))}
-            </select>
-          </div>
+          {hideCreatedBy ? null : (
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                Created By
+              </label>
+              <select
+                value={createdBy}
+                onChange={(e) => onCreatedByChange(e.target.value)}
+                className="w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border border-border text-foreground focus:outline-none cursor-pointer"
+              >
+                {ACTIVITY_OWNERS.map((o) => (
+                  <option
+                    key={o}
+                    value={o}
+                    className="bg-popover text-popover-foreground"
+                  >
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="pt-1">
@@ -244,6 +271,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
           value={body}
           onChange={onBodyChange}
           error={submitted && Boolean(errors.body)}
+          wrapToolbar={wrapToolbar}
           placeholder="Start typing your notes here... Type @ to assign someone."
         />
         {submitted && errors.body ? (

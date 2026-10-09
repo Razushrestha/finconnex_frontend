@@ -86,8 +86,10 @@ export function smokeStorageWiring() {
   const attachments = readSrc(
     "src/app/(dashboard)/activities/attachments/page.tsx",
   );
-  if (!attachments.includes("uploadCrmStorageFile")) {
-    fail("attachments page does not call uploadCrmStorageFile");
+  // The Activities Attachments module was retired; uploads live in the
+  // document library (checked above).
+  if (!attachments.includes('redirect("/documents/library")')) {
+    fail("attachments page must redirect to the document library");
   }
 
   const settings = readSrc("src/components/settings/SettingsFormClient.tsx");

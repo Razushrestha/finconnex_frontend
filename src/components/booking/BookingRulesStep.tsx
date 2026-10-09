@@ -428,6 +428,7 @@ export function BookingRulesStep({
   onBack,
   onSave,
   onChange,
+  onDraftChange,
 }: {
   initial?: BookingRulesValues | null;
   /** Group consultations also set how many guests share a slot. */
@@ -437,6 +438,8 @@ export function BookingRulesStep({
   onBack?: () => void;
   onSave?: (rules: BookingRulesValues) => void;
   onChange?: (rules: BookingRulesValues) => void;
+  /** Every valid change in the wizard, so it can be kept as a draft. */
+  onDraftChange?: (rules: BookingRulesValues) => void;
 }) {
   const [rules, setRules] = useState<BookingRulesValues>(
     initial ?? DEFAULT_RULES,
@@ -449,8 +452,9 @@ export function BookingRulesStep({
     const next = { ...rules, ...partial };
     setRules(next);
     // Never save a half-valid combination from the overview.
-    if (embedded && Object.keys(rulesErrors(next, group)).length === 0) {
-      onChange?.(next);
+    if (Object.keys(rulesErrors(next, group)).length === 0) {
+      if (embedded) onChange?.(next);
+      onDraftChange?.(next);
     }
   }
 

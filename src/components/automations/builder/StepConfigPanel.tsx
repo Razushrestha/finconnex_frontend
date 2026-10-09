@@ -67,6 +67,8 @@ import { EmailTemplateField } from "./EmailTemplateField";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
 import { SlideOverPanel } from "./SlideOverPanel";
+import { SendEmailActionForm } from "./SendEmailActionForm";
+import { CreateNoteActionForm } from "./CreateNoteActionForm";
 import { TimezoneField } from "./TimezoneField";
 
 function useMembers() {
@@ -141,6 +143,14 @@ function ActionConfigForm({
   // Create Contact is the Create Contact modal's own form.
   if (step.action === "CREATE_CONTACT") {
     return <CreateContactActionForm config={config} entityType={entityType} onChange={onChange} />;
+  }
+  // Create Note is the Notes page's own editor card.
+  if (step.action === "CREATE_NOTE") {
+    return <CreateNoteActionForm config={config} entityType={entityType} onChange={onChange} />;
+  }
+  // Send Email is the Emails compose page, laid out in the panel.
+  if (step.action === "SEND_EMAIL") {
+    return <SendEmailActionForm config={config} entityType={entityType} onChange={onChange} />;
   }
   // Create Lead is the Create Lead modal's own form.
   if (step.action === "CREATE_LEAD") {

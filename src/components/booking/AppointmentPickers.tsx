@@ -35,6 +35,8 @@ import {
 } from "@/lib/booking/new-appointment";
 import type { BookingCurrency } from "@/lib/booking/types";
 import { cn } from "@/lib/utils";
+import { emailAddressProblem } from "@/lib/emails/address";
+import { EmailProblemText } from "@/components/shared/EmailProblemText";
 
 /** Accent used across the New Appointment form. */
 export const ACCENT = "#5A4FCF";
@@ -169,12 +171,12 @@ export function EventTypePicker({
   const shown = options.filter((option) => matchesKeywords(option.name, query));
 
   return (
-    <PickerField label="Event Types" picker="event">
+    <PickerField label="Consultations" picker="event">
       <PickerTrigger
-        label="Event Types"
+        label="Consultations"
         icon={Ticket}
         value={selected?.name ?? ""}
-        placeholder="Select Event Type"
+        placeholder="Select Consultation"
         chevron
         open={open}
         invalid={invalid}
@@ -192,7 +194,7 @@ export function EventTypePicker({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search keywords"
-              aria-label="Search event types"
+              aria-label="Search consultations"
               className={cn(SEARCH_INPUT, "pr-3 pl-10")}
             />
           </div>
@@ -204,8 +206,8 @@ export function EventTypePicker({
             ) : shown.length === 0 ? (
               <li className="px-2 py-5 text-center text-[13px] text-slate-400">
                 {options.length === 0
-                  ? "No active event types yet. Create and activate a consultation first."
-                  : "No event types match your search."}
+                  ? "No active consultations yet. Create and activate a consultation first."
+                  : "No consultations match your search."}
               </li>
             ) : (
               shown.map((option) => (
@@ -272,12 +274,12 @@ export function UserPicker({
   const choice = users.length > 1;
   const selected = users.find((user) => user.id === value);
   return (
-    <PickerField label="User" picker="user">
+    <PickerField label="Consultant" picker="user">
       <PickerTrigger
-        label="User"
+        label="Consultant"
         icon={UsersRound}
-        value={selected?.name ?? "Random User"}
-        placeholder="Random User"
+        value={selected?.name ?? "Random Consultant"}
+        placeholder="Random Consultant"
         chevron={choice}
         open={open}
         onClick={() => {
@@ -286,8 +288,8 @@ export function UserPicker({
       />
       {open && choice ? (
         <div className={cn(POPOVER, "top-full mt-2 p-2")}>
-          <ul role="listbox" aria-label="Users" className="max-h-64 overflow-y-auto">
-            {[{ id: "random", name: "Random User" }, ...users].map((user) => (
+          <ul role="listbox" aria-label="Consultants" className="max-h-64 overflow-y-auto">
+            {[{ id: "random", name: "Random Consultant" }, ...users].map((user) => (
               <li key={user.id}>
                 <button
                   type="button"
@@ -400,7 +402,7 @@ export function DateTimePicker({
 
   let side: ReactNode;
   if (!hasEventType) {
-    side = <SideMessage>Select an Event Type first</SideMessage>;
+    side = <SideMessage>Select a consultation first</SideMessage>;
   } else if (loading) {
     side = (
       <SideMessage>
@@ -570,7 +572,6 @@ function SideMessage({
 /* Customer                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type NewCustomerInput = { name: string; email: string; phone: string };
 
@@ -598,12 +599,12 @@ export function CustomerPicker({
   onCreate: (input: NewCustomerInput) => Promise<AppointmentCustomer>;
 }) {
   return (
-    <PickerField label="Customer" picker="customer">
+    <PickerField label="Client" picker="customer">
       <PickerTrigger
-        label="Customer"
+        label="Client"
         icon={UserRound}
         value={selected?.name ?? ""}
-        placeholder="Select Customer"
+        placeholder="Select Client"
         chevron
         open={open}
         invalid={invalid}
@@ -671,7 +672,7 @@ function CustomerPopover({
                     type="button"
                     aria-haspopup="listbox"
                     aria-expanded={sourceMenu}
-                    aria-label="Customer source"
+                    aria-label="Client source"
                     onClick={() => setSourceMenu((current) => !current)}
                     className="flex h-11 items-center gap-1.5 rounded-l-xl border border-slate-200 bg-slate-50 px-3 text-[14px] font-medium text-slate-700 hover:bg-slate-100"
                   >
@@ -681,7 +682,7 @@ function CustomerPopover({
                   {sourceMenu ? (
                     <ul
                       role="listbox"
-                      aria-label="Customer source"
+                      aria-label="Client source"
                       className="absolute top-full left-0 z-10 mt-1 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
                     >
                       {CUSTOMER_SOURCES.map((item) => (
@@ -711,7 +712,7 @@ function CustomerPopover({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Enter to Search"
-                  aria-label="Search customers"
+                  aria-label="Search clients"
                   className={cn(SEARCH_INPUT, "min-w-0 flex-1 rounded-l-none px-3")}
                 />
               </div>
@@ -724,7 +725,7 @@ function CustomerPopover({
                 New Customer
               </button>
               <div className="my-2.5 border-t border-slate-100" />
-              <ul role="listbox" aria-label="Customers" className="max-h-56 overflow-y-auto">
+              <ul role="listbox" aria-label="Clients" className="max-h-56 overflow-y-auto">
                 {loading && customers.length === 0 ? (
                   <li className="px-2 py-4 text-center text-[13px] text-slate-400">
                     Loading customers…
@@ -733,7 +734,7 @@ function CustomerPopover({
                   <li className="px-2 py-4 text-center text-[13px] text-slate-400">
                     {customers.length === 0
                       ? `No ${source.toLowerCase()} found.`
-                      : "No customers match your search."}
+                      : "No clients match your search."}
                   </li>
                 ) : (
                   shown.map((customer) => (
@@ -791,14 +792,15 @@ function NewCustomerForm({
 
   async function save() {
     if (busy) return;
-    if (!name.trim()) return setError("Enter the customer's name.");
-    if (!EMAIL_PATTERN.test(email.trim())) return setError("Enter a valid email address.");
+    if (!name.trim()) return setError("Enter the client's name.");
+    const emailProblem = emailAddressProblem(email);
+    if (emailProblem) return setError(emailProblem);
     setBusy(true);
     setError("");
     try {
       await onCreate({ name: name.trim(), email: email.trim(), phone: phone.trim() });
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "Could not add the customer.");
+      setError(err instanceof Error && err.message ? err.message : "Could not add the client.");
       setBusy(false);
     }
   }
@@ -813,13 +815,13 @@ function NewCustomerForm({
       }}
       className="space-y-2.5"
     >
-      <p className="text-[14px] font-semibold text-slate-800">New Customer</p>
+      <p className="text-[14px] font-semibold text-slate-800">New Client</p>
       <input
         ref={nameRef}
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="Full name"
-        aria-label="Customer name"
+        aria-label="Client name"
         className={input}
       />
       <input
@@ -827,7 +829,7 @@ function NewCustomerForm({
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         placeholder="Email address"
-        aria-label="Customer email"
+        aria-label="Client email"
         className={input}
       />
       <input
@@ -835,17 +837,27 @@ function NewCustomerForm({
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
         placeholder="Phone (optional)"
-        aria-label="Customer phone"
+        aria-label="Client phone"
         className={input}
       />
-      {error ? <p className="text-[12px] font-medium text-rose-600">{error}</p> : null}
+      {error ? (
+        <EmailProblemText
+          message={error}
+          email={email}
+          onUseSuggestion={(address) => {
+            setEmail(address);
+            setError("");
+          }}
+          className="text-[12px] font-medium text-rose-600"
+        />
+      ) : null}
       <div className="flex gap-2 pt-0.5">
         <button
           type="submit"
           disabled={busy}
           className="h-10 flex-1 rounded-lg bg-[var(--brand-primary-strong)] text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-60"
         >
-          {busy ? "Adding…" : "Add Customer"}
+          {busy ? "Adding…" : "Add Client"}
         </button>
         <button
           type="button"

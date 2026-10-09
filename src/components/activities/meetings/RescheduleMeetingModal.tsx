@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { X } from "lucide-react";
 import type { Meeting } from "@/lib/meetings/types";
 import {

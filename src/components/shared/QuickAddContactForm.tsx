@@ -11,6 +11,8 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { splitNameParts } from "@/components/sales/leads/LeadContactPicker";
 import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
+import { emailAddressProblem } from "@/lib/emails/address";
+import { EmailProblemText } from "@/components/shared/EmailProblemText";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,15 +85,21 @@ export function QuickAddContactForm({
     const last = lastName.trim();
     const mail = email.trim();
     const tel = phone.trim();
+    const emailProblem = mail ? emailAddressProblem(mail) : null;
     const nextErrors = {
       firstName: !first,
       lastName: !last,
-      email: !mail || !EMAIL_RE.test(mail),
+      email: !mail || emailProblem !== null,
       phone: !isValidPhoneInput(tel),
     };
     setFieldErrors(nextErrors);
-    if (nextErrors.firstName || nextErrors.lastName || nextErrors.email) {
+    if (nextErrors.firstName || nextErrors.lastName || !mail) {
       setError("First name, last name and email are required");
+      return;
+    }
+    if (emailProblem) {
+      // e.g. "Did you mean ram@gmail.com?" for ram@gmail.comcomcom
+      setError(emailProblem);
       return;
     }
     if (nextErrors.phone) {
@@ -173,7 +181,16 @@ export function QuickAddContactForm({
         </Field>
       </div>
       {error ? (
-        <p className="mt-1.5 text-[11px] font-medium text-rose-500">{error}</p>
+        <EmailProblemText
+          message={error}
+          email={email}
+          onUseSuggestion={(address) => {
+            setEmail(address);
+            setError("");
+            setFieldErrors((prev) => ({ ...prev, email: false }));
+          }}
+          className="mt-1.5 text-[11px] font-medium text-rose-500"
+        />
       ) : null}
       <div className="mt-2 flex justify-end gap-2">
         <button

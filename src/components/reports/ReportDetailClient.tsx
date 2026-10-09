@@ -91,6 +91,7 @@ import {
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function ReportDetailClient({ id }: { id: string }) {
@@ -605,8 +606,17 @@ export function ReportDetailClient({ id }: { id: string }) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (!window.confirm(`Delete ${row.reportId}?`)) return;
+            onClick={async () => {
+              if (
+                !(await confirmDialog({
+                  title: "Delete report?",
+                  message: `Delete ${row.reportId}?`,
+                  confirmText: "Delete",
+                  tone: "danger",
+                }))
+              ) {
+                return;
+              }
               const gate = softDeleteRecord({
                 action: "reports.delete",
                 module: "reports",

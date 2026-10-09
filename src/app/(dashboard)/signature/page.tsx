@@ -10,6 +10,7 @@ import {
   computeOverallStatus,
 } from "@/lib/documents/signature/types";
 import { onRecordsChange } from "@/lib/records-sync";
+import { confirmDialog } from "@/lib/notify/dialog";
 import {
   deleteCrmSignatureRequest,
   isCrmSignatureRequestId,
@@ -248,11 +249,14 @@ export default function ESignatureOverviewPage() {
     router.push(`/signature/${doc.id}/edit`);
   }
 
-  function handleDeleteDocument(doc: SignatureRequest) {
+  async function handleDeleteDocument(doc: SignatureRequest) {
     if (
-      !window.confirm(
-        `Delete "${doc.documentName}"? This action can't be undone.`,
-      )
+      !(await confirmDialog({
+        title: "Delete document?",
+        message: `Delete "${doc.documentName}"? This action can't be undone.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     )
       return;
     deleteSignatureRequest(doc.id);
@@ -268,11 +272,14 @@ export default function ESignatureOverviewPage() {
     router.push(`/signature/templates/${tpl.id}/edit`);
   }
 
-  function handleDeleteTemplate(tpl: SignatureRequest) {
+  async function handleDeleteTemplate(tpl: SignatureRequest) {
     if (
-      !window.confirm(
-        `Delete template "${tpl.documentName}"? This action can't be undone.`,
-      )
+      !(await confirmDialog({
+        title: "Delete template?",
+        message: `Delete template "${tpl.documentName}"? This action can't be undone.`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
     )
       return;
     deleteSignatureRequest(tpl.id);
@@ -512,7 +519,7 @@ export default function ESignatureOverviewPage() {
                           </button>
                           <RowActionsMenu
                             onEdit={() => handleEditDocument(doc)}
-                            onDelete={() => handleDeleteDocument(doc)}
+                            onDelete={() => void handleDeleteDocument(doc)}
                           />
                         </div>
                       </td>
@@ -624,7 +631,7 @@ export default function ESignatureOverviewPage() {
                           </button>
                           <RowActionsMenu
                             onEdit={() => handleEditTemplate(tpl)}
-                            onDelete={() => handleDeleteTemplate(tpl)}
+                            onDelete={() => void handleDeleteTemplate(tpl)}
                           />
                         </div>
                       </td>

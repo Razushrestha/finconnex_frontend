@@ -35,12 +35,19 @@ export type EmailOption = {
   placeholder?: boolean;
 };
 
+/** The workspace's no-reply sender: what every page uses until changed. */
+export const SEND_FROM_NO_REPLY = "no_reply";
 export const SEND_FROM_DEFAULT = "default";
 export const PARTY_SUPER_ADMIN = "super_admin";
 export const PARTY_STAFF = "staff";
 export const PARTY_CUSTOMER = "customer";
 
-const SEND_FROM_VALUES = [SEND_FROM_DEFAULT, PARTY_SUPER_ADMIN, PARTY_STAFF];
+const SEND_FROM_VALUES = [
+  SEND_FROM_NO_REPLY,
+  SEND_FROM_DEFAULT,
+  PARTY_SUPER_ADMIN,
+  PARTY_STAFF,
+];
 const REPLY_TO_CUSTOMER_TAB = ["", PARTY_SUPER_ADMIN, PARTY_STAFF];
 // Replying to the customer only makes sense on emails that go to the team.
 const REPLY_TO_USER_TAB = ["", PARTY_SUPER_ADMIN, PARTY_STAFF, PARTY_CUSTOMER];
@@ -54,10 +61,11 @@ export function superAdminLabel(email: string) {
 }
 
 const STAFF_LABEL = "Allocated staff member's email address";
-const CUSTOMER_LABEL = "Customer's Email address";
+const CUSTOMER_LABEL = "Client's Email address";
 
 export function sendFromOptions(superAdminEmail = ""): EmailOption[] {
   return [
+    { value: SEND_FROM_NO_REPLY, label: "No-reply email address" },
     { value: SEND_FROM_DEFAULT, label: "Default FinConnex email address" },
     { value: PARTY_SUPER_ADMIN, label: superAdminLabel(superAdminEmail) },
     { value: PARTY_STAFF, label: STAFF_LABEL },
@@ -121,12 +129,17 @@ export function normalizeEmailRouting(
   ctx: PartyContext = {},
 ): EmailRouting {
   return {
-    sendFrom: partyFrom(raw?.sendFrom, SEND_FROM_VALUES, ctx) || SEND_FROM_DEFAULT,
-    replyTo: partyFrom(
-      raw?.replyTo,
-      audience === "user" ? REPLY_TO_USER_TAB : REPLY_TO_CUSTOMER_TAB,
-      ctx,
-    ),
+    sendFrom: partyFrom(raw?.sendFrom, SEND_FROM_VALUES, ctx) || SEND_FROM_NO_REPLY,
+    // Never set: customers reply to the staff member handling the booking.
+    // "" is kept as a deliberate "no Reply To".
+    replyTo:
+      raw?.replyTo === undefined && audience === "customer"
+        ? PARTY_STAFF
+        : partyFrom(
+            raw?.replyTo,
+            audience === "user" ? REPLY_TO_USER_TAB : REPLY_TO_CUSTOMER_TAB,
+            ctx,
+          ),
     cc: partyFrom(raw?.cc, CC_VALUES, ctx),
   };
 }

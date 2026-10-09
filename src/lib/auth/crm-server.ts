@@ -10,7 +10,9 @@ import {
   getSessionCookieOptions,
   REMEMBER_MAX_AGE,
   SESSION_MAX_AGE,
+  sessionRememberMe,
 } from "@/lib/auth/constants";
+import { getSession } from "@/lib/auth/session";
 import type { SessionPayload } from "@/lib/auth/types";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { asWorkspaceRole } from "@/lib/auth/workspace-role";
@@ -191,10 +193,26 @@ export function sessionFromCrmUser(
   };
 }
 
+type CookieJar = {
+  set(
+    name: string,
+    value: string,
+    options: ReturnType<typeof getSessionCookieOptions>,
+  ): unknown;
+};
+
 export function applyCrmTokenCookies(
   response: NextResponse,
   tokens: { accessToken: string; refreshToken?: string | null },
   rememberMe = false,
+) {
+  writeCrmTokenCookies(response.cookies, tokens, rememberMe);
+}
+
+function writeCrmTokenCookies(
+  jar: CookieJar,
+  tokens: { accessToken: string; refreshToken?: string | null },
+  rememberMe: boolean,
 ) {
   const base = getSessionCookieOptions(rememberMe);
   // Browsers silently drop Set-Cookie values over ~4KB. Nest access JWTs often
@@ -203,19 +221,19 @@ export function applyCrmTokenCookies(
   const maxCookieBytes = 3500;
   const accessBytes = new TextEncoder().encode(tokens.accessToken).length;
   if (accessBytes > 0 && accessBytes <= maxCookieBytes) {
-    response.cookies.set(CRM_ACCESS_COOKIE, tokens.accessToken, {
+    jar.set(CRM_ACCESS_COOKIE, tokens.accessToken, {
       ...base,
       maxAge: tokenMaxAgeSeconds(tokens.accessToken, CRM_ACCESS_FALLBACK_MAX_AGE),
     });
   } else {
-    response.cookies.set(CRM_ACCESS_COOKIE, "", { ...base, maxAge: 0 });
+    jar.set(CRM_ACCESS_COOKIE, "", { ...base, maxAge: 0 });
   }
   if (tokens.refreshToken) {
     const refreshBytes = new TextEncoder().encode(tokens.refreshToken).length;
     if (refreshBytes <= maxCookieBytes) {
       const refreshFallback = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
       const refreshAge = tokenMaxAgeSeconds(tokens.refreshToken, refreshFallback);
-      response.cookies.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
+      jar.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
         ...base,
         maxAge: rememberMe ? Math.max(refreshAge, REMEMBER_MAX_AGE) : refreshAge,
       });
@@ -275,11 +293,39 @@ export async function readCrmTokens(): Promise<{
   };
 }
 
-/** Cookie/env CRM JWTs, refreshed and workspace-scoped when possible. */
-let inflightRotate: Promise<{
+/**
+ * Rotations in flight, keyed by the refresh token being spent. Concurrent
+ * requests holding the same token share one rotation; a different token (or a
+ * different user) must never be handed another rotation's result.
+ */
+const inflightRotations = new Map<
+  string,
+  Promise<{ accessToken: string; refreshToken: string }>
+>();
+
+/**
+ * Write a rotated pair back to the request's cookie jar. Nest accepts a
+ * superseded refresh token only for a short grace window
+ * (AUTH_REFRESH_ROTATION_GRACE_SECONDS) and then treats it as reuse, which
+ * deletes the whole CRM session — every later call fails with
+ * "Session is invalid or expired". Route Handlers that rotated through
+ * resolveLiveCrmAuth without setting cookies left the browser holding exactly
+ * such a token. Server Component renders cannot set cookies; that throw is
+ * swallowed (and outside a request scope there is no jar at all).
+ */
+async function persistRotatedCrmTokens(tokens: {
   accessToken: string;
   refreshToken: string;
-}> | null = null;
+}) {
+  try {
+    const store = await cookies();
+    writeCrmTokenCookies(store, tokens, sessionRememberMe(await getSession()));
+  } catch {
+    /* read-only cookie store (Server Component render) */
+  }
+}
+
+/** Cookie/env CRM JWTs, refreshed and workspace-scoped when possible. */
 
 export async function resolveLiveCrmAuth(): Promise<{
   accessToken: string;
@@ -508,26 +554,28 @@ export async function refreshCrmTokens(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
 }> {
-  if (inflightRotate) return inflightRotate;
-  inflightRotate = (async () => {
-    const { data } = await crmFetch<{
-      accessToken: string;
-      refreshToken: string;
-    }>("/auth/refresh-token", {
-      method: "POST",
-      refreshToken,
-      bearer: "refresh",
-    });
-    if (!data?.accessToken || !data?.refreshToken) {
-      throw new CrmAuthError(401, "Could not refresh CRM session");
-    }
-    return data;
-  })();
-  try {
-    return await inflightRotate;
-  } finally {
-    inflightRotate = null;
+  let rotation = inflightRotations.get(refreshToken);
+  if (!rotation) {
+    rotation = (async () => {
+      const { data } = await crmFetch<{
+        accessToken: string;
+        refreshToken: string;
+      }>("/auth/refresh-token", {
+        method: "POST",
+        refreshToken,
+        bearer: "refresh",
+      });
+      if (!data?.accessToken || !data?.refreshToken) {
+        throw new CrmAuthError(401, "Could not refresh CRM session");
+      }
+      return data;
+    })().finally(() => inflightRotations.delete(refreshToken));
+    inflightRotations.set(refreshToken, rotation);
   }
+  const rotated = await rotation;
+  // Per request, outside the shared promise: each request owns its cookie jar.
+  await persistRotatedCrmTokens(rotated);
+  return rotated;
 }
 
 export async function crmMe(accessToken: string, refreshToken?: string | null) {

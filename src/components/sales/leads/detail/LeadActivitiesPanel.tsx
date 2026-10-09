@@ -41,6 +41,7 @@ import {
 } from "@/lib/leads/next-best-action";
 import type { LeadCardData } from "@/lib/leads/types";
 import { onRulesChange } from "@/lib/rules";
+import { confirmDialog } from "@/lib/notify/dialog";
 import { cn } from "@/lib/utils";
 
 const PURPLE = "var(--brand-primary)";
@@ -332,9 +333,18 @@ export function LeadActivitiesPanel({
     emitLeadActivityChange();
   }
 
-  function deleteActivity(item: ActivityRow) {
+  async function deleteActivity(item: ActivityRow) {
     setMenuId(null);
-    if (!window.confirm(`Delete “${item.title}”?`)) return;
+    if (
+      !(await confirmDialog({
+        title: "Delete activity?",
+        message: `Delete “${item.title}”?`,
+        confirmText: "Delete",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     if (item.type === "task") deleteTask(item.id);
     else if (item.type === "call") deleteCall(item.id);
     else deleteMeeting(item.id);
@@ -734,7 +744,7 @@ export function LeadActivitiesPanel({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => deleteActivity(item)}
+                                onClick={() => void deleteActivity(item)}
                                 className="flex w-full px-3 py-1.5 text-left text-[12px] text-rose-600 hover:bg-rose-50"
                               >
                                 Delete

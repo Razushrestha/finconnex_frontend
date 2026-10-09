@@ -2,12 +2,20 @@
 
 import {
   guestAppointmentNotes,
+  guestClockInstant,
   guestClockRange,
   type GuestClock,
 } from "@/lib/meetings/appointment-manage";
 import type { Meeting } from "@/lib/meetings/types";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Scheduled" | "Cancelled";
+/** Where the appointment is in its lifecycle — the stages guests are notified about. */
+export type AppointmentStage =
+  | "Booked"
+  | "Rescheduled"
+  | "Cancelled"
+  | "Completed"
+  | "No Show";
 export type AppointmentType = "Consultation" | "Strategy Call" | "Review";
 export type AppointmentChannel = "In Person" | "Phone Call" | "Video Call";
 export type RelatedKind = "Lead" | "Contact" | "Deal" | "Company";
@@ -49,6 +57,8 @@ export interface DashboardAppointment {
   createdBy?: string;
   type: AppointmentType;
   status: AppointmentStatus;
+  /** Lifecycle stage; unset means Booked (or Cancelled, per status). */
+  stage?: AppointmentStage;
   channel: AppointmentChannel;
   /** True when the booking record itself named a location. Event-type defaults must not replace it. */
   channelFromBooking?: boolean;
@@ -231,6 +241,11 @@ function addDays(date: Date, days: number) {
 
 function inRange(date: Date, start: Date, end: Date) {
   return date >= start && date < end;
+}
+
+export function appointmentStage(row: DashboardAppointment): AppointmentStage {
+  if (row.status === "Cancelled") return "Cancelled";
+  return row.stage ?? "Booked";
 }
 
 export function appointmentMatchesKpi(
@@ -505,8 +520,8 @@ function parseRelated(raw?: string): { kind: RelatedKind; id: string } {
   return { kind: "Contact", id: value || "—" };
 }
 
-function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus | null {
-  if (status === "Completed") return null;
+function mapMeetingStatus(status: Meeting["status"]): AppointmentStatus {
+  if (status === "Completed") return "Confirmed";
   if (status === "Cancelled") return "Cancelled";
   if (status === "In Progress") return "Confirmed";
   if (status === "Rescheduled") return "Pending";
@@ -547,11 +562,26 @@ function mapChannel(type: Meeting["type"]): AppointmentChannel {
 }
 
 /** Rows the booking dashboard can show from the local appointment store when the CRM is down. */
+/**
+ * A guest clock's start and end on the booking screens' clock (the signed-in
+ * host's zone, else this browser's). The guest picked the time on their own
+ * clock; showing those digits as they were put a 9:00 Sydney appointment at
+ * 3:45 for a host in Sydney because the guest was in Kathmandu.
+ */
+export function guestClockDisplayRange(clock: GuestClock): { start: string; end: string } {
+  const instant = guestClockInstant(clock);
+  if (!instant) {
+    return guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+  }
+  const end = new Date(instant.getTime() + Math.max(0, clock.durationMinutes) * 60_000);
+  return { start: toLocalStart(instant.toISOString()), end: toLocalStart(end.toISOString()) };
+}
+
 export function appointmentsFromGuestClocks(clocks: GuestClock[]): DashboardAppointment[] {
   return clocks
     .filter((clock) => clock.status !== "deleted")
     .map((clock) => {
-      const range = guestClockRange(clock.dateIso, clock.startHHmm, clock.durationMinutes);
+      const range = guestClockDisplayRange(clock);
       const cancelled = clock.status === "cancelled";
       return {
         id: clock.meetingId || clock.token || `title:${clock.title.trim().toLowerCase()}`,
@@ -580,7 +610,12 @@ export function meetingToAppointment(
   consultants: { id: string; name: string; email?: string }[] = [],
 ): DashboardAppointment | null {
   const status = mapMeetingStatus(meeting.status);
-  if (!status) return null;
+  const stage: AppointmentStage | undefined =
+    meeting.status === "Completed"
+      ? "Completed"
+      : meeting.status === "Rescheduled"
+        ? "Rescheduled"
+        : undefined;
   const hostAttendee = meeting.attendees.find((row) => row.role === "Host");
   const host = resolveConsultantMatch(
     [
@@ -634,8 +669,15 @@ export function meetingToAppointment(
       meeting.bookingHostUserId ||
       "",
     consultantName,
-    start: toLocalStart(meeting.startDateTime),
-    end: meeting.endDateTime ? toLocalStart(meeting.endDateTime) : undefined,
+    // The instant, read on the host's clock; startDateTime is text already
+    // formatted on this browser's clock, which showed a Sydney 9:00 at 3:45
+    // to a host whose browser was in Kathmandu.
+    start: toLocalStart(meeting.startAt ?? meeting.startDateTime),
+    end: meeting.endAt
+      ? toLocalStart(meeting.endAt)
+      : meeting.endDateTime
+        ? toLocalStart(meeting.endDateTime)
+        : undefined,
     eventTypeName:
       appointmentPersonName(meeting.title) &&
       appointmentPersonName(meeting.title) !== guestName
@@ -643,6 +685,7 @@ export function meetingToAppointment(
         : undefined,
     type: "Consultation",
     status,
+    stage,
     channel: mapChannel(meeting.type),
     avatarClass: AVATARS[(guest?.name || meeting.title).length % AVATARS.length],
     notes: meeting.notes || meeting.agenda,

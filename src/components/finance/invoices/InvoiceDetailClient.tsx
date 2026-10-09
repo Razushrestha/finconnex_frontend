@@ -57,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { softDeleteRecord } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { notify, toast } from "@/lib/notify/toast";
+import { confirmDialog } from "@/lib/notify/dialog";
 
 export function InvoiceDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -458,8 +459,16 @@ export function InvoiceDetailClient({ id }: { id: string }) {
             {!terminal ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (!window.confirm(`Delete ${row.invoiceId}?`)) return;
+                onClick={async () => {
+                  if (
+                    !(await confirmDialog({
+                      title: "Delete invoice?",
+                      message: `Delete ${row.invoiceId}?`,
+                      confirmText: "Delete",
+                      tone: "danger",
+                    }))
+                  )
+                    return;
                   const gate = softDeleteRecord({
                     action: "finance.invoices.delete",
                     module: "finance.invoices",

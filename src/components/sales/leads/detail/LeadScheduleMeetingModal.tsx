@@ -44,7 +44,12 @@ import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import type { LeadCardData } from "@/lib/leads/types";
 import {
-  createMeeting,
+  createMeetingPreferCrm,
+  isCrmMeetingId,
+  persistRemoteMeeting,
+  updateCrmMeeting,
+} from "@/lib/meetings/api";
+import {
   findMeetingById,
   formatMeetingDateTime,
   updateMeeting,
@@ -271,7 +276,7 @@ export function LeadScheduleMeetingModal({
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     setAttempted(true);
     if (!title.trim()) {
       setError("Appointment title is required");
@@ -364,7 +369,7 @@ export function LeadScheduleMeetingModal({
       if (editId && findMeetingById(editId)) {
         const startDate = starts[0];
         const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
-        updateMeeting(editId, {
+        const patch = {
           title: title.trim(),
           relatedTo,
           type,
@@ -375,23 +380,42 @@ export function LeadScheduleMeetingModal({
           meetingLink: meetingLinkValue,
           notes: noteText || undefined,
           attendees,
-        });
+        };
+        if (isCrmMeetingId(editId)) {
+          persistRemoteMeeting(
+            await updateCrmMeeting(editId, { ...patch, agenda: patch.notes }),
+          );
+        }
+        updateMeeting(editId, patch);
       } else {
-        starts.forEach((startDate) => {
+        // Sequential: one CRM error stops the series instead of half-saving it
+        // in parallel.
+        for (const startDate of starts) {
           const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
-          createMeeting({
+          await createMeetingPreferCrm({
             title: title.trim(),
             relatedTo,
+            relatedKind,
+            // Only link the lead by id while the form still points at it.
+            relatedId:
+              relatedKind === "Lead" && relatedName.trim() === card.name.trim()
+                ? card.id
+                : undefined,
             type,
+            status: "Scheduled",
             startDateTime: formatMeetingDateTime(startDate),
             endDateTime: formatMeetingDateTime(endDate),
             organizer: host,
             location,
             meetingLink: meetingLinkValue,
+            timezone,
+            externalAttendees: guests
+              .filter((guest) => guest.email)
+              .map((guest) => ({ email: guest.email, name: guest.name })),
             attendees,
             notes: noteText || undefined,
           });
-        });
+        }
       }
       emitLeadActivityChange();
       toast.success(

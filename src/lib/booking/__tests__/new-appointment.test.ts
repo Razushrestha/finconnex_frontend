@@ -397,12 +397,12 @@ describe("what is missing from the form", () => {
   it("asks for things in the order they appear", () => {
     const base = { hasEventType: true, hasSlot: true, customer, needsEmail: true };
     expect(appointmentProblem({ ...base, hasEventType: false, hasSlot: false, customer: null })).toBe(
-      "Select an event type.",
+      "Select a consultation.",
     );
     expect(appointmentProblem({ ...base, hasSlot: false, customer: null })).toBe(
       "Select a date and time.",
     );
-    expect(appointmentProblem({ ...base, customer: null })).toBe("Select a customer.");
+    expect(appointmentProblem({ ...base, customer: null })).toBe("Select a client.");
     expect(appointmentProblem(base)).toBeNull();
   });
 

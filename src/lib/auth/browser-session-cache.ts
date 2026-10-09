@@ -36,13 +36,16 @@ export function readStoredCrmTokens() {
     return { accessToken: null as string | null, refreshToken: null as string | null };
   }
   try {
+    // localStorage first: it is shared by every tab, while a tab's
+    // sessionStorage keeps whatever pair that tab last saw — after another tab
+    // rotates, that refresh token is spent and replaying it ends the session.
     return {
       accessToken:
-        window.sessionStorage.getItem("fc.crm.accessToken") ||
-        window.localStorage.getItem("fc.crm.accessToken"),
+        window.localStorage.getItem("fc.crm.accessToken") ||
+        window.sessionStorage.getItem("fc.crm.accessToken"),
       refreshToken:
-        window.sessionStorage.getItem("fc.crm.refreshToken") ||
-        window.localStorage.getItem("fc.crm.refreshToken"),
+        window.localStorage.getItem("fc.crm.refreshToken") ||
+        window.sessionStorage.getItem("fc.crm.refreshToken"),
     };
   } catch {
     return { accessToken: null, refreshToken: null };
