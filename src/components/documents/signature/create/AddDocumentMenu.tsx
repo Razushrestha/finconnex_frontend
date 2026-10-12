@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import {
-  pickOneDriveFiles,
-  preloadOneDrivePicker,
-} from "@/lib/documents/onedrive/picker";
+import { CloudPickerDialog } from "@/components/documents/signature/create/CloudPickerDialog";
+import { preloadOneDrivePicker } from "@/lib/documents/onedrive/picker";
 import {
   getCrmSignatureTemplate,
   listCrmSignatureTemplates,
@@ -45,6 +43,7 @@ export function AddDocumentMenu({
   buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -83,21 +82,6 @@ export function AddDocumentMenu({
     setOpen(false);
     setPicker(null);
     setBusyId(null);
-  }
-
-  async function openOneDrive() {
-    setOpen(false);
-    setPicker(null);
-    setError("");
-    setLoading(true);
-    try {
-      const files = await pickOneDriveFiles();
-      if (files.length) onFiles(files);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open OneDrive.");
-    } finally {
-      setLoading(false);
-    }
   }
 
   async function addTemplate(row: SignatureRequest) {
@@ -155,7 +139,8 @@ export function AddDocumentMenu({
                     return;
                   }
                   if (item.id === "cloud") {
-                    void openOneDrive();
+                    setOpen(false);
+                    setCloudOpen(true);
                     return;
                   }
                   setPicker("templates");
@@ -196,6 +181,13 @@ export function AddDocumentMenu({
           </div>
         </>
       ) : null}
+      <CloudPickerDialog
+        open={cloudOpen}
+        onClose={() => setCloudOpen(false)}
+        onAttach={(files) => {
+          if (files.length) onFiles(files);
+        }}
+      />
       {error && !picker ? (
         <p
           className={
@@ -206,9 +198,6 @@ export function AddDocumentMenu({
         >
           {error}
         </p>
-      ) : null}
-      {loading && !picker ? (
-        <p className="mt-2 text-[11px] text-slate-400">Opening OneDrive…</p>
       ) : null}
     </div>
   );
