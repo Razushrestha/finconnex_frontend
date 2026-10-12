@@ -39,6 +39,7 @@ import {
 } from "@/lib/booking/types";
 import { firstHostJoinUrl, joinUrlFromRecord } from "@/lib/booking/meeting-link";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
+import { useZoomConnection } from "@/lib/integrations/use-zoom-connection";
 import { dateInTimezone, isPastBookingStart } from "@/lib/booking/timezones";
 import { asRelatedKind } from "@/lib/activities/create-defaults";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
@@ -133,6 +134,9 @@ export default function ScheduleMeetingPage({
   const [timezone, setTimezone] = useState("GMT+10:00 Australia/Sydney (AEST)");
   const [meetingType, setMeetingType] = useState<MeetingType>("Video Call");
   const [meetingLink, setMeetingLink] = useState("");
+  const zoom = useZoomConnection();
+  // On by default: with Zoom connected, choosing Zoom should just work.
+  const [autoZoom, setAutoZoom] = useState(true);
   const [locationMode, setLocationMode] =
     useState<MeetingLocationMode>("default");
   const [locationKind, setLocationKind] =
@@ -284,8 +288,17 @@ export default function ScheduleMeetingPage({
         : contactName.trim()
           ? `Contact: ${contactName.trim()}`
           : undefined;
-    const meetingLinkValue =
-      locationMode === "default"
+    // The CRM creates the Zoom room on the organiser's account and returns
+    // its join link, so there is no link to send.
+    const createZoomRoom =
+      locationMode === "custom" &&
+      locationKind === "Zoom" &&
+      autoZoom &&
+      zoom.ready;
+    const conferenceProvider = createZoomRoom ? ("ZOOM" as const) : undefined;
+    const meetingLinkValue = createZoomRoom
+      ? undefined
+      : locationMode === "default"
         ? firstHostJoinUrl(selectedCalendar?.videoLink)
         : isVideo
           ? firstHostJoinUrl(meetingLink)
@@ -346,6 +359,7 @@ export default function ScheduleMeetingPage({
           endDateTime: endDate.toISOString(),
           location,
           meetingLink: meetingLinkValue,
+          conferenceProvider,
           agenda: agenda.trim() || undefined,
           notes: note || undefined,
         };
@@ -454,6 +468,7 @@ export default function ScheduleMeetingPage({
           organizer: host,
           location,
           meetingLink: meetingLinkValue,
+          conferenceProvider,
           notes: note || undefined,
           agenda: agenda.trim() || undefined,
           timezone,
@@ -578,6 +593,9 @@ export default function ScheduleMeetingPage({
             meetingType={meetingType}
             onMeetingTypeChange={setMeetingType}
             meetingLink={meetingLink}
+            zoom={zoom}
+            autoZoom={autoZoom}
+            onAutoZoomChange={setAutoZoom}
             onMeetingLinkChange={setMeetingLink}
             locationMode={locationMode}
             onLocationModeChange={setLocationMode}

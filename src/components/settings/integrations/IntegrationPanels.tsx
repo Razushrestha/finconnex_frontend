@@ -2,7 +2,14 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, Copy, ExternalLink, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Video,
+} from "lucide-react";
 
 import { CalendarSyncSettingsClient } from "@/components/settings/CalendarSyncSettingsClient";
 import { getCrmApiBaseUrl } from "@/lib/activity-timeline/auth";
@@ -19,12 +26,19 @@ import {
   saveMessagingCredential,
   setWebhookEndpointActive,
   verifyMessagingCredential,
+  authorizeZoom,
+  disconnectZoom,
+  zoomReturnNotice,
   type EquifaxConnection,
   type IntegrationConnection,
   type MessagingCredential,
   type StripeConnection,
   type WebhookEndpoint,
+  type ZoomConnectionStatus,
 } from "@/lib/integrations/api";
+import { openIntegrationTab } from "@/lib/integrations/open-tab";
+import { confirmDialog } from "@/lib/notify/dialog";
+import { toast } from "@/lib/notify/toast";
 import {
   oauthConnectionLabel,
   type IntegrationDefinition,
@@ -881,6 +895,144 @@ export function OAuthPanel({
       </PrimaryButton>
       <ErrorText error={error} />
     </form>
+  );
+}
+
+/* ----------------------------------------------------------------- Zoom */
+
+const ZOOM_BENEFITS = [
+  "Pick Zoom as the location when you schedule a meeting, and the Zoom room is created for you.",
+  "The join link is saved on the meeting and shows on the contact, lead and deal.",
+  "Moving or cancelling the meeting in FinConnex moves or cancels it in Zoom.",
+  "When the call starts and ends in Zoom, the meeting's status updates here.",
+];
+
+/**
+ * One-click Zoom: the user signs in to their own Zoom account on Zoom's
+ * consent screen (a new tab) and is sent back to this page. Nothing to paste.
+ */
+export function ZoomPanel({
+  status,
+  onChanged,
+}: {
+  status: ZoomConnectionStatus | null;
+  onChanged: () => void;
+}) {
+  const { busy, error, run } = useAction(onChanged);
+
+  // Zoom sends the browser back here with the outcome in the query string.
+  // Say what happened once, tidy the address bar, and re-read the status.
+  useEffect(() => {
+    const found = zoomReturnNotice(window.location.search);
+    if (!found) return;
+    if (found.tone === "success") toast.success(found.text);
+    else toast.error(found.text);
+    const url = new URL(window.location.href);
+    for (const key of ["integration", "status", "reason"]) {
+      url.searchParams.delete(key);
+    }
+    window.history.replaceState(window.history.state, "", url.toString());
+    onChanged();
+  }, [onChanged]);
+
+  const connect = () =>
+    void run(
+      "connect",
+      // Opened inside the click so the browser allows the new tab; this tab
+      // re-reads the connection when the user comes back to it.
+      () => openIntegrationTab(authorizeZoom),
+      "Could not open Zoom sign-in.",
+    );
+
+  const disconnect = async () => {
+    const ok = await confirmDialog({
+      title: "Disconnect Zoom?",
+      message:
+        "Meetings already scheduled keep their Zoom links, but FinConnex will no longer create, move or cancel Zoom meetings for you until you connect again.",
+      confirmText: "Disconnect",
+      tone: "danger",
+    });
+    if (!ok) return;
+    await run("disconnect", disconnectZoom, "Could not disconnect Zoom.");
+    toast.success("Zoom disconnected.");
+  };
+
+  if (status && !status.available && !status.connected) {
+    return (
+      <div className="space-y-3">
+        <Status connected={false} text="Not available yet" />
+        <p className="text-[12px] text-slate-600">
+          Zoom isn&apos;t switched on for this FinConnex server yet. An
+          administrator needs to add the FinConnex Zoom app&apos;s credentials
+          on the server; after that, everyone can connect their own Zoom account
+          here with one click.
+        </p>
+      </div>
+    );
+  }
+
+  if (status?.connected) {
+    return (
+      <div className="space-y-4">
+        {status.needsReconnect ? (
+          <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Your Zoom connection stopped working (access was removed or has
+              expired). Reconnect to keep creating Zoom meetings.
+            </span>
+          </div>
+        ) : (
+          <Status
+            connected
+            text={`Connected${status.zoomEmail ? ` · ${status.zoomEmail}` : ""}`}
+          />
+        )}
+        <p className="text-[12px] text-slate-600">
+          Choose <strong>Zoom</strong> as the location when you schedule a
+          meeting, and FinConnex creates the Zoom meeting on your account.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {status.needsReconnect ? (
+            <PrimaryButton busy={busy === "connect"} onClick={connect}>
+              <Video className="h-4 w-4" />
+              Reconnect Zoom
+            </PrimaryButton>
+          ) : null}
+          <SecondaryButton
+            danger
+            busy={busy === "disconnect"}
+            onClick={() => void disconnect()}
+          >
+            Disconnect Zoom
+          </SecondaryButton>
+        </div>
+        <ErrorText error={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Status connected={false} />
+      <ul className="space-y-1.5 text-[12px] text-slate-600">
+        {ZOOM_BENEFITS.map((line) => (
+          <li key={line} className="flex gap-2">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+      <PrimaryButton busy={busy === "connect"} onClick={connect}>
+        <Video className="h-4 w-4" />
+        Connect Zoom
+      </PrimaryButton>
+      <p className="text-[11px] text-slate-400">
+        Opens Zoom in a new tab. Sign in and press Allow; you&apos;ll come
+        straight back here. Your Zoom password is never shared with FinConnex.
+      </p>
+      <ErrorText error={error} />
+    </div>
   );
 }
 
