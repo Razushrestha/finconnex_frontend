@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { documentRequestInviteCopy } from "@/lib/documents/requests/invite-email";
 import { emailBrandFromSettings } from "@/lib/emails/brand-mail";
+import { DEFAULT_BRAND_PRIMARY } from "@/lib/settings/brand";
 
 describe("documentRequestInviteCopy", () => {
   it("lists requested documents and the upload link", () => {
@@ -19,7 +20,7 @@ describe("documentRequestInviteCopy", () => {
     expect(copy.text).toContain("nepatronix web");
     expect(copy.html).toContain("Open secure document portal");
     expect(copy.html).toContain("DOCUMENTS REQUESTED");
-    expect(copy.html).toContain("#5A32A3");
+    expect(copy.html).toContain(DEFAULT_BRAND_PRIMARY);
     expect(copy.html).toContain("FinconneX");
     expect(copy.html).toContain("Driver licence");
     expect(copy.html).toContain("https://app.example.com/provide/token");
