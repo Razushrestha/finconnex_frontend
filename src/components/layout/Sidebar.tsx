@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
-import { resolveWorkspaceBrand } from "@/lib/settings/brand";
 import { BrandLogo } from "@/components/settings/BrandLogo";
 import type { LogoFrame, LogoSlot } from "@/lib/settings/logo-frame";
 import {
@@ -192,12 +191,7 @@ export function Sidebar({
   const pathname = usePathname();
   const chatRef = React.useRef<HTMLInputElement>(null);
   const crm = useCrmSettings();
-  const brand = resolveWorkspaceBrand({
-    ...crm.settings,
-    primaryColor: crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
-    secondaryColor:
-      crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
-  });
+  const brand = crm.brand;
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();

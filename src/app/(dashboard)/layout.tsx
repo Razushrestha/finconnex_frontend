@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
+import { BRAND_COOKIE, parseRememberedBrand } from "@/lib/settings/brand";
 
 export default async function DashboardLayout({
   children,
@@ -28,5 +30,13 @@ export default async function DashboardLayout({
     redirect("/create-workspace");
   }
 
-  return <DashboardShell session={session}>{children}</DashboardShell>;
+  const initialBrand = parseRememberedBrand(
+    (await cookies()).get(BRAND_COOKIE)?.value,
+  );
+
+  return (
+    <DashboardShell session={session} initialBrand={initialBrand}>
+      {children}
+    </DashboardShell>
+  );
 }

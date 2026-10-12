@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import { BottomBar } from "@/components/layout/BottomBar";
@@ -12,19 +12,24 @@ import { rulesRoleForWorkspaceRole } from "@/lib/auth/workspace-role";
 import { BOTTOM_BAR_H } from "@/lib/layout";
 import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
 import {
-  resolveWorkspaceBrand,
   workspaceBrandCssVars,
+  type RememberedBrand,
 } from "@/lib/settings/brand";
 import { getTenantContext, setTenantContext } from "@/lib/persistence/tenant";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   session: SessionPayload;
+  initialBrand?: RememberedBrand | null;
 }
 
-export function DashboardShell({ children, session }: DashboardShellProps) {
+export function DashboardShell({
+  children,
+  session,
+  initialBrand = null,
+}: DashboardShellProps) {
   return (
-    <SettingsCrmProvider>
+    <SettingsCrmProvider initialBrand={initialBrand}>
       <DashboardShellInner session={session}>{children}</DashboardShellInner>
     </SettingsCrmProvider>
   );
@@ -41,17 +46,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const crm = useCrmSettings();
-  const brand = useMemo(
-    () =>
-      resolveWorkspaceBrand({
-        ...crm.settings,
-        primaryColor:
-          crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
-        secondaryColor:
-          crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
-      }),
-    [crm.settings, crm.previewBrand],
-  );
+  const brand = crm.brand;
 
   useEffect(() => {
     /*

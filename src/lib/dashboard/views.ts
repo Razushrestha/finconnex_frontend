@@ -8,6 +8,7 @@ export const DASHBOARD_VIEWS = [
 export type DashboardViewId = (typeof DASHBOARD_VIEWS)[number]["id"];
 
 const VIEW_KEY = "dashboard:active-view";
+export const DASHBOARD_VIEW_COOKIE = "fc_dash_view";
 
 export function isDashboardViewId(value: string | null | undefined): value is DashboardViewId {
   return DASHBOARD_VIEWS.some((view) => view.id === value);
@@ -30,4 +31,5 @@ export function loadDashboardView(): DashboardViewId {
 export function saveDashboardView(id: DashboardViewId) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(VIEW_KEY, id);
+  document.cookie = `${DASHBOARD_VIEW_COOKIE}=${id}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
