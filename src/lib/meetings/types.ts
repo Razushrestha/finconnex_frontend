@@ -71,6 +71,8 @@ export interface Meeting {
   rescheduleReason?: string;
   location?: string;
   meetingLink?: string;
+  /** Set when the CRM created the meeting's video room (Zoom). */
+  conferenceProvider?: "ZOOM";
   attendees: Attendee[];
   organizer: string;
   organizerId?: string;

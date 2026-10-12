@@ -306,6 +306,7 @@ export function normalizeMeeting(
       pickStr(raw.meetingLink, raw.meetingUrl, raw.url, raw.joinUrl) ||
       joinUrlFromRecord(raw) ||
       undefined,
+    conferenceProvider: raw.conferenceProvider === "ZOOM" ? "ZOOM" : undefined,
     attendees: [...internals, ...guests],
     organizerId,
     bookingHostName:
@@ -475,6 +476,8 @@ export function toCreateMeetingBody(input: {
   timezone?: string;
   organizerUserId?: string;
   externalAttendees?: Array<{ email: string; name?: string }>;
+  /** Have the CRM create the room on the organiser's connected account. */
+  conferenceProvider?: "ZOOM";
 }): Record<string, unknown> {
   const startAt = toMeetingIso(input.startDateTime);
   const endAt = toMeetingIso(input.endDateTime);
@@ -495,7 +498,10 @@ export function toCreateMeetingBody(input: {
   if (location && location.length <= 500 && !/^https:\/\//i.test(location)) {
     body.location = location;
   }
-  if (httpsLink) body.meetingLink = httpsLink;
+  if (input.conferenceProvider) {
+    // The CRM creates the room and fills in its join link.
+    body.conferenceProvider = input.conferenceProvider;
+  } else if (httpsLink) body.meetingLink = httpsLink;
   else {
     const fromLocation = location.match(/https:\/\/[^\s]+/i)?.[0];
     if (fromLocation && fromLocation.length <= 2048) body.meetingLink = fromLocation;
@@ -568,7 +574,8 @@ export async function updateCrmMeeting(
   if (patch.startDateTime) body.startAt = toMeetingIso(patch.startDateTime);
   if (patch.endDateTime) body.endAt = toMeetingIso(patch.endDateTime);
   if (patch.location != null) body.location = patch.location;
-  if (httpsLink) body.meetingLink = httpsLink;
+  if (patch.conferenceProvider) body.conferenceProvider = patch.conferenceProvider;
+  else if (httpsLink) body.meetingLink = httpsLink;
   if (patch.agenda != null) body.agenda = patch.agenda;
   return asMeeting(
     await meetingsMutate(`/${id}`, {

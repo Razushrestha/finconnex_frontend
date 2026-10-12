@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FC } from "react";
-import { ChevronDown, Link2, MapPin } from "lucide-react";
+import { ChevronDown, ExternalLink, Link2, MapPin, Video } from "lucide-react";
 import { UseCurrentLocationButton } from "@/components/shared/UseCurrentLocationButton";
 import type { MeetingType } from "@/lib/meetings/types";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
@@ -34,6 +34,7 @@ import {
 import { SearchablePersonSelect } from "@/components/shared/SearchablePersonSelect";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { cn } from "@/lib/utils";
+import type { ZoomConnectionStatus } from "@/lib/integrations/api";
 
 export type { MeetingLocationKind };
 export type MeetingLocationMode = "default" | "custom";
@@ -98,6 +99,74 @@ interface MeetingFormCardProps {
   hideAgenda?: boolean;
   titleError?: string;
   dateTimeError?: string;
+  /**
+   * The user's Zoom connection. With `onAutoZoomChange`, choosing Zoom as the
+   * location offers to create the Zoom meeting instead of pasting a link.
+   */
+  zoom?: { status: ZoomConnectionStatus | null; ready: boolean };
+  autoZoom?: boolean;
+  onAutoZoomChange?: (on: boolean) => void;
+}
+
+/**
+ * "Create the Zoom meeting automatically", shown when Zoom is the location.
+ * Connected: a checkbox (on by default). Not connected: how to connect, with
+ * pasting a link left as the fallback.
+ */
+export function ZoomAutoCreateOption({
+  status,
+  ready,
+  checked,
+  onChange,
+}: {
+  status: ZoomConnectionStatus | null;
+  ready: boolean;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  if (ready) {
+    return (
+      <label className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm text-gray-800">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-[#0B5CFF]"
+        />
+        <span>
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <Video className="h-3.5 w-3.5 text-[#0B5CFF]" />
+            Create the Zoom meeting automatically
+          </span>
+          <span className="block text-[11px] text-gray-500">
+            {checked
+              ? `Made on your Zoom account${status?.zoomEmail ? ` (${status.zoomEmail})` : ""} when you save; the join link is added to the invite.`
+              : "Paste an existing Zoom link below instead."}
+          </span>
+        </span>
+      </label>
+    );
+  }
+  if (status && !status.available && !status.connected) return null;
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-gray-600">
+      {status?.needsReconnect
+        ? "Your Zoom connection stopped working. "
+        : "Connect Zoom to create Zoom meetings automatically. "}
+      <a
+        href="/settings/integrations/zoom"
+        target="_blank"
+        rel="noopener"
+        className="inline-flex items-center gap-1 font-semibold text-[#0B5CFF] hover:underline"
+      >
+        {status?.needsReconnect ? "Reconnect Zoom" : "Connect Zoom"}
+        <ExternalLink className="h-3 w-3" />
+      </a>
+      <span className="block text-[11px] text-gray-500">
+        Or paste a Zoom link below.
+      </span>
+    </div>
+  );
 }
 
 export function MeetingRelatedFields({
@@ -255,6 +324,9 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
   hideAgenda = false,
   titleError,
   dateTimeError,
+  zoom,
+  autoZoom = false,
+  onAutoZoomChange,
 }) => {
   const locationKinds = useMemo(() => availableCustomLocationKinds(), []);
   const crmSettings = useCrmSettings();
@@ -293,8 +365,15 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
     }
   }
 
+  const zoomOption =
+    locationMode === "custom" &&
+    locationKind === "Zoom" &&
+    Boolean(onAutoZoomChange && zoom);
+  const zoomCreates = zoomOption && autoZoom && Boolean(zoom?.ready);
   const showLink =
-    locationMode === "custom" && isOnlineLocationKind(locationKind);
+    locationMode === "custom" &&
+    isOnlineLocationKind(locationKind) &&
+    !zoomCreates;
 
   return (
     <div
@@ -484,6 +563,14 @@ export const MeetingFormCard: FC<MeetingFormCardProps> = ({
                   </select>
                   <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 </div>
+                {zoomOption && zoom && onAutoZoomChange ? (
+                  <ZoomAutoCreateOption
+                    status={zoom.status}
+                    ready={zoom.ready}
+                    checked={autoZoom}
+                    onChange={onAutoZoomChange}
+                  />
+                ) : null}
                 {showLink ? (
                   <div className="relative">
                     <Link2 className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />

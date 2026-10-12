@@ -7,6 +7,7 @@
  *   Twilio        — /v1/messaging-credentials/:provider (API keys)
  * - OAuth2 apps   — /v1/integrations/connections       (generic framework)
  * - Webhooks      — /v1/integrations/webhook-endpoints (inbound URLs)
+ * - Zoom          — /v1/integrations/zoom              (one-click OAuth, per user)
  *
  * Calendar sync keeps its own client in
  * lib/booking/calendly-integration-api.
@@ -278,4 +279,88 @@ export function setWebhookEndpointActive(id: string, isActive: boolean) {
       isActive,
     },
   );
+}
+
+/* ------------------------------------------------------------------ Zoom */
+
+/**
+ * The signed-in user's own Zoom account. Personal, like a mailbox: each
+ * member connects theirs, and meetings they schedule get a Zoom room on it.
+ * The CRM never returns tokens here.
+ */
+export type ZoomConnectionStatus = {
+  /** The server has a Zoom app configured, so Connect can work. */
+  available: boolean;
+  connected: boolean;
+  zoomEmail: string | null;
+  connectedAt: string | null;
+  /** The stored grant stopped working (revoked, expired): reconnect. */
+  needsReconnect: boolean;
+};
+
+export function normalizeZoomStatus(raw: unknown): ZoomConnectionStatus {
+  const r = rec(raw);
+  return {
+    available: r.available !== false,
+    connected: r.connected === true,
+    zoomEmail: str(r.zoomEmail) || null,
+    connectedAt: str(r.connectedAt) || null,
+    needsReconnect: r.needsReconnect === true,
+  };
+}
+
+export async function getZoomConnection(): Promise<ZoomConnectionStatus> {
+  return normalizeZoomStatus(await call("/v1/integrations/zoom/connection"));
+}
+
+/** Zoom's consent page for the signed-in user. */
+export async function authorizeZoom(): Promise<string> {
+  const url = str(rec(await call("/v1/integrations/zoom/authorize")).authUrl);
+  if (!/^https:\/\/([a-z0-9-]+\.)*zoom\.us\//i.test(url)) {
+    // Only ever send the browser to Zoom itself.
+    throw new Error("The CRM did not return a Zoom sign-in address.");
+  }
+  return url;
+}
+
+export async function disconnectZoom(): Promise<ZoomConnectionStatus> {
+  return normalizeZoomStatus(
+    await call("/v1/integrations/zoom/connection/disconnect", "POST", {}),
+  );
+}
+
+const ZOOM_RETURN_REASONS: Record<string, string> = {
+  access_denied: "Zoom access was not granted.",
+  link_expired: "The Zoom sign-in link expired. Press Connect Zoom again.",
+  invalid_state:
+    "That Zoom sign-in could not be verified. Press Connect Zoom again.",
+  not_configured:
+    "Zoom is not set up on this server yet. Ask an administrator.",
+  no_refresh_token:
+    "Zoom did not grant lasting access. Press Connect Zoom again.",
+  no_code: "Zoom did not complete the sign-in. Press Connect Zoom again.",
+};
+
+/**
+ * What to tell the user when Zoom sends the browser back here with
+ * `?integration=zoom&status=…&reason=…`, or null for any other address.
+ */
+export function zoomReturnNotice(
+  search: string,
+): { tone: "success" | "error"; text: string } | null {
+  const params = new URLSearchParams(search);
+  if (params.get("integration") !== "zoom") return null;
+  const status = params.get("status");
+  if (status === "connected") {
+    return { tone: "success", text: "Zoom connected." };
+  }
+  const reason = params.get("reason") ?? "";
+  return {
+    tone: "error",
+    text:
+      ZOOM_RETURN_REASONS[reason] ??
+      (status === "denied"
+        ? ZOOM_RETURN_REASONS.access_denied
+        : "Zoom could not be connected. Please try again."),
+  };
 }

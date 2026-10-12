@@ -3,6 +3,8 @@
  * one connects. The flow follows what the CRM supports for it:
  *
  * - "calendar"   Google / Outlook calendar sync — the provider's consent screen
+ * - "zoom"       one-click Connect Zoom — each user signs in to their own
+ *                Zoom account on Zoom's consent screen; no keys to paste
  * - "stripe"     API keys on /payments/stripe/connection
  * - "equifax"    OAuth client credentials on /equifax/connection
  * - "messaging"  SendGrid / Twilio keys on /messaging-credentials
@@ -42,6 +44,7 @@ export type OAuthPreset = {
 
 export type IntegrationFlow =
   | { kind: "calendar"; provider: "google" | "outlook" }
+  | { kind: "zoom" }
   | { kind: "stripe" }
   | { kind: "equifax" }
   | { kind: "messaging"; provider: "SENDGRID" | "TWILIO"; whatsapp?: boolean }
@@ -116,18 +119,12 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     id: "zoom",
     name: "Zoom Meetings",
     category: "Calendar & meetings",
-    blurb: "Zoom links for video appointments.",
+    blurb:
+      "Connect your Zoom account once, then create Zoom meetings from any appointment, contact or deal.",
     icon: "zoom",
     color: "#0B5CFF",
     initials: "ZM",
-    flow: {
-      kind: "oauth",
-      preset: {
-        tokenEndpoint: "https://zoom.us/oauth/token",
-        scopes: ["meeting:write", "user:read"],
-        developerUrl: "https://marketplace.zoom.us/develop/create",
-      },
-    },
+    flow: { kind: "zoom" },
   },
 
   // Email & messaging

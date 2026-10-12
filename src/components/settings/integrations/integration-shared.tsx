@@ -12,6 +12,7 @@ import {
 import {
   getEquifaxConnection,
   getStripeConnection,
+  getZoomConnection,
   listIntegrationConnections,
   listMessagingCredentials,
   listWebhookEndpoints,
@@ -20,6 +21,7 @@ import {
   type MessagingCredential,
   type StripeConnection,
   type WebhookEndpoint,
+  type ZoomConnectionStatus,
 } from "@/lib/integrations/api";
 import {
   oauthConnectionLabel,
@@ -34,6 +36,7 @@ import {
   OAuthPanel,
   StripePanel,
   WebhookPanel,
+  ZoomPanel,
 } from "./IntegrationPanels";
 
 export type IntegrationStatuses = {
@@ -43,6 +46,7 @@ export type IntegrationStatuses = {
   oauth: IntegrationConnection[];
   webhooks: WebhookEndpoint[];
   calendars: CalendarSyncConnection[];
+  zoom: ZoomConnectionStatus | null;
 };
 
 const EMPTY: IntegrationStatuses = {
@@ -52,6 +56,7 @@ const EMPTY: IntegrationStatuses = {
   oauth: [],
   webhooks: [],
   calendars: [],
+  zoom: null,
 };
 
 function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
@@ -74,8 +79,9 @@ export function useIntegrationStatuses() {
       listIntegrationConnections(),
       listWebhookEndpoints(),
       listCalendarSyncConnections(),
+      getZoomConnection(),
     ]).then(
-      ([stripe, equifax, messaging, oauth, webhooks, calendars]) => {
+      ([stripe, equifax, messaging, oauth, webhooks, calendars, zoom]) => {
         if (!alive) return;
         setStatuses({
           stripe: settled(stripe, null),
@@ -84,6 +90,7 @@ export function useIntegrationStatuses() {
           oauth: settled(oauth, []),
           webhooks: settled(webhooks, []),
           calendars: settled(calendars, []),
+          zoom: settled(zoom, null),
         });
         setLoading(false);
       },
@@ -113,6 +120,8 @@ export function isIntegrationConnected(
       return s.calendars.some(
         (c) => c.connected && c.provider.toLowerCase().includes(flow.provider),
       );
+    case "zoom":
+      return !!s.zoom?.connected && !s.zoom.needsReconnect;
     case "stripe":
       return !!s.stripe?.connected;
     case "equifax":
@@ -190,6 +199,8 @@ function IntegrationSetup({
   switch (flow.kind) {
     case "calendar":
       return <CalendarPanel provider={flow.provider} />;
+    case "zoom":
+      return <ZoomPanel status={statuses.zoom} onChanged={onChanged} />;
     case "stripe":
       return <StripePanel status={statuses.stripe} onChanged={onChanged} />;
     case "equifax":
