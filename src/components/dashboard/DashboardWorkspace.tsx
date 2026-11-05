@@ -129,12 +129,14 @@ function spanClass(id: DashboardWidgetId) {
 
 export function DashboardWorkspace({
   sessionName = "",
+  initialView = "executive",
 }: {
   sessionName?: string;
+  initialView?: DashboardViewId;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<DashboardViewId>("executive");
+  const [view, setView] = useState<DashboardViewId>(initialView);
   const [layout, setLayout] = useState<DashboardLayout>(defaultDashboardLayout);
   const [flash, setFlash] = useState<string | null>(null);
   const [role, setRole] = useState<HierarchyLevel>("Manager");
@@ -207,12 +209,17 @@ export function DashboardWorkspace({
 
   useEffect(() => {
     const fromUrl = searchParams.get("view");
-    const next = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
+    const stored = loadDashboardView();
+    const next = isDashboardViewId(fromUrl)
+      ? fromUrl
+      : stored !== "executive"
+        ? stored
+        : initialView;
     setView(next);
     setViewHidden(loadViewHidden(next));
     setViewOrder(loadViewOrder(next));
     saveDashboardView(next);
-  }, [searchParams]);
+  }, [initialView, searchParams]);
 
   useEffect(() => {
     function sync() {

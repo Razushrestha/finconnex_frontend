@@ -434,8 +434,17 @@ export async function removeCrmMessageReaction(
   );
 }
 
-export async function getCrmChatUnreadCount(): Promise<number> {
-  const data = await chatGet("/unread-count");
+const UNREAD_MISSING_KEY = "fc.chat.unreadMissing";
+
+type UnreadGate =
+  | { status: "missing" }
+  | { status: "pending"; promise: Promise<number> };
+
+function unreadHost(): { __fcChatUnread?: UnreadGate } {
+  return globalThis as { __fcChatUnread?: UnreadGate };
+}
+
+function readUnreadCount(data: unknown): number {
   if (typeof data === "number") return data;
   if (data && typeof data === "object") {
     const rec = data as Record<string, unknown>;
@@ -444,6 +453,60 @@ export async function getCrmChatUnreadCount(): Promise<number> {
     if (typeof n === "string") return Number.parseInt(n, 10) || 0;
   }
   return 0;
+}
+
+/** Nest answers a missing route with "Cannot GET /v1/...", not the word 404. */
+export function isMissingChatRoute(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /404|not found|cannot get\b/i.test(message);
+}
+
+function unreadRouteMissing(): boolean {
+  if (unreadHost().__fcChatUnread?.status === "missing") return true;
+  if (typeof sessionStorage === "undefined") return false;
+  try {
+    if (sessionStorage.getItem(UNREAD_MISSING_KEY) === "1") {
+      unreadHost().__fcChatUnread = { status: "missing" };
+      return true;
+    }
+  } catch {
+    /* private browsing */
+  }
+  return false;
+}
+
+function rememberUnreadRouteMissing() {
+  unreadHost().__fcChatUnread = { status: "missing" };
+  try {
+    sessionStorage.setItem(UNREAD_MISSING_KEY, "1");
+  } catch {
+    /* private browsing */
+  }
+}
+
+export async function getCrmChatUnreadCount(): Promise<number> {
+  if (unreadRouteMissing()) return 0;
+  const pending = unreadHost().__fcChatUnread;
+  if (pending?.status === "pending") return pending.promise;
+  const promise = chatGet("/unread-count")
+    .then((data) => {
+      if (unreadHost().__fcChatUnread?.status === "pending") {
+        unreadHost().__fcChatUnread = undefined;
+      }
+      return readUnreadCount(data);
+    })
+    .catch((err: unknown) => {
+      if (isMissingChatRoute(err)) {
+        rememberUnreadRouteMissing();
+        return 0;
+      }
+      if (unreadHost().__fcChatUnread?.status === "pending") {
+        unreadHost().__fcChatUnread = undefined;
+      }
+      throw err;
+    });
+  unreadHost().__fcChatUnread = { status: "pending", promise };
+  return promise;
 }
 
 export async function tryCrmChat<T>(

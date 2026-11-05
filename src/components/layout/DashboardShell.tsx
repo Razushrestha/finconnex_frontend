@@ -15,32 +15,25 @@ import {
   useCrmSettings,
 } from "@/lib/settings/use-crm-settings";
 import {
-  resolveWorkspaceBrand,
   workspaceBrandCssVars,
+  type RememberedBrand,
 } from "@/lib/settings/brand";
-import {
-  writeBrandCookie,
-  type BrandColors,
-} from "@/lib/settings/brand-cookie";
 import { getTenantContext, setTenantContext } from "@/lib/persistence/tenant";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   session: SessionPayload;
-  /** The workspace's colours from the last visit, used until settings load. */
-  initialBrand?: BrandColors | null;
+  initialBrand?: RememberedBrand | null;
 }
 
 export function DashboardShell({
   children,
   session,
-  initialBrand,
+  initialBrand = null,
 }: DashboardShellProps) {
   return (
-    <SettingsCrmProvider>
-      <DashboardShellInner session={session} initialBrand={initialBrand}>
-        {children}
-      </DashboardShellInner>
+    <SettingsCrmProvider initialBrand={initialBrand}>
+      <DashboardShellInner session={session}>{children}</DashboardShellInner>
     </SettingsCrmProvider>
   );
 }
@@ -57,29 +50,8 @@ function DashboardShellInner({
   const [mobileOpen, setMobileOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const crm = useCrmSettings();
-  // An unsaved choice in Settings → Branding shows at once; until the
-  // settings load, the colours from the last visit stand in.
-  const brand = useMemo(() => {
-    const preview = crm.previewBrand;
-    const stand = crm.settings ? null : initialBrand;
-    return resolveWorkspaceBrand(crm.settings, {
-      primary: preview?.primaryColor ?? stand?.primary,
-      secondary: preview?.secondaryColor ?? stand?.secondary,
-      style: preview?.brandStyle ?? stand?.style,
-    });
-  }, [crm.settings, crm.previewBrand, initialBrand]);
+  const brand = crm.brand;
   const brandVars = useMemo(() => workspaceBrandCssVars(brand), [brand]);
-
-  // Remember the saved colours (not a live preview) for the next load.
-  useEffect(() => {
-    if (!crm.settings) return;
-    const saved = resolveWorkspaceBrand(crm.settings);
-    writeBrandCookie(session.tenantId, {
-      primary: saved.primary,
-      secondary: saved.secondary,
-      style: saved.style,
-    });
-  }, [crm.settings, session.tenantId]);
 
   // Dialogs portalled to <body> sit outside this shell: give them the brand
   // through <html> as well.

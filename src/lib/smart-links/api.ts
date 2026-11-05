@@ -22,6 +22,13 @@ export type CrmSmartShortLink = {
 function extractRecords(data: unknown): Record<string, unknown>[] {
   if (!data) return [];
   if (Array.isArray(data)) {
+    if (
+      data.length === 2 &&
+      Array.isArray(data[0]) &&
+      (typeof data[1] === "number" || data[1] == null)
+    ) {
+      return extractRecords(data[0]);
+    }
     return data.filter(
       (row): row is Record<string, unknown> =>
         !!row && typeof row === "object" && !Array.isArray(row),
@@ -29,7 +36,16 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
   }
   if (typeof data === "object") {
     const rec = data as Record<string, unknown>;
-    for (const key of ["items", "hubs", "records", "rows", "result"]) {
+    for (const key of [
+      "items",
+      "hubs",
+      "smartHubs",
+      "shortLinks",
+      "links",
+      "records",
+      "rows",
+      "result",
+    ]) {
       if (Array.isArray(rec[key])) return extractRecords(rec[key]);
     }
     if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
@@ -74,6 +90,16 @@ export function shortLinkPublicUrl(alias: string): string {
   return `${window.location.origin}${shortLinkPublicPath(alias)}`;
 }
 
+/** The public hub payload leaves this out. Only an explicit false is a draft. */
+export function readHubPublished(raw: Record<string, unknown>): boolean {
+  const flag = raw.published;
+  if (flag == null || flag === "") return true;
+  if (flag === false || flag === "false" || flag === 0 || flag === "0") {
+    return false;
+  }
+  return true;
+}
+
 export function mapHubResponse(raw: Record<string, unknown>): CrmSmartHub {
   const slug = pickStr(raw.slug, (raw.profile as { slug?: string } | undefined)?.slug);
   const customization =
@@ -93,7 +119,7 @@ export function mapHubResponse(raw: Record<string, unknown>): CrmSmartHub {
     links: asObjectArray(raw.links) as unknown as BrokerHubConfig["links"],
     socials: asObjectArray(raw.socials) as unknown as BrokerHubConfig["socials"],
     customization,
-    published: Boolean(raw.published),
+    published: readHubPublished(raw),
     templateId: pickStr(raw.templateId) || undefined,
     createdAt: pickStr(raw.createdAt) || undefined,
     updatedAt: pickStr(raw.updatedAt) || undefined,
@@ -101,12 +127,13 @@ export function mapHubResponse(raw: Record<string, unknown>): CrmSmartHub {
 }
 
 function mapShortLink(raw: Record<string, unknown>): CrmSmartShortLink {
+  const clicks = raw.clicks ?? raw.clickCount;
   return {
     id: pickStr(raw.id),
-    alias: pickStr(raw.alias),
-    destination: pickStr(raw.destination),
-    clicks: typeof raw.clicks === "number" ? raw.clicks : Number(raw.clicks) || 0,
-    generateQr: Boolean(raw.generateQr),
+    alias: pickStr(raw.alias, raw.slug),
+    destination: pickStr(raw.destination, raw.url, raw.targetUrl, raw.redirectUrl),
+    clicks: typeof clicks === "number" ? clicks : Number(clicks) || 0,
+    generateQr: Boolean(raw.generateQr ?? raw.qr ?? raw.hasQr),
     createdAt: pickStr(raw.createdAt) || new Date().toISOString(),
   };
 }
@@ -221,18 +248,25 @@ export async function deleteCrmSmartShortLink(id: string): Promise<void> {
   await smartRequest(`/v1/smart-short-links/${id}`, { method: "DELETE" });
 }
 
+/**
+ * The public slug route only returns a hub that is already live. The CRM
+ * payload often omits `published`, which used to hide the page.
+ */
+export function asPublishedHub(data: unknown): BrokerHubConfig | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const raw = data as Record<string, unknown>;
+  const row = mapHubResponse(raw);
+  if (!row.profile.slug) return null;
+  return { ...row, published: readHubPublished(raw) };
+}
+
 export async function fetchPublishedHubBySlug(
   slug: string,
 ): Promise<BrokerHubConfig | null> {
   const data = await smartRequest(
     `/v1/public/smart-hubs/${encodeURIComponent(slug)}`,
   );
-  const row =
-    data && typeof data === "object" && !Array.isArray(data)
-      ? mapHubResponse(data as Record<string, unknown>)
-      : null;
-  if (!row?.profile.slug) return null;
-  return row;
+  return asPublishedHub(data);
 }
 
 export async function resolvePublicShortLink(
@@ -242,7 +276,13 @@ export async function resolvePublicShortLink(
     `/v1/public/smart-short-links/${encodeURIComponent(alias)}`,
   );
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    const destination = pickStr((data as Record<string, unknown>).destination);
+    const raw = data as Record<string, unknown>;
+    const destination = pickStr(
+      raw.destination,
+      raw.url,
+      raw.targetUrl,
+      raw.redirectUrl,
+    );
     return destination || null;
   }
   return null;

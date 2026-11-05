@@ -7,6 +7,20 @@ import { readLogoFrame, type LogoFrame } from "@/lib/settings/logo-frame";
 
 export const DEFAULT_BRAND_PRIMARY = "#6376B5";
 export const DEFAULT_BRAND_SECONDARY = "#BF83B8";
+export const BRAND_COOKIE = "fc_brand";
+
+/**
+ * The brand from the last successful load, kept in the `fc_brand` cookie so
+ * the server renders the shell in it: primary, secondary, company name,
+ * colour style, and the workspace it belongs to.
+ */
+export type RememberedBrand = {
+  p: string;
+  s: string;
+  n: string;
+  t?: BrandStyle;
+  w?: string;
+};
 
 /** Settings → Branding "Colour style": blend the two colours, or use each solid. */
 export type BrandStyle = "gradient" | "solid";
@@ -119,6 +133,142 @@ function usableLogoUrl(
     return value;
   }
   return isWorkspaceStorageKey(value) ? value : "";
+}
+
+/** A failed settings read comes back with no saved colours and no timestamps. */
+export function isBareSettingsFallback(
+  settings: CrmWorkspaceSettings | null | undefined,
+): boolean {
+  if (!settings) return true;
+  return (
+    !settings.id &&
+    !settings.updatedAt &&
+    !settings.createdAt &&
+    !readHex(settings.primaryColor) &&
+    !readHex(settings.secondaryColor)
+  );
+}
+
+export function settingsCarryBrand(
+  settings: CrmWorkspaceSettings | null | undefined,
+): boolean {
+  if (!settings) return false;
+  const page = settings.catalog?.["organization/branding"];
+  const profile = settings.catalog?.["organization/company-profile"];
+  return Boolean(
+    readHex(page?.primaryColor) ||
+    readHex(page?.secondaryColor) ||
+    readHex(profile?.primaryColor) ||
+    readHex(profile?.secondaryColor) ||
+    readHex(settings.primaryColor) ||
+    readHex(settings.secondaryColor) ||
+    catalogName(profile?.companyName),
+  );
+}
+
+export function parseRememberedBrand(
+  raw: string | null | undefined,
+  /** Ignore a cookie saved for another workspace. */
+  workspaceId?: string | null,
+): RememberedBrand | null {
+  if (!raw) return null;
+  let text = raw.trim();
+  if (!text) return null;
+  try {
+    if (text.includes("%")) text = decodeURIComponent(text);
+  } catch {
+    /* already decoded */
+  }
+  try {
+    const parsed = JSON.parse(text) as {
+      p?: unknown;
+      s?: unknown;
+      n?: unknown;
+      t?: unknown;
+      w?: unknown;
+    };
+    const p = readHex(parsed.p);
+    const s = readHex(parsed.s);
+    if (!p || !s) return null;
+    const w = typeof parsed.w === "string" ? parsed.w : undefined;
+    if (w && workspaceId && w !== workspaceId) return null;
+    const n = catalogName(parsed.n).replace(/[<>]/g, "").slice(0, 80);
+    return { p, s, n, t: readBrandStyle(parsed.t), w };
+  } catch {
+    return null;
+  }
+}
+
+function brandFromRemembered(
+  base: WorkspaceBrand,
+  remembered: RememberedBrand,
+): WorkspaceBrand {
+  const secondaryIsLight = hexLuminance(remembered.s) > 0.55;
+  return {
+    ...base,
+    primary: remembered.p,
+    secondary: remembered.s,
+    secondaryIsLight,
+    onSecondary: secondaryIsLight ? "#0F172A" : "#F8FAFC",
+    appName: remembered.n || base.appName,
+    style: remembered.t ?? base.style,
+  };
+}
+
+/**
+ * Live branding wins. A settings fallback with no saved colours keeps the
+ * brand from the last successful load so the shell does not change colour.
+ */
+export function selectWorkspaceBrand(
+  settings: CrmWorkspaceSettings | null | undefined,
+  /** Unsaved Settings → Branding choices: they win over everything saved. */
+  preview: {
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    brandStyle?: BrandStyle;
+  } | null,
+  remembered: RememberedBrand | null,
+): WorkspaceBrand {
+  const resolved = resolveWorkspaceBrand(settings, {
+    primary: preview?.primaryColor,
+    secondary: preview?.secondaryColor,
+    style: preview?.brandStyle,
+  });
+  if (
+    preview &&
+    (readHex(preview.primaryColor) ||
+      readHex(preview.secondaryColor) ||
+      preview.brandStyle)
+  ) {
+    return resolved;
+  }
+  if (
+    settings &&
+    !isBareSettingsFallback(settings) &&
+    settingsCarryBrand(settings)
+  ) {
+    return resolved;
+  }
+  if (remembered) return brandFromRemembered(resolved, remembered);
+  return resolved;
+}
+
+/** Saves the brand for the next load, tagged with its workspace. */
+export function rememberWorkspaceBrand(
+  brand: WorkspaceBrand,
+  workspaceId?: string | null,
+) {
+  if (typeof document === "undefined") return;
+  const payload = encodeURIComponent(
+    JSON.stringify({
+      p: brand.primary,
+      s: brand.secondary,
+      n: brand.appName,
+      t: brand.style,
+      ...(workspaceId ? { w: workspaceId } : {}),
+    }),
+  );
+  document.cookie = `${BRAND_COOKIE}=${payload}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
 /**

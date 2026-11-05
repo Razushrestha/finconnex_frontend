@@ -20,8 +20,16 @@ import {
 } from "@/lib/settings/api";
 import { mirrorOfficeCalendar } from "@/lib/settings/office-calendar";
 import type { LogoFrame, LogoSlot } from "@/lib/settings/logo-frame";
-import type { BrandStyle } from "@/lib/settings/brand";
 import { getTenantContext } from "@/lib/persistence/tenant";
+import {
+  rememberWorkspaceBrand,
+  selectWorkspaceBrand,
+  settingsCarryBrand,
+  isBareSettingsFallback,
+  type BrandStyle,
+  type RememberedBrand,
+  type WorkspaceBrand,
+} from "@/lib/settings/brand";
 
 export type SettingsDataSource = "api" | "demo";
 
@@ -44,6 +52,7 @@ export type CrmSettingsState = {
     focus: LogoSlot;
     frames: Partial<Record<LogoSlot, LogoFrame>>;
   } | null;
+  brand: WorkspaceBrand;
   setPreviewLogos: (
     next: {
       focus: LogoSlot;
@@ -149,7 +158,10 @@ function writeSettingsCache(cache: SettingsCache) {
   }
 }
 
-function useCrmSettingsState(enabled: boolean): CrmSettingsState {
+function useCrmSettingsState(
+  enabled: boolean,
+  remembered: RememberedBrand | null,
+): CrmSettingsState {
   // Keep the first render identical on the server and client. Saved brand
   // colours live in sessionStorage and are applied after hydration.
   const [source, setSource] = useState<SettingsDataSource>("demo");
@@ -168,8 +180,25 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   const [tick, setTick] = useState(0);
   // When settings were last requested, so live refreshes stay infrequent.
   const lastLoadRef = useRef(0);
+  const [lockedBrand, setLockedBrand] = useState<RememberedBrand | null>(remembered);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
+  const brand = selectWorkspaceBrand(settings, previewBrand, lockedBrand);
+
+  useEffect(() => {
+    if (!settings || isBareSettingsFallback(settings) || !settingsCarryBrand(settings)) {
+      return;
+    }
+    const next = selectWorkspaceBrand(settings, null, null);
+    setLockedBrand({
+      p: next.primary,
+      s: next.secondary,
+      n: next.appName,
+      t: next.style,
+      w: settings.workspaceId,
+    });
+    rememberWorkspaceBrand(next, settings.workspaceId);
+  }, [settings]);
 
   const setSettings = useCallback((next: CrmWorkspaceSettings | null) => {
     setSettingsState(next);
@@ -322,12 +351,19 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
     setPreviewBrand,
     previewLogos,
     setPreviewLogos,
+    brand,
   };
 }
 
 /** One GET /settings + /security + /capabilities for the whole Settings chrome. */
-export function SettingsCrmProvider({ children }: { children: ReactNode }) {
-  const value = useCrmSettingsState(true);
+export function SettingsCrmProvider({
+  children,
+  initialBrand = null,
+}: {
+  children: ReactNode;
+  initialBrand?: RememberedBrand | null;
+}) {
+  const value = useCrmSettingsState(true, initialBrand);
   return (
     <SettingsCrmContext.Provider value={value}>
       {children}
@@ -337,6 +373,6 @@ export function SettingsCrmProvider({ children }: { children: ReactNode }) {
 
 export function useCrmSettings(): CrmSettingsState {
   const ctx = useContext(SettingsCrmContext);
-  const local = useCrmSettingsState(!ctx);
+  const local = useCrmSettingsState(!ctx, null);
   return ctx ?? local;
 }
