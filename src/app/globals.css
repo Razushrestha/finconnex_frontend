@@ -64,6 +64,8 @@
     var(--brand-primary) 0%,
     var(--brand-secondary) 100%
   );
+  /* Sidebar and footer fill: the gradient, or the secondary colour when solid. */
+  --brand-surface: var(--brand-gradient);
   --brand-primary-strong: color-mix(in srgb, var(--brand-primary) 82%, black);
   --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 9%, white);
   --brand-primary-muted: color-mix(in srgb, var(--brand-primary) 14%, white);

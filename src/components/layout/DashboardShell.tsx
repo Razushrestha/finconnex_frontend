@@ -10,48 +10,87 @@ import { setRulesActor } from "@/lib/rules/actor";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { rulesRoleForWorkspaceRole } from "@/lib/auth/workspace-role";
 import { BOTTOM_BAR_H } from "@/lib/layout";
-import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
+import {
+  SettingsCrmProvider,
+  useCrmSettings,
+} from "@/lib/settings/use-crm-settings";
 import {
   resolveWorkspaceBrand,
   workspaceBrandCssVars,
 } from "@/lib/settings/brand";
+import {
+  writeBrandCookie,
+  type BrandColors,
+} from "@/lib/settings/brand-cookie";
 import { getTenantContext, setTenantContext } from "@/lib/persistence/tenant";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   session: SessionPayload;
+  /** The workspace's colours from the last visit, used until settings load. */
+  initialBrand?: BrandColors | null;
 }
 
-export function DashboardShell({ children, session }: DashboardShellProps) {
+export function DashboardShell({
+  children,
+  session,
+  initialBrand,
+}: DashboardShellProps) {
   return (
     <SettingsCrmProvider>
-      <DashboardShellInner session={session}>{children}</DashboardShellInner>
+      <DashboardShellInner session={session} initialBrand={initialBrand}>
+        {children}
+      </DashboardShellInner>
     </SettingsCrmProvider>
   );
 }
 
-function DashboardShellInner({ children, session }: DashboardShellProps) {
-  if (
-    session.tenantId &&
-    getTenantContext().tenantId !== session.tenantId
-  ) {
+function DashboardShellInner({
+  children,
+  session,
+  initialBrand,
+}: DashboardShellProps) {
+  if (session.tenantId && getTenantContext().tenantId !== session.tenantId) {
     setTenantContext({ tenantId: session.tenantId });
   }
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const crm = useCrmSettings();
-  const brand = useMemo(
-    () =>
-      resolveWorkspaceBrand({
-        ...crm.settings,
-        primaryColor:
-          crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
-        secondaryColor:
-          crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
-      }),
-    [crm.settings, crm.previewBrand],
-  );
+  // An unsaved choice in Settings → Branding shows at once; until the
+  // settings load, the colours from the last visit stand in.
+  const brand = useMemo(() => {
+    const preview = crm.previewBrand;
+    const stand = crm.settings ? null : initialBrand;
+    return resolveWorkspaceBrand(crm.settings, {
+      primary: preview?.primaryColor ?? stand?.primary,
+      secondary: preview?.secondaryColor ?? stand?.secondary,
+      style: preview?.brandStyle ?? stand?.style,
+    });
+  }, [crm.settings, crm.previewBrand, initialBrand]);
+  const brandVars = useMemo(() => workspaceBrandCssVars(brand), [brand]);
+
+  // Remember the saved colours (not a live preview) for the next load.
+  useEffect(() => {
+    if (!crm.settings) return;
+    const saved = resolveWorkspaceBrand(crm.settings);
+    writeBrandCookie(session.tenantId, {
+      primary: saved.primary,
+      secondary: saved.secondary,
+      style: saved.style,
+    });
+  }, [crm.settings, session.tenantId]);
+
+  // Dialogs portalled to <body> sit outside this shell: give them the brand
+  // through <html> as well.
+  useEffect(() => {
+    const root = document.documentElement.style;
+    const entries = Object.entries(brandVars);
+    for (const [name, value] of entries) root.setProperty(name, String(value));
+    return () => {
+      for (const [name] of entries) root.removeProperty(name);
+    };
+  }, [brandVars]);
 
   useEffect(() => {
     /*
@@ -94,7 +133,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   return (
     <div
       ref={shellRef}
-      style={workspaceBrandCssVars(brand)}
+      style={brandVars}
       className="flex h-screen w-full max-w-full overflow-hidden overscroll-none bg-background font-sans"
     >
       {/* On mobile the sidebar renders as a fixed off-canvas drawer (out of
@@ -110,7 +149,9 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
         />
       </div>
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
-        <Suspense fallback={<div className="h-16 shrink-0 border-b border-border/60" />}>
+        <Suspense
+          fallback={<div className="h-16 shrink-0 border-b border-border/60" />}
+        >
           <Navbar
             onOpenMobileMenu={() => setMobileOpen(true)}
             user={{

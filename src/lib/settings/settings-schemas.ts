@@ -893,14 +893,25 @@ const CURATED: Record<string, SettingsSchema> = {
   "organization/branding": {
     title: "Branding",
     description:
-      "Primary and secondary colours. Buttons, menus, and client emails blend them into a gradient.",
+      "Primary and secondary colours, shown as a gradient or as solid colours on buttons, menus, and client emails.",
     fields: [
+      {
+        id: "brandStyle",
+        label: "Colour style",
+        type: "select",
+        defaultValue: "gradient",
+        help: "Gradient blends primary into secondary. Solid uses the primary colour on buttons and emails, and the secondary colour on the sidebar and footer.",
+        options: [
+          { label: "Gradient", value: "gradient" },
+          { label: "Solid colour", value: "solid" },
+        ],
+      },
       {
         id: "primaryColor",
         label: "Primary colour",
         type: "color",
         defaultValue: "#6376B5",
-        help: "Buttons, links, and the start of the brand gradient.",
+        help: "Buttons, links, and the start of the gradient.",
         options: [
           { label: "FinConnex", value: "#6376B5" },
           { label: "Violet", value: "#7C3AED" },
@@ -921,7 +932,7 @@ const CURATED: Record<string, SettingsSchema> = {
         label: "Secondary colour",
         type: "color",
         defaultValue: "#BF83B8",
-        help: "Second stop of the brand gradient on the sidebar and footer.",
+        help: "Sidebar and footer, and the end of the gradient.",
         options: [
           { label: "FinConnex", value: "#BF83B8" },
           { label: "Navy", value: "#0F172A" },

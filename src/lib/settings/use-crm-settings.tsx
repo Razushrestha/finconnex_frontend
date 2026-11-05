@@ -3,6 +3,7 @@
 import {
   createContext,
   useCallback,
+  useRef,
   useContext,
   useEffect,
   useState,
@@ -19,6 +20,8 @@ import {
 } from "@/lib/settings/api";
 import { mirrorOfficeCalendar } from "@/lib/settings/office-calendar";
 import type { LogoFrame, LogoSlot } from "@/lib/settings/logo-frame";
+import type { BrandStyle } from "@/lib/settings/brand";
+import { getTenantContext } from "@/lib/persistence/tenant";
 
 export type SettingsDataSource = "api" | "demo";
 
@@ -33,9 +36,9 @@ export type CrmSettingsState = {
   setSettings: (next: CrmWorkspaceSettings | null) => void;
   setSecurity: (next: CrmSecuritySettings | null) => void;
   setCapabilities: (next: CrmCapabilities | null) => void;
-  previewBrand: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null;
+  previewBrand: BrandPreview | null;
   setPreviewBrand: (
-    next: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null,
+    next: BrandPreview | null,
   ) => void;
   previewLogos: {
     focus: LogoSlot;
@@ -53,6 +56,10 @@ const SettingsCrmContext = createContext<CrmSettingsState | null>(null);
 
 const SETTINGS_CACHE_KEY = "fc.settings.shell.v1";
 const SHELL_TTL_MS = 45_000;
+/** Refresh shared settings on tab focus at most this often… */
+const LIVE_REFRESH_MIN_MS = 30_000;
+/** …and in the background this often while the tab is visible. */
+const LIVE_REFRESH_EVERY_MS = 120_000;
 
 type SettingsCache = {
   settings: CrmWorkspaceSettings | null;
@@ -69,16 +76,31 @@ type ShellBundle = {
 let shellInflight: Promise<ShellBundle> | null = null;
 let shellFetchedAt = 0;
 
+/** Both settings are known to belong to different workspaces. */
+function otherWorkspace(
+  a: CrmWorkspaceSettings | null | undefined,
+  b: CrmWorkspaceSettings | null | undefined,
+) {
+  return Boolean(a?.workspaceId && b?.workspaceId && a.workspaceId !== b.workspaceId);
+}
+
 function isNewerRevision(
   prev: CrmWorkspaceSettings | null,
   incoming: CrmWorkspaceSettings,
 ) {
+  // Revisions count per workspace: never let one workspace's outrank another's.
+  if (otherWorkspace(prev, incoming)) return false;
   return (
     prev?.revision != null &&
     incoming.revision != null &&
     prev.revision > incoming.revision
   );
 }
+
+/** Unsaved Settings → Branding choices, shown live across the app. */
+export type BrandPreview = Partial<
+  Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">
+> & { brandStyle?: BrandStyle };
 
 export function invalidateCrmSettingsShell() {
   shellInflight = null;
@@ -107,7 +129,12 @@ function readSettingsCache(): SettingsCache | null {
   try {
     const raw = sessionStorage.getItem(SETTINGS_CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as SettingsCache;
+    const cache = JSON.parse(raw) as SettingsCache;
+    // A tab that switched workspace must not show the previous one's branding.
+    const active = getTenantContext().tenantId;
+    const cachedFor = cache.settings?.workspaceId;
+    if (active && cachedFor && cachedFor !== active) return null;
+    return cache;
   } catch {
     return null;
   }
@@ -132,13 +159,15 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   const [security, setSecurity] = useState<CrmSecuritySettings | null>(null);
   const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(null);
   const [previewBrand, setPreviewBrand] = useState<
-    Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null
+    BrandPreview | null
   >(null);
   const [previewLogos, setPreviewLogos] = useState<{
     focus: LogoSlot;
     frames: Partial<Record<LogoSlot, LogoFrame>>;
   } | null>(null);
   const [tick, setTick] = useState(0);
+  // When settings were last requested, so live refreshes stay infrequent.
+  const lastLoadRef = useRef(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -180,10 +209,11 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
             : cachedNow?.capabilities ?? null;
         setSettingsState((prev) => {
           if (isNewerRevision(prev, ws.value)) return prev;
+          const base = otherWorkspace(prev, ws.value) ? null : prev;
           const next = {
             ...ws.value,
             catalog: {
-              ...(prev?.catalog ?? {}),
+              ...(base?.catalog ?? {}),
               ...(ws.value.catalog ?? {}),
             },
           };
@@ -224,10 +254,11 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       mirrorOfficeCalendar(catalog);
       setSettingsState((prev) => {
         if (isNewerRevision(prev, ws.value)) return prev;
+        const base = otherWorkspace(prev, ws.value) ? null : prev;
         const next = {
           ...ws.value,
           catalog: {
-            ...(prev?.catalog ?? {}),
+            ...(base?.catalog ?? {}),
             ...(ws.value.catalog ?? {}),
             ...catalog,
           },
@@ -242,6 +273,7 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       });
     };
 
+    lastLoadRef.current = Date.now();
     // Let / and dashboard compile before the four settings BFF routes.
     const waitMs = cachedNow?.settings && tick === 0 ? 2_500 : tick === 0 ? 400 : 0;
     const timer = window.setTimeout(() => {
@@ -253,6 +285,27 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       window.clearTimeout(timer);
     };
   }, [enabled, tick]);
+
+  // Workspace branding and settings are shared: when an owner or admin
+  // changes them, everyone else's open tabs pick it up on return to the tab
+  // and every couple of minutes, without a reload.
+  useEffect(() => {
+    if (!enabled) return;
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadRef.current < LIVE_REFRESH_MIN_MS) return;
+      invalidateCrmSettingsShell();
+      setTick((n) => n + 1);
+    };
+    const timer = window.setInterval(refreshIfStale, LIVE_REFRESH_EVERY_MS);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
+  }, [enabled]);
 
   return {
     source,

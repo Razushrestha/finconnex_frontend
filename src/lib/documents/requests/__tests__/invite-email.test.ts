@@ -56,3 +56,24 @@ describe("documentRequestInviteCopy", () => {
     expect(brand.gradient).toBe(true);
   });
 });
+
+describe("brand colour style", () => {
+  it("fills the header and button with solid primary when the style is solid", () => {
+    const brand = emailBrandFromSettings({
+      primaryColor: "#2563EB",
+      secondaryColor: "#059669",
+      catalog: { "organization/branding": { brandStyle: "solid" } },
+    });
+    expect(brand.gradient).toBe(false);
+    const copy = documentRequestInviteCopy({
+      clientName: "Mohit Chapagain",
+      brokerName: "SmartDocs Demo",
+      title: "First Home Buyer",
+      documents: ["Driving Licence"],
+      provideUrl: "https://app.example.com/provide/token",
+      brand,
+    });
+    expect(copy.html).toContain("background-color:#2563EB");
+    expect(copy.html).not.toContain("linear-gradient");
+  });
+});

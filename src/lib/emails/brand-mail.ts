@@ -1,13 +1,14 @@
 import {
   DEFAULT_BRAND_PRIMARY,
   DEFAULT_BRAND_SECONDARY,
+  readBrandStyle,
 } from "@/lib/settings/brand";
 import { loadSettingsValues } from "@/lib/settings/settings-store";
 
 export type EmailBrand = {
   primary: string;
   secondary: string;
-  /** Header and button blend primary into secondary. */
+  /** Header and button blend primary into secondary; otherwise solid primary. */
   gradient: boolean;
   appName: string;
 };
@@ -27,6 +28,9 @@ function asHex(value: unknown, fallback: string): string {
 export function emailBrandFromValues(input: {
   primaryColor?: unknown;
   secondaryColor?: unknown;
+  /** Settings → Branding "Colour style". */
+  brandStyle?: unknown;
+  /** Explicit on/off (a posted brand); wins over brandStyle. */
   emailGradient?: unknown;
   appName?: unknown;
 } | null | undefined): EmailBrand {
@@ -37,7 +41,10 @@ export function emailBrandFromValues(input: {
   return {
     primary: asHex(input?.primaryColor, DEFAULT_BRAND_PRIMARY),
     secondary: asHex(input?.secondaryColor, DEFAULT_BRAND_SECONDARY),
-    gradient: true,
+    gradient:
+      typeof input?.emailGradient === "boolean"
+        ? input.emailGradient
+        : readBrandStyle(input?.brandStyle) === "gradient",
     appName,
   };
 }
@@ -53,16 +60,16 @@ export function emailBrandFromSettings(settings: {
   return emailBrandFromValues({
     primaryColor: settings?.primaryColor ?? page?.primaryColor,
     secondaryColor: settings?.secondaryColor ?? page?.secondaryColor,
-    emailGradient: page?.emailGradient,
+    brandStyle: page?.brandStyle,
     appName: typeof companyName === "string" ? companyName : undefined,
   });
 }
 
-/** Inline style for the email header and the main button. Always the site gradient. */
+/** Inline style for the email header and the main button: the brand gradient, or solid primary. */
 export function emailFillStyle(brand: EmailBrand): string {
   const primary = brand.primary;
   const secondary = brand.secondary;
-  if (primary.toLowerCase() === secondary.toLowerCase()) {
+  if (!brand.gradient || primary.toLowerCase() === secondary.toLowerCase()) {
     return `background-color:${primary};`;
   }
   return `background-color:${primary};background-image:linear-gradient(135deg,${primary} 0%,${secondary} 100%);`;
@@ -102,7 +109,7 @@ export function readClientEmailBrand(): EmailBrand {
     primaryColor: cached?.primaryColor || page?.primaryColor || local.primaryColor,
     secondaryColor:
       cached?.secondaryColor || page?.secondaryColor || local.secondaryColor,
-    emailGradient: page?.emailGradient ?? local.emailGradient,
+    brandStyle: page?.brandStyle ?? local.brandStyle,
     appName: profile?.companyName || localProfile.companyName,
   });
 }

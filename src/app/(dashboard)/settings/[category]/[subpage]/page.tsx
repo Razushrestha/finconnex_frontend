@@ -6,6 +6,9 @@ import {
 } from "@/lib/settings/settings-config";
 import { settingsSubnav } from "@/lib/settings/settings-nav";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
+import { getSession } from "@/lib/auth/session";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
+import { canManageMembers } from "@/lib/auth/workspace-role";
 import { RecycleBinSettingsClient } from "@/components/settings/RecycleBinSettingsClient";
 import { RulesHubClient } from "@/components/rules/RulesHubClient";
 import { LeadCardSettingsClient } from "@/components/settings/LeadCardSettingsClient";
@@ -190,9 +193,26 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
             path={path}
             moduleHref={item.moduleHref}
             moduleLabel={item.moduleLabel}
+            readOnly={
+              category.slug !== "my-preferences" &&
+              !(await canEditWorkspaceSettings())
+            }
           />
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Workspace settings are shared by every member, and the CRM only lets
+ * owners and admins change them (`@WorkspaceRoles(OWNER, ADMIN)`); everyone
+ * else sees them read-only.
+ */
+async function canEditWorkspaceSettings(): Promise<boolean> {
+  const session = await getSession();
+  if (!session) return false;
+  return (
+    isPlatformAdminRole(session.role) || canManageMembers(session.workspaceRole)
   );
 }

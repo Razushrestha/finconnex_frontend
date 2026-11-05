@@ -192,11 +192,10 @@ export function Sidebar({
   const pathname = usePathname();
   const chatRef = React.useRef<HTMLInputElement>(null);
   const crm = useCrmSettings();
-  const brand = resolveWorkspaceBrand({
-    ...crm.settings,
-    primaryColor: crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
-    secondaryColor:
-      crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
+  const brand = resolveWorkspaceBrand(crm.settings, {
+    primary: crm.previewBrand?.primaryColor,
+    secondary: crm.previewBrand?.secondaryColor,
+    style: crm.previewBrand?.brandStyle,
   });
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
@@ -363,7 +362,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] [background-image:var(--brand-gradient)] px-5 py-6 text-[var(--brand-on-secondary)] transition-transform duration-200 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] [background-image:var(--brand-surface)] px-5 py-6 text-[var(--brand-on-secondary)] transition-transform duration-200 ease-in-out",
           "border-r border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius] md:pb-10",

@@ -8,6 +8,13 @@ import { readLogoFrame, type LogoFrame } from "@/lib/settings/logo-frame";
 export const DEFAULT_BRAND_PRIMARY = "#6376B5";
 export const DEFAULT_BRAND_SECONDARY = "#BF83B8";
 
+/** Settings → Branding "Colour style": blend the two colours, or use each solid. */
+export type BrandStyle = "gradient" | "solid";
+
+export function readBrandStyle(value: unknown): BrandStyle {
+  return value === "solid" ? "solid" : "gradient";
+}
+
 function readHex(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const t = value.trim();
@@ -39,6 +46,7 @@ function hexLuminance(hex: string): number {
 export type WorkspaceBrand = {
   primary: string;
   secondary: string;
+  style: BrandStyle;
   secondaryIsLight: boolean;
   onSecondary: string;
   appName: string;
@@ -48,8 +56,16 @@ export type WorkspaceBrand = {
   logoDarkFrame: LogoFrame;
 };
 
+/** Values that win over the saved branding: a live preview, or before settings load. */
+export type BrandOverrides = {
+  primary?: string | null;
+  secondary?: string | null;
+  style?: BrandStyle;
+};
+
 export function resolveWorkspaceBrand(
   settings: CrmWorkspaceSettings | null | undefined,
+  overrides?: BrandOverrides,
 ): WorkspaceBrand {
   const page = settings?.catalog?.["organization/branding"];
   const profile = settings?.catalog?.["organization/company-profile"];
@@ -61,16 +77,23 @@ export function resolveWorkspaceBrand(
         : "";
   const catalogDark = typeof page?.logoDark === "string" ? page.logoDark : "";
   const secondary = brandHex(
-    page?.secondaryColor ?? profile?.secondaryColor ?? settings?.secondaryColor,
+    readHex(overrides?.secondary) ??
+      page?.secondaryColor ??
+      profile?.secondaryColor ??
+      settings?.secondaryColor,
     DEFAULT_BRAND_SECONDARY,
   );
   const secondaryIsLight = hexLuminance(secondary) > 0.55;
   return {
     primary: brandHex(
-      page?.primaryColor ?? profile?.primaryColor ?? settings?.primaryColor,
+      readHex(overrides?.primary) ??
+        page?.primaryColor ??
+        profile?.primaryColor ??
+        settings?.primaryColor,
       DEFAULT_BRAND_PRIMARY,
     ),
     secondary,
+    style: overrides?.style ?? readBrandStyle(page?.brandStyle),
     secondaryIsLight,
     onSecondary: secondaryIsLight ? "#0F172A" : "#F8FAFC",
     appName: catalogName(profile?.companyName) || "FinConnex",
@@ -98,11 +121,21 @@ function usableLogoUrl(
   return isWorkspaceStorageKey(value) ? value : "";
 }
 
+/**
+ * `--brand-gradient` paints buttons over their primary background colour;
+ * `--brand-surface` paints the sidebar and footer. Solid style drops the
+ * button gradient and fills the surfaces with the secondary colour.
+ */
 export function workspaceBrandCssVars(brand: WorkspaceBrand): CSSProperties {
+  const gradient = `linear-gradient(168deg, ${brand.primary} 0%, ${brand.secondary} 100%)`;
+  const solid = brand.style === "solid";
   return {
     "--brand-primary": brand.primary,
     "--brand-secondary": brand.secondary,
     "--brand-on-secondary": brand.onSecondary,
-    "--brand-gradient": `linear-gradient(168deg, ${brand.primary} 0%, ${brand.secondary} 100%)`,
+    "--brand-gradient": solid ? "none" : gradient,
+    "--brand-surface": solid
+      ? `linear-gradient(${brand.secondary}, ${brand.secondary})`
+      : gradient,
   } as CSSProperties;
 }

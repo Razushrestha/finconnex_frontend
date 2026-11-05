@@ -55,6 +55,7 @@ import { useResolvedImageSrc } from "@/lib/storage/use-resolved-image";
 import { loadSignature, saveSignature } from "@/lib/emails/signature";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { readBrandStyle } from "@/lib/settings/brand";
 import { emailBrandFromValues } from "@/lib/emails/brand-mail";
 
 export function SettingsFormClient({
@@ -63,12 +64,15 @@ export function SettingsFormClient({
   path,
   moduleHref,
   moduleLabel,
+  readOnly = false,
 }: {
   categorySlug: string;
   subpageSlug: string;
   path: string;
   moduleHref?: string;
   moduleLabel?: string;
+  /** Members who can't change workspace settings see them, without editing. */
+  readOnly?: boolean;
 }) {
   const schema = useMemo(
     () => getSettingsSchema(categorySlug, subpageSlug),
@@ -114,6 +118,7 @@ export function SettingsFormClient({
   }, [schemaKey, schema, crm.settings, crm.security, memberPrefs.preferences]);
 
   function setField(id: string, value: string | boolean | number) {
+    if (readOnly) return;
     dirtyRef.current = true;
     setValues((v) => ({ ...v, [id]: value }));
     if (
@@ -124,6 +129,12 @@ export function SettingsFormClient({
       crm.setPreviewBrand({
         ...(crm.previewBrand ?? {}),
         [id]: value,
+      });
+    }
+    if (schemaKey === "organization/branding" && id === "brandStyle") {
+      crm.setPreviewBrand({
+        ...(crm.previewBrand ?? {}),
+        brandStyle: readBrandStyle(value),
       });
     }
     if (
@@ -327,7 +338,16 @@ export function SettingsFormClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-5 gap-y-4 p-5 sm:p-6 xl:grid-cols-2">
+      {readOnly ? (
+        <p className="border-b border-slate-100 bg-amber-50 px-5 py-2.5 text-[12px] text-amber-800">
+          Only workspace owners and admins can change these settings. They
+          apply to everyone in the workspace.
+        </p>
+      ) : null}
+      <fieldset
+        disabled={readOnly}
+        className="grid min-w-0 grid-cols-1 gap-x-5 gap-y-4 p-5 sm:p-6 xl:grid-cols-2"
+      >
         {schemaKey === "organization/branding" ? (
           <EmailGradientPreview values={values} />
         ) : null}
@@ -338,7 +358,8 @@ export function SettingsFormClient({
               field.type === "textarea" ||
               field.type === "address" ||
               field.type === "file" ||
-              field.type === "color"
+              field.type === "color" ||
+              field.id === "brandStyle"
                 ? "xl:col-span-2"
                 : undefined
             }
@@ -401,9 +422,12 @@ export function SettingsFormClient({
             />
           </div>
         ))}
-      </div>
+      </fieldset>
 
-      <div className="space-y-2 border-t border-slate-100 bg-slate-50/95 px-5 py-4">
+      <div
+        hidden={readOnly}
+        className="space-y-2 border-t border-slate-100 bg-slate-50/95 px-5 py-4"
+      >
         <div className="flex justify-end gap-2">
           <button
             type="button"
@@ -433,12 +457,17 @@ function EmailGradientPreview({ values }: { values: SettingsValues }) {
   const brand = emailBrandFromValues({
     primaryColor: values.primaryColor,
     secondaryColor: values.secondaryColor,
+    brandStyle: values.brandStyle,
     appName: typeof companyName === "string" ? companyName : undefined,
   });
-  const blended = brand.primary.toLowerCase() !== brand.secondary.toLowerCase();
+  const blended =
+    brand.gradient &&
+    brand.primary.toLowerCase() !== brand.secondary.toLowerCase();
   return (
     <div className="xl:col-span-2">
-      <p className="text-[12px] font-semibold text-slate-700">Brand gradient</p>
+      <p className="text-[12px] font-semibold text-slate-700">
+        {brand.gradient ? "Brand gradient" : "Brand colour"}
+      </p>
       <div
         className="mt-2 rounded-xl px-4 py-4 text-white"
         style={{
@@ -456,8 +485,66 @@ function EmailGradientPreview({ values }: { values: SettingsValues }) {
         </div>
       </div>
       <p className="mt-1.5 text-[11px] text-slate-400">
-        Buttons, menus, and client emails blend these two colours.
+        {brand.gradient
+          ? "Buttons, menus, and client emails blend these two colours."
+          : "Buttons and client emails use the primary colour; the sidebar and footer use the secondary colour."}
       </p>
+    </div>
+  );
+}
+
+/** Gradient or solid, as two cards showing what each looks like. */
+function BrandStyleField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingsField;
+  value: string | boolean | number | undefined;
+  onChange: (v: string) => void;
+}) {
+  const current = readBrandStyle(value);
+  return (
+    <div className="space-y-1.5" role="radiogroup" aria-label={field.label}>
+      <p className="text-[12px] font-semibold text-slate-700">{field.label}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {(field.options ?? []).map((option) => {
+          const style = readBrandStyle(option.value);
+          const selected = current === style;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(style)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-[12px] font-semibold transition-colors",
+                selected
+                  ? "border-[var(--brand-primary)] bg-[var(--brand-primary-faint)] text-slate-900 ring-1 ring-[var(--brand-primary)]"
+                  : "border-slate-200 text-slate-600 hover:border-slate-300",
+              )}
+            >
+              <span
+                aria-hidden
+                className="h-6 w-10 shrink-0 rounded-md border border-black/5"
+                style={
+                  style === "gradient"
+                    ? {
+                        backgroundImage:
+                          "linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%)",
+                      }
+                    : { backgroundColor: "var(--brand-primary)" }
+                }
+              />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {field.help ? (
+        <p className="text-[11px] text-slate-400">{field.help}</p>
+      ) : null}
     </div>
   );
 }
@@ -579,6 +666,11 @@ function FieldRenderer({
   }
 
   if (field.type === "select") {
+    if (field.id === "brandStyle") {
+      return (
+        <BrandStyleField field={field} value={value} onChange={onChange} />
+      );
+    }
     if (field.id === "theme") {
       return (
         <div className="space-y-1.5">

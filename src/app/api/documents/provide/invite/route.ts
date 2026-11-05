@@ -165,8 +165,8 @@ async function workspaceEmailBrand(
     const json = await crmGet(base, accessToken, "/v1/settings");
     const settings = normalizeCrmWorkspaceSettings(json);
     const remote = emailBrandFromSettings(settings);
-    const savedGradient = settings.catalog?.["organization/branding"]?.emailGradient;
-    if (fallback && savedGradient === undefined) {
+    const savedStyle = settings.catalog?.["organization/branding"]?.brandStyle;
+    if (fallback && savedStyle === undefined) {
       return { ...remote, gradient: posted.gradient };
     }
     return remote;
